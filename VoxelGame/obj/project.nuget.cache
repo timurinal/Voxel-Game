@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "fzZonLNECTzgNXVrzAbCN/OntctzujE6AYofVmrWaesjHVfBfFoGmYzz5we4CvqNLPTr2mGideXiAcdW8AS3dA==",
+  "dgSpecHash": "/1C/72sWtd3EuVoAImgLPcvTHyplP/CSsDM8J8Mig/TY7KhzTecC3oX873kXoQ2iTOmIXhuJQjCeAyHZDSMOvg==",
   "success": true,
-  "projectFilePath": "C:\\Users\\UserPC\\RiderProjects\\VoxelEngine\\VoxelEngine\\VoxelEngine.csproj",
+  "projectFilePath": "C:\\Users\\UserPC\\Documents\\GitHub\\VoxelGame\\VoxelGame\\VoxelGame.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\UserPC\\.nuget\\packages\\opentk\\4.8.2\\opentk.4.8.2.nupkg.sha512",
     "C:\\Users\\UserPC\\.nuget\\packages\\opentk.audio.openal\\4.8.2\\opentk.audio.openal.4.8.2.nupkg.sha512",

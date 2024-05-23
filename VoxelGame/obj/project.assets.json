@@ -419,11 +419,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\UserPC\\RiderProjects\\VoxelEngine\\VoxelEngine\\VoxelEngine.csproj",
-      "projectName": "VoxelEngine",
-      "projectPath": "C:\\Users\\UserPC\\RiderProjects\\VoxelEngine\\VoxelEngine\\VoxelEngine.csproj",
+      "projectUniqueName": "C:\\Users\\UserPC\\Documents\\GitHub\\VoxelGame\\VoxelGame\\VoxelGame.csproj",
+      "projectName": "VoxelGame",
+      "projectPath": "C:\\Users\\UserPC\\Documents\\GitHub\\VoxelGame\\VoxelGame\\VoxelGame.csproj",
       "packagesPath": "C:\\Users\\UserPC\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\UserPC\\RiderProjects\\VoxelEngine\\VoxelEngine\\obj\\",
+      "outputPath": "C:\\Users\\UserPC\\Documents\\GitHub\\VoxelGame\\VoxelGame\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\UserPC\\AppData\\Roaming\\NuGet\\NuGet.Config"
