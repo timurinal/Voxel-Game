@@ -37,15 +37,18 @@ public sealed class Engine : GameWindow
     {
         base.OnUpdateFrame(args);
         
+        // Close game window
         if (KeyboardState.IsKeyPressed(Keys.Escape))
             Close();
 
+        // Toggle fullscreen
         if (KeyboardState.IsKeyPressed(Keys.F12))
         {
             IsFullscreen = !IsFullscreen;
             WindowState = IsFullscreen ? WindowState.Fullscreen : WindowState.Normal;
         }
         
+        // Toggle wireframe
         if (KeyboardState.IsKeyPressed(Keys.F1))
         {
             IsWireframe = !IsWireframe;
