@@ -1,7 +1,9 @@
-﻿using OpenTK.Windowing.Common;
+﻿using OpenTK.Mathematics;
+using OpenTK.Windowing.Common;
 using OpenTK.Windowing.Desktop;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using VoxelGame.Rendering;
+using Vector3 = VoxelGame.Maths.Vector3;
 
 namespace VoxelGame;
 
@@ -10,12 +12,20 @@ public sealed class Engine : GameWindow
     public new bool IsFullscreen { get; set; }
     public new bool IsWireframe { get; set; }
 
+    public readonly Camera Camera;
+
     private Shader _shader;
     private int _vao, _vbo, _ebo;
+
+    private int _uniformProjMat;
+    private int _uniformViewMat;
+    private int _uniformModelMat;
     
     public Engine(GameWindowSettings gws, NativeWindowSettings nws) : base(gws, nws)
     {
         CenterWindow();
+
+        Camera = new Camera(Size);
     }
 
     protected override void OnLoad()
@@ -24,7 +34,7 @@ public sealed class Engine : GameWindow
         
         // GL setup
         GL.Enable(EnableCap.Multisample);
-        // GL.Enable(EnableCap.CullFace);
+        GL.Enable(EnableCap.CullFace);
         GL.Enable(EnableCap.DepthTest);
         
         GL.CullFace(CullFaceMode.Front);
@@ -37,10 +47,10 @@ public sealed class Engine : GameWindow
 
         float[] data =
         [
-            -0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, // Vertex 1: Bottom left corner
-            0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, // Vertex 2: Bottom right corner
-            -0.5f, 0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, // Vertex 3: Top left corner
-            0.5f, 0.5f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f // Vertex 4: Top right corner
+            -0.5f, -0.5f, 0.0f,    1.0f, 0.0f, 0.0f, 1.0f, // Vertex 1: Bottom left corner
+             0.5f, -0.5f, 0.0f,    0.0f, 1.0f, 0.0f, 1.0f, // Vertex 2: Bottom right corner
+            -0.5f,  0.5f, 0.0f,    0.0f, 0.0f, 1.0f, 1.0f, // Vertex 3: Top left corner
+             0.5f,  0.5f, 0.0f,    1.0f, 1.0f, 0.0f, 1.0f, // Vertex 4: Top right corner
         ];
 
         int[] triangles =
@@ -73,6 +83,8 @@ public sealed class Engine : GameWindow
         GL.BindVertexArray(0);
         
         _shader = Shader.Load("Shaders/shader.vert", "Shaders/shader.frag");
+        var translation = Matrix4.CreateTranslation(new Vector3(0, 0, -5));
+        _shader.SetUniform("m_model", ref translation);
     }
 
     protected override void OnUpdateFrame(FrameEventArgs args)
@@ -81,6 +93,8 @@ public sealed class Engine : GameWindow
 
         Input._keyboardState = KeyboardState;
         Time.DeltaTime = (float)args.Time;
+        
+        Camera.Update(Size);
         
         // Close game window
         if (Input.GetKeyDown(Keys.Escape))
@@ -110,8 +124,12 @@ public sealed class Engine : GameWindow
         // Render here
         GL.BindVertexArray(_vao);
         _shader.Use();
+        _shader.SetUniform("m_proj", ref Camera.ProjectionMatrix);
+        _shader.SetUniform("m_view", ref Camera.ViewMatrix);
         GL.DrawElements(PrimitiveType.Triangles, 6, DrawElementsType.UnsignedInt, 0);
         GL.BindVertexArray(0);
+
+        Title = $"FPS: {Time.Fps}";
         
         SwapBuffers();
     }
@@ -121,5 +139,6 @@ public sealed class Engine : GameWindow
         base.OnResize(e);
         
         GL.Viewport(0, 0, e.Width, e.Height);
+        Camera.UpdateProjection(Size);
     }
 }

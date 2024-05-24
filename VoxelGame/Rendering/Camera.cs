@@ -11,8 +11,8 @@ public class Camera
     public float Yaw => yaw;
     public float Pitch => pitch;
     
-    internal Matrix4 m_proj;
-    internal Matrix4 m_view;
+    internal Matrix4 ProjectionMatrix;
+    internal Matrix4 ViewMatrix;
 
     private Vector3 cameraTarget = Vector3.Zero;
     private Vector3 cameraPosition = Vector3.Zero;
@@ -36,8 +36,8 @@ public class Camera
 
         this.fov = fov;
         
-        m_view = Matrix4.LookAt(cameraPosition, cameraPosition + cameraFront, cameraUp);
-        m_proj = Matrix4.CreatePerspectiveFieldOfView(fov * Mathf.Deg2Rad, (float)screenSize.X / screenSize.Y, 
+        ViewMatrix = Matrix4.LookAt(cameraPosition, cameraPosition + cameraFront, cameraUp);
+        ProjectionMatrix = Matrix4.CreatePerspectiveFieldOfView(fov * Mathf.Deg2Rad, (float)screenSize.X / screenSize.Y, 
             0.1f, 100f);
     }
 
@@ -72,15 +72,15 @@ public class Camera
         cameraRight = Vector3.Normalize(Vector3.Cross(Vector3.Up, cameraDirection));
         cameraUp = Vector3.Cross(cameraDirection, cameraRight);
 
-        m_view = Matrix4.LookAt(cameraPosition, cameraPosition + cameraFront, cameraUp);
-        m_proj = Matrix4.CreatePerspectiveFieldOfView(fov * Mathf.Deg2Rad, (float)screenSize.X / screenSize.Y, 
+        ViewMatrix = Matrix4.LookAt(cameraPosition, cameraPosition + cameraFront, cameraUp);
+        ProjectionMatrix = Matrix4.CreatePerspectiveFieldOfView(fov * Mathf.Deg2Rad, (float)screenSize.X / screenSize.Y, 
             0.1f, 100f);
     }
 
     internal void UpdateProjection(Vector2Int screenSize, float fov = 65f)
     {
         this.fov = fov;
-        m_proj = Matrix4.CreatePerspectiveFieldOfView(fov * Mathf.Deg2Rad, (float)screenSize.X / screenSize.Y, 
+        ProjectionMatrix = Matrix4.CreatePerspectiveFieldOfView(fov * Mathf.Deg2Rad, (float)screenSize.X / screenSize.Y, 
             0.1f, 100f);
     }
 

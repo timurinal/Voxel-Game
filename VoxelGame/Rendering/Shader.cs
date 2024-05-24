@@ -1,3 +1,8 @@
+using OpenTK.Mathematics;
+using Vector2 = VoxelGame.Maths.Vector2;
+using Vector3 = VoxelGame.Maths.Vector3;
+using Vector4 = VoxelGame.Maths.Vector4;
+
 namespace VoxelGame.Rendering;
 
 public struct Shader
@@ -34,7 +39,47 @@ public struct Shader
         GL.UseProgram(_id);
     }
 
-    public int GetUniformLocation(string uniformName) => GL.GetUniformLocation(_id, uniformName);
+    public int GetUniformLocation(string uniformName)
+    {
+        Use();
+        return GL.GetUniformLocation(_id, uniformName);
+    }
+
+    public void SetUniform(string uniformName, float v)
+    {
+        Use();
+        GL.Uniform1(GetUniformLocation(uniformName), v);
+    }
+    public void SetUniform(string uniformName, Vector2 v)
+    {
+        Use();
+        GL.Uniform2(GetUniformLocation(uniformName), v);
+    }
+    public void SetUniform(string uniformName, Vector3 v)
+    {
+        Use();
+        GL.Uniform3(GetUniformLocation(uniformName), v);
+    }
+    public void SetUniform(string uniformName, Vector4 v)
+    {
+        Use();
+        GL.Uniform4(GetUniformLocation(uniformName), v);
+    }
+    public void SetUniform(string uniformName, Colour v)
+    {
+        Use();
+        GL.Uniform4(GetUniformLocation(uniformName), v);
+    }
+    public void SetUniform(string uniformName, int v)
+    {
+        Use();
+        GL.Uniform1(GetUniformLocation(uniformName), v);
+    }
+    public void SetUniform(string uniformName, ref Matrix4 m, bool transpose = false)
+    {
+        Use();
+        GL.UniformMatrix4(GetUniformLocation(uniformName), transpose, ref m);
+    }
     
     private struct SubShader
     {
