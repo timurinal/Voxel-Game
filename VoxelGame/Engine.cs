@@ -15,11 +15,8 @@ public sealed class Engine : GameWindow
     public readonly Camera Camera;
 
     private Shader _shader;
+    private Texture2D _texture;
     private int _vao, _vbo, _ebo;
-
-    private int _uniformProjMat;
-    private int _uniformViewMat;
-    private int _uniformModelMat;
     
     public Engine(GameWindowSettings gws, NativeWindowSettings nws) : base(gws, nws)
     {
@@ -47,10 +44,10 @@ public sealed class Engine : GameWindow
 
         float[] data =
         [
-            -0.5f, -0.5f, 0.0f,    1.0f, 0.0f, 0.0f, 1.0f, // Vertex 1: Bottom left corner
-             0.5f, -0.5f, 0.0f,    0.0f, 1.0f, 0.0f, 1.0f, // Vertex 2: Bottom right corner
-            -0.5f,  0.5f, 0.0f,    0.0f, 0.0f, 1.0f, 1.0f, // Vertex 3: Top left corner
-             0.5f,  0.5f, 0.0f,    1.0f, 1.0f, 0.0f, 1.0f, // Vertex 4: Top right corner
+            -0.5f, -0.5f, 0.0f,    0.0f, 0.0f,    1.0f, 0.0f, 0.0f, 1.0f, // Vertex 1: Bottom left corner
+             0.5f, -0.5f, 0.0f,    1.0f, 0.0f,    0.0f, 1.0f, 0.0f, 1.0f, // Vertex 2: Bottom right corner
+            -0.5f,  0.5f, 0.0f,    0.0f, 1.0f,    0.0f, 0.0f, 1.0f, 1.0f, // Vertex 3: Top left corner
+             0.5f,  0.5f, 0.0f,    1.0f, 1.0f,    1.0f, 1.0f, 0.0f, 1.0f, // Vertex 4: Top right corner
         ];
 
         int[] triangles =
@@ -69,11 +66,13 @@ public sealed class Engine : GameWindow
         GL.BufferData(BufferTarget.ArrayBuffer, data.Length * sizeof(float), data, BufferUsageHint.StaticDraw);
         
         // setup vertex attributes
-        int stride = 7;
+        int stride = 9; // each vertex has 9 floats: 3 position, 2 texcoord, 4 colour
         GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, stride * sizeof(float), 0);
-        GL.VertexAttribPointer(1, 4, VertexAttribPointerType.Float, false, stride * sizeof(float), 3 * sizeof(float));
+        GL.VertexAttribPointer(1, 2, VertexAttribPointerType.Float, false, stride * sizeof(float), 3 * sizeof(float));
+        GL.VertexAttribPointer(2, 4, VertexAttribPointerType.Float, false, stride * sizeof(float), 5 * sizeof(float));
         GL.EnableVertexAttribArray(0);
         GL.EnableVertexAttribArray(1);
+        GL.EnableVertexAttribArray(2);
         
         // generate and bind element buffer
         _ebo = GL.GenBuffer();
@@ -85,6 +84,8 @@ public sealed class Engine : GameWindow
         _shader = Shader.Load("Shaders/shader.vert", "Shaders/shader.frag");
         var translation = Matrix4.CreateTranslation(new Vector3(0, 0, -5));
         _shader.SetUniform("m_model", ref translation);
+
+        _texture = new("Textures/atlas-main.png", false, false, true);
     }
 
     protected override void OnUpdateFrame(FrameEventArgs args)
@@ -124,6 +125,7 @@ public sealed class Engine : GameWindow
         // Render here
         GL.BindVertexArray(_vao);
         _shader.Use();
+        _texture.Use();
         _shader.SetUniform("m_proj", ref Camera.ProjectionMatrix);
         _shader.SetUniform("m_view", ref Camera.ViewMatrix);
         GL.DrawElements(PrimitiveType.Triangles, 6, DrawElementsType.UnsignedInt, 0);
