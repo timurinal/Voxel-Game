@@ -3,8 +3,7 @@ Voxel-Game
 
 A voxel game (like Minecraft) made completely in C# using OpenTK
 
-### Features
-
+Features
 ---
 
 - Ability to interact with the world, by placing and breaking voxels
@@ -13,9 +12,7 @@ A voxel game (like Minecraft) made completely in C# using OpenTK
 - Mod loading
 - Fast chunk building
 
-
-### How to use
-
+How to use
 ---
 
 **IT IS STRONGLY RECOMMENDED THAT YOU HAVE THE LATEST VERSION OF YOUR GPU DRIVERS BEFORE USING**
