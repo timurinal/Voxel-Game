@@ -1,5 +1,4 @@
-﻿using OpenTK.Graphics.OpenGL;
-using OpenTK.Windowing.Common;
+﻿using OpenTK.Windowing.Common;
 using OpenTK.Windowing.Desktop;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 
@@ -36,20 +35,23 @@ public sealed class Engine : GameWindow
     protected override void OnUpdateFrame(FrameEventArgs args)
     {
         base.OnUpdateFrame(args);
+
+        Input._keyboardState = KeyboardState;
+        Time.DeltaTime = (float)args.Time;
         
         // Close game window
-        if (KeyboardState.IsKeyPressed(Keys.Escape))
+        if (Input.GetKeyDown(Keys.Escape))
             Close();
 
         // Toggle fullscreen
-        if (KeyboardState.IsKeyPressed(Keys.F12))
+        if (Input.GetKeyDown(Keys.F12))
         {
             IsFullscreen = !IsFullscreen;
             WindowState = IsFullscreen ? WindowState.Fullscreen : WindowState.Normal;
         }
         
         // Toggle wireframe
-        if (KeyboardState.IsKeyPressed(Keys.F1))
+        if (Input.GetKeyDown(Keys.F1))
         {
             IsWireframe = !IsWireframe;
             GL.PolygonMode(MaterialFace.FrontAndBack, IsWireframe ? PolygonMode.Line : PolygonMode.Fill);
