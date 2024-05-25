@@ -38,7 +38,7 @@ public class Camera
         
         ViewMatrix = Matrix4.LookAt(cameraPosition, cameraPosition + cameraFront, cameraUp);
         ProjectionMatrix = Matrix4.CreatePerspectiveFieldOfView(fov * Mathf.Deg2Rad, (float)screenSize.X / screenSize.Y, 
-            0.1f, 100f);
+            0.1f, 5000f);
     }
 
     internal void Update(Vector2Int screenSize)

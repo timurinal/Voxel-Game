@@ -1,6 +1,7 @@
 ﻿using OpenTK.Mathematics;
 using VoxelGame.Maths;
 using Random = VoxelGame.Maths.Random;
+using Vector2 = VoxelGame.Maths.Vector2;
 using Vector3 = VoxelGame.Maths.Vector3;
 
 namespace VoxelGame.Rendering;
@@ -31,11 +32,11 @@ public sealed class Chunk
         _voxels = new uint[ChunkVolume];
 
         // TODO: Remove this line
-        Array.Fill<uint>(_voxels, 1);
-        // for (int i = 0; i < ChunkVolume; i++)
-        // {
-        //     _voxels[i] = Random.Value > 0.9f ? 1u : 0u;
-        // }
+        // Array.Fill<uint>(_voxels, 1);
+        for (int i = 0; i < ChunkVolume; i++)
+        {
+            _voxels[i] = Random.Value >= 0.5f ? 1u : 2u;
+        }
 
         _vao = GL.GenVertexArray();
         _vbo = GL.GenBuffer();
@@ -47,6 +48,7 @@ public sealed class Chunk
     internal void BuildChunk()
     {
         List<Vector3> vertices = new();
+        List<Vector2> uvs = new();
         List<int> triangles = new();
 
         for (int i = 0, triangleIndex = 0; i < _voxels.Length; i++)
@@ -58,110 +60,141 @@ public sealed class Chunk
             Vector3Int worldPosition = chunkPosition * ChunkSize + new Vector3Int(x, y, z);
             if (_voxels[i] != 0)
             {
-                // Front, back, up, down, right, left
-                bool[] sides =
-                [
-                    IsAir(voxelPosition + new Vector3Int(0, 0, -1), _voxels),
-                    IsAir(voxelPosition + new Vector3Int(0, 0, 1), _voxels),
-                    IsAir(voxelPosition + new Vector3Int(0, 1, 0), _voxels),
-                    IsAir(voxelPosition + new Vector3Int(0, -1, 0), _voxels),
-                    IsAir(voxelPosition + new Vector3Int(1, 0, 0), _voxels),
-                    IsAir(voxelPosition + new Vector3Int(-1, 0, 0), _voxels),
-                ];
+                int voxelID = (int)_voxels[i];
+                Vector2 uv00 = GetUVForVoxel(voxelID - 1, 1, 1);
+                Vector2 uv01 = GetUVForVoxel(voxelID - 1, 1, 0);
+                Vector2 uv10 = GetUVForVoxel(voxelID - 1, 0, 1);
+                Vector2 uv11 = GetUVForVoxel(voxelID - 1, 0, 0);
 
-                if (sides[0])
+                if (IsAir(voxelPosition + new Vector3Int(0, 0, -1), _voxels))
                 {
                     // Front face
-                    vertices.AddRange([
+                    vertices.AddRange(new Vector3[]
+                    {
                         new(x - 0.5f, y - 0.5f, z - 0.5f),
                         new(x - 0.5f, y + 0.5f, z - 0.5f),
                         new(x + 0.5f, y - 0.5f, z - 0.5f),
                         new(x + 0.5f, y + 0.5f, z - 0.5f),
-                    ]);
-                    triangles.AddRange([
+                    });
+                    uvs.AddRange(new[]
+                    {
+                        uv00, uv01, uv10, uv11
+                    });
+                    triangles.AddRange(new[]
+                    {
                         0 + triangleIndex, 1 + triangleIndex, 2 + triangleIndex,
                         2 + triangleIndex, 1 + triangleIndex, 3 + triangleIndex,
-                    ]);
+                    });
                     triangleIndex += 4;
                 }
 
-                if (sides[1])
+                if (IsAir(voxelPosition + new Vector3Int(0, 0, 1), _voxels))
                 {
                     // Back face
-                    vertices.AddRange([
+                    vertices.AddRange(new Vector3[]
+                    {
                         new(x - 0.5f, y - 0.5f, z + 0.5f),
                         new(x - 0.5f, y + 0.5f, z + 0.5f),
                         new(x + 0.5f, y - 0.5f, z + 0.5f),
                         new(x + 0.5f, y + 0.5f, z + 0.5f),
-                    ]);
-                    triangles.AddRange([
+                    });
+                    uvs.AddRange(new[]
+                    {
+                        uv00, uv01, uv10, uv11
+                    });
+                    triangles.AddRange(new[]
+                    {
                         0 + triangleIndex, 2 + triangleIndex, 1 + triangleIndex,
                         2 + triangleIndex, 3 + triangleIndex, 1 + triangleIndex,
-                    ]);
+                    });
                     triangleIndex += 4;
                 }
 
-                if (sides[2])
+                if (IsAir(voxelPosition + new Vector3Int(0, 1, 0), _voxels))
                 {
                     // Top face
-                    vertices.AddRange([
+                    vertices.AddRange(new Vector3[]
+                    {
                         new(x - 0.5f, y + 0.5f, z - 0.5f),
                         new(x + 0.5f, y + 0.5f, z - 0.5f),
                         new(x - 0.5f, y + 0.5f, z + 0.5f),
                         new(x + 0.5f, y + 0.5f, z + 0.5f),
-                    ]);
-                    triangles.AddRange([
+                    });
+                    uvs.AddRange(new[]
+                    {
+                        uv00, uv01, uv10, uv11
+                    });
+                    triangles.AddRange(new[]
+                    {
                         0 + triangleIndex, 2 + triangleIndex, 1 + triangleIndex,
                         2 + triangleIndex, 3 + triangleIndex, 1 + triangleIndex,
-                    ]);
+                    });
                     triangleIndex += 4;
                 }
 
-                if (sides[3])
+                if (IsAir(voxelPosition + new Vector3Int(0, -1, 0), _voxels))
                 {
                     // Bottom face
-                    vertices.AddRange([
+                    vertices.AddRange(new Vector3[]
+                    {
                         new(x - 0.5f, y - 0.5f, z - 0.5f),
                         new(x + 0.5f, y - 0.5f, z - 0.5f),
                         new(x - 0.5f, y - 0.5f, z + 0.5f),
                         new(x + 0.5f, y - 0.5f, z + 0.5f),
-                    ]);
-                    triangles.AddRange([
+                    });
+                    uvs.AddRange(new[]
+                    {
+                        uv00, uv01, uv10, uv11
+                    });
+                    triangles.AddRange(new[]
+                    {
                         0 + triangleIndex, 1 + triangleIndex, 2 + triangleIndex,
                         2 + triangleIndex, 1 + triangleIndex, 3 + triangleIndex,
-                    ]);
+                    });
                     triangleIndex += 4;
                 }
 
-                if (sides[4])
+                if (IsAir(voxelPosition + new Vector3Int(1, 0, 0), _voxels))
                 {
                     // Right face
-                    vertices.AddRange([
+                    vertices.AddRange(new Vector3[]
+                    {
                         new(x + 0.5f, y - 0.5f, z - 0.5f),
                         new(x + 0.5f, y + 0.5f, z - 0.5f),
                         new(x + 0.5f, y - 0.5f, z + 0.5f),
                         new(x + 0.5f, y + 0.5f, z + 0.5f),
-                    ]);
-                    triangles.AddRange([
+                    });
+                    uvs.AddRange(new[]
+                    {
+                        uv00, uv01, uv10, uv11
+                    });
+                    triangles.AddRange(new[]
+                    {
                         0 + triangleIndex, 1 + triangleIndex, 2 + triangleIndex,
                         2 + triangleIndex, 1 + triangleIndex, 3 + triangleIndex,
-                    ]);
+                    });
                     triangleIndex += 4;
                 }
 
-                if (sides[5])
+                if (IsAir(voxelPosition + new Vector3Int(-1, 0, 0), _voxels))
                 {
                     // Left face
-                    vertices.AddRange([
+                    vertices.AddRange(new Vector3[]
+                    {
                         new(x - 0.5f, y - 0.5f, z - 0.5f),
                         new(x - 0.5f, y + 0.5f, z - 0.5f),
                         new(x - 0.5f, y - 0.5f, z + 0.5f),
                         new(x - 0.5f, y + 0.5f, z + 0.5f),
-                    ]);
-                    triangles.AddRange([
+                    });
+                    uvs.AddRange(new[]
+                    {
+                        uv00, uv01, uv10, uv11
+                    });
+                    triangles.AddRange(new[]
+                    {
                         0 + triangleIndex, 2 + triangleIndex, 1 + triangleIndex,
                         2 + triangleIndex, 3 + triangleIndex, 1 + triangleIndex,
-                    ]);
+                    });
                     triangleIndex += 4;
                 }
             }
@@ -170,7 +203,7 @@ public sealed class Chunk
         _triangleCount = triangles.Count;
         _vertexCount = vertices.Count;
 
-        const uint stride = 3; // each vertex has 3 floats: 3 position
+        const int stride = 5; // each vertex has 3 position floats and 2 UV floats
         float[] data = new float[vertices.Count * stride];
 
         for (int i = 0; i < vertices.Count; i++)
@@ -178,21 +211,38 @@ public sealed class Chunk
             data[i * stride + 0] = vertices[i].X;
             data[i * stride + 1] = vertices[i].Y;
             data[i * stride + 2] = vertices[i].Z;
+            data[i * stride + 3] = uvs[i].X;
+            data[i * stride + 4] = uvs[i].Y;
         }
-        
+
         GL.BindVertexArray(_vao);
         GL.BindBuffer(BufferTarget.ArrayBuffer, _vbo);
-        GL.BufferData(BufferTarget.ArrayBuffer, data.Length * sizeof(float), data,
-            BufferUsageHint.StaticDraw);
+        GL.BufferData(BufferTarget.ArrayBuffer, data.Length * sizeof(float), data, BufferUsageHint.StaticDraw);
 
         GL.BindBuffer(BufferTarget.ElementArrayBuffer, _ebo);
-        GL.BufferData(BufferTarget.ElementArrayBuffer, triangles.Count * sizeof(int), triangles.ToArray(),
-            BufferUsageHint.StaticDraw);
+        GL.BufferData(BufferTarget.ElementArrayBuffer, triangles.Count * sizeof(int), triangles.ToArray(), BufferUsageHint.StaticDraw);
 
-        GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, Vector3.Size, 0);
+        GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, stride * sizeof(float), 0);
         GL.EnableVertexAttribArray(0);
+        GL.VertexAttribPointer(1, 2, VertexAttribPointerType.Float, false, stride * sizeof(float), 3 * sizeof(float));
+        GL.EnableVertexAttribArray(1);
 
         GL.BindVertexArray(0);
+    }
+
+    private Vector2 GetUVForVoxel(int voxelID, int u, int v)
+    {
+        int texturePerRow = TextureAtlas.AtlasWidth / TextureAtlas.VoxelTextureSize;
+        float unit = 1.0f / texturePerRow;
+
+        // Padding to avoid bleeding
+        float padding = 0.001f;
+
+        float x = (voxelID % texturePerRow) * unit + padding;
+        float y = (voxelID / texturePerRow) * unit + padding;
+        float adjustedUnit = unit - 2 * padding;
+
+        return new Vector2(x + u * adjustedUnit, y + v * adjustedUnit);
     }
 
     public static bool IsAir(Vector3Int voxelPos, uint[] voxels)
@@ -218,6 +268,7 @@ public sealed class Chunk
         
         GL.BindVertexArray(_vao);
         _shader.Use();
+        TextureAtlas.AtlasTexture.Use();
         GL.DrawElements(PrimitiveType.Triangles, _triangleCount, DrawElementsType.UnsignedInt, 0);
         ErrorCode glError = GL.GetError();
         if (glError != ErrorCode.NoError)
