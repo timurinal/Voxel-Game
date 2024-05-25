@@ -15,8 +15,11 @@ Features
 How to use
 ---
 
-**IT IS STRONGLY RECOMMENDED THAT YOU HAVE THE LATEST VERSION OF YOUR GPU DRIVERS BEFORE USING**
+**IT IS STRONGLY RECOMMENDED THAT YOU HAVE THE LATEST VERSION OF YOUR GPU DRIVERS BEFORE CONTINUING**
 
-First start by ensuring you have .NET 8 installed by downloading it from the [official .NET site](https://dotnet.microsoft.com/en-us/download/dotnet/8.0)
+First, start by ensuring you have .NET 8 installed by downloading it from the [official .NET site](https://dotnet.microsoft.com/en-us/download/dotnet/8.0)
+Then, download one of the releases in Github and run the executable. All the files are compiled into the executable so there is only one file.
 
-Then download one of the releases in Github and run the executable.
+### Source code
+Start by cloning the repository.
+The project was made in JetBrains Rider and the project-specific IDE files are included so formatting may differ between IDEs
