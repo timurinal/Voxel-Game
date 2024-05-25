@@ -239,5 +239,8 @@ public struct Vector3
         return new Vector3(Mathf.DegToRad(v.X), Mathf.DegToRad(v.Y), Mathf.DegToRad(v.Z));
     }
 
+    public static Vector3Int Round(Vector3 v) =>
+        new(Mathf.RoundToInt(v.X), Mathf.RoundToInt(v.Y), Mathf.RoundToInt(v.Z));
+
     #endregion
 }

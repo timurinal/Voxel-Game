@@ -9,7 +9,7 @@ namespace VoxelGame.Rendering;
 
 public sealed class Chunk
 {
-    public const int ChunkSize = 16;
+    public const int ChunkSize = 32;
     public const int ChunkArea = ChunkSize * ChunkSize;
     public const int ChunkVolume = ChunkArea * ChunkSize;
     

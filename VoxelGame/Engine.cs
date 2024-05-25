@@ -23,7 +23,6 @@ public sealed class Engine : GameWindow
     
     private Shader _shader;
     private Dictionary<Vector3Int, Chunk> _chunks;
-    private List<AABB> _collisions;
 
     private Vector3 _velocity;
 
@@ -35,20 +34,20 @@ public sealed class Engine : GameWindow
         CursorState = CursorState.Grabbed;
     }
 
-    protected override void OnLoad()
+    protected override async void OnLoad()
     {
         base.OnLoad();
-        
+
         // GL setup
         GL.Enable(EnableCap.Multisample);
         GL.Enable(EnableCap.CullFace);
         GL.Enable(EnableCap.DepthTest);
-        
+
         GL.CullFace(CullFaceMode.Front);
         GL.FrontFace(FrontFaceDirection.Cw);
-        
+
         GL.ClearColor(0.6f, 0.75f, 1f, 1f);
-        
+
         TextureAtlas.Init();
 
         // Make the window visible after setting up so it appears in place and not in a random location
@@ -56,33 +55,6 @@ public sealed class Engine : GameWindow
 
         _shader = Shader.Load("Shaders/shader.vert", "Shaders/shader.frag");
         _chunks = new();
-        _collisions = new();
-        Title = $"Generating chunks...";
-        // precompute the voxels for the chunk so faces can be culled between chunks
-        const int worldSize = 4;
-        for (int x = 0; x < worldSize; x++)
-        {
-            for (int y = 0; y < worldSize; y++)
-            {
-                for (int z = 0; z < worldSize; z++)
-                {
-                    _chunks.Add(new(x, y, z), new Chunk(new Vector3Int(x, y, z) * Chunk.ChunkSize, _shader));
-                }
-            }
-        }
-        for (int x = 0; x < worldSize; x++)
-        {
-            for (int y = 0; y < worldSize; y++)
-            {
-                for (int z = 0; z < worldSize; z++)
-                {
-                    _chunks[new(x, y, z)].BuildChunk(_chunks);
-                    _collisions.AddRange(_chunks[new(x, y, z)].GenerateCollisions());
-                }
-            }
-        }
-        
-        Console.WriteLine($"{_collisions.Count:N0} collision AABBs generated.");
     }
 
     protected override void OnUpdateFrame(FrameEventArgs args)
@@ -110,6 +82,26 @@ public sealed class Engine : GameWindow
         {
             IsWireframe = !IsWireframe;
             GL.PolygonMode(MaterialFace.FrontAndBack, IsWireframe ? PolygonMode.Line : PolygonMode.Fill);
+        }
+
+        for (int x = -Player.ChunkRenderDistance; x < Player.ChunkRenderDistance; x++)
+        {
+            for (int y = -Player.ChunkRenderDistance; y < Player.ChunkRenderDistance; y++)
+            {
+                for (int z = -Player.ChunkRenderDistance; z < Player.ChunkRenderDistance; z++)
+                {
+                    Vector3Int playerPosition = Vector3.Round(Player.Position / Chunk.ChunkSize);
+                    Vector3Int chunkPosition = new Vector3Int(x, y, z) + playerPosition;
+                    Vector3Int chunkWorldPosition = chunkPosition * Chunk.ChunkSize;
+
+                    if (!_chunks.ContainsKey(chunkPosition))
+                    {
+                        var chunk = new Chunk(chunkWorldPosition, _shader);
+                        chunk.BuildChunk(null);
+                        _chunks.Add(chunkPosition, chunk);
+                    }
+                }
+            }
         }
     }
 

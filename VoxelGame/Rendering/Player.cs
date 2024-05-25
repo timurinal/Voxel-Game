@@ -7,7 +7,7 @@ namespace VoxelGame.Rendering;
 
 public class Player
 {
-    public const int ChunkRenderDistance = 16;
+    public const int ChunkRenderDistance = 4;
     
     public Vector3 Position => cameraPosition;
     public float Yaw => yaw;
@@ -42,7 +42,7 @@ public class Player
         
         ViewMatrix = Matrix4.LookAt(cameraPosition, cameraPosition + cameraFront, cameraUp);
         ProjectionMatrix = Matrix4.CreatePerspectiveFieldOfView(fov * Mathf.Deg2Rad, (float)screenSize.X / screenSize.Y, 
-            0.1f, 5000f);
+            0.1f, 15000f);
     }
 
     internal void Update(Vector2Int screenSize)
