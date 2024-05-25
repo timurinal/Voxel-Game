@@ -5,6 +5,7 @@ using OpenTK.Windowing.Desktop;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using VoxelGame.Maths;
 using VoxelGame.Rendering;
+using VoxelGame.Rendering.Font;
 using Vector2 = VoxelGame.Maths.Vector2;
 using Vector3 = VoxelGame.Maths.Vector3;
 
@@ -119,7 +120,7 @@ public sealed class Engine : GameWindow
         GL.Viewport(0, 0, e.Width, e.Height);
         Camera.UpdateProjection(Size);
     }
-    
+
     [StructLayout(LayoutKind.Sequential)]
     struct VertexData(Vector3 position, Vector2 uv, Colour colour)
     {
