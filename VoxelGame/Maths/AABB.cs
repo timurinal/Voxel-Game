@@ -28,17 +28,25 @@ public struct AABB
         return new AABB(position - new Vector3(0.3f, 0, 0.3f), position + new Vector3(0.3f, 1.85f, 0.3f));
     }
 
-    public static bool IsOverlapping(AABB a, AABB b)
+    public bool Intersects(AABB other)
     {
-        return a.Min.X <= b.Max.X && a.Max.X >= b.Min.X && a.Min.Y <= b.Max.Y && a.Max.Y >= b.Min.Y &&
-               a.Min.Z <= b.Max.Z && a.Max.Z >= b.Min.Z;
+        return (Min.X <= other.Max.X && Max.X >= other.Min.X) &&
+               (Min.Y <= other.Max.Y && Max.Y >= other.Min.Y) &&
+               (Min.Z <= other.Max.Z && Max.Z >= other.Min.Z);
+    }
+    
+    public Vector3 GetPenetrationDepth(AABB other)
+    {
+        float xDepth = Math.Min(Max.X - other.Min.X, other.Max.X - Min.X);
+        float yDepth = Math.Min(Max.Y - other.Min.Y, other.Max.Y - Min.Y);
+        float zDepth = Math.Min(Max.Z - other.Min.Z, other.Max.Z - Min.Z);
+
+        return new Vector3(xDepth, yDepth, zDepth);
     }
 
-    public static Vector3 ResolveCollision(AABB dynamic, AABB other)
+    public bool PointInAABB(Vector3 point)
     {
-        Vector3 resolutionDirection = other.Min - dynamic.Max;
-        float resolutionDistance = Math.Min(Math.Min(Math.Abs(resolutionDirection.X), Math.Abs(resolutionDirection.Y)),
-            Math.Abs(resolutionDirection.Z));
-        return resolutionDirection.Normalized * resolutionDistance;
+        return (point.X >= Min.X && point.X <= Max.X) && (point.Y >= Min.Y && point.Y <= Max.Y) &&
+               (point.Z >= Min.Z && point.Z <= Max.Z);
     }
 }

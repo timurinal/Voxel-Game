@@ -268,7 +268,7 @@ public sealed class Chunk
 
     internal AABB[] GenerateCollisions()
     {
-        var aabbs = new AABB[solidVoxelCount];
+        List<AABB> aabbs = new();
         
         for (int i = 0; i < voxels.Length; i++)
         {
@@ -279,10 +279,10 @@ public sealed class Chunk
             int z = i / ChunkArea;
             Vector3Int worldPosition = chunkPosition + new Vector3Int(x, y, z);
 
-            aabbs[i] = AABB.CreateVoxelAABB(worldPosition);
+            aabbs.Add(AABB.CreateVoxelAABB(worldPosition));
         }
 
-        return aabbs;
+        return aabbs.ToArray();
     }
 
     internal void Render(Player player)

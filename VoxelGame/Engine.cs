@@ -23,6 +23,9 @@ public sealed class Engine : GameWindow
     
     private Shader _shader;
     private Dictionary<Vector3Int, Chunk> _chunks;
+    private List<AABB> _collisions;
+
+    private Vector3 _velocity;
 
     public Engine(GameWindowSettings gws, NativeWindowSettings nws) : base(gws, nws)
     {
@@ -53,6 +56,7 @@ public sealed class Engine : GameWindow
 
         _shader = Shader.Load("Shaders/shader.vert", "Shaders/shader.frag");
         _chunks = new();
+        _collisions = new();
         Title = $"Generating chunks...";
         // precompute the voxels for the chunk so faces can be culled between chunks
         const int worldSize = 4;
@@ -73,9 +77,12 @@ public sealed class Engine : GameWindow
                 for (int z = 0; z < worldSize; z++)
                 {
                     _chunks[new(x, y, z)].BuildChunk(_chunks);
+                    _collisions.AddRange(_chunks[new(x, y, z)].GenerateCollisions());
                 }
             }
         }
+        
+        Console.WriteLine($"{_collisions.Count:N0} collision AABBs generated.");
     }
 
     protected override void OnUpdateFrame(FrameEventArgs args)

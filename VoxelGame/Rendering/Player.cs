@@ -13,11 +13,13 @@ public class Player
     public float Yaw => yaw;
     public float Pitch => pitch;
     
+    public AABB Collider = AABB.PlayerAABB(Vector3.Zero);
+    
     internal Matrix4 ProjectionMatrix;
     internal Matrix4 ViewMatrix;
 
     private Vector3 cameraTarget = Vector3.Zero;
-    private Vector3 cameraPosition = new(-5, 0, 5);
+    private Vector3 cameraPosition = new(32, 75, 32);
     private Vector3 cameraDirection = Vector3.Zero;
     private Vector3 cameraUp = Vector3.Up;
     private Vector3 cameraRight = Vector3.Right;
@@ -84,6 +86,7 @@ public class Player
     public void Move(Vector3 dir)
     {
         cameraPosition += dir;
+        Collider = AABB.PlayerAABB(cameraPosition);
     }
 
     public void Rotate(float yaw, float pitch)
