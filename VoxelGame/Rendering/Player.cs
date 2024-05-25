@@ -17,14 +17,14 @@ public class Player
     internal Matrix4 ViewMatrix;
 
     private Vector3 cameraTarget = Vector3.Zero;
-    private Vector3 cameraPosition = Vector3.Zero;
+    private Vector3 cameraPosition = new(-5, 0, 5);
     private Vector3 cameraDirection = Vector3.Zero;
     private Vector3 cameraUp = Vector3.Up;
     private Vector3 cameraRight = Vector3.Right;
     private Vector3 cameraFront = Vector3.Back;
     private Vector3 _cameraDirection;
 
-    private float yaw = -90f, pitch;
+    private float yaw, pitch;
 
     private float MoveSpeed;
     private float RotateSpeed;

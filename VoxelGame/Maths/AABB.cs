@@ -27,4 +27,18 @@ public struct AABB
         // create a player aabb with a width and depth of 0.6 and a height of 1.85
         return new AABB(position - new Vector3(0.3f, 0, 0.3f), position + new Vector3(0.3f, 1.85f, 0.3f));
     }
+
+    public static bool IsOverlapping(AABB a, AABB b)
+    {
+        return a.Min.X <= b.Max.X && a.Max.X >= b.Min.X && a.Min.Y <= b.Max.Y && a.Max.Y >= b.Min.Y &&
+               a.Min.Z <= b.Max.Z && a.Max.Z >= b.Min.Z;
+    }
+
+    public static Vector3 ResolveCollision(AABB dynamic, AABB other)
+    {
+        Vector3 resolutionDirection = other.Min - dynamic.Max;
+        float resolutionDistance = Math.Min(Math.Min(Math.Abs(resolutionDirection.X), Math.Abs(resolutionDirection.Y)),
+            Math.Abs(resolutionDirection.Z));
+        return resolutionDirection.Normalized * resolutionDistance;
+    }
 }

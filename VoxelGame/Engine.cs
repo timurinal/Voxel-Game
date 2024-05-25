@@ -55,7 +55,7 @@ public sealed class Engine : GameWindow
         _chunks = new();
         Title = $"Generating chunks...";
         // precompute the voxels for the chunk so faces can be culled between chunks
-        const int worldSize = 32;
+        const int worldSize = 4;
         for (int x = 0; x < worldSize; x++)
         {
             for (int y = 0; y < worldSize; y++)
@@ -118,10 +118,10 @@ public sealed class Engine : GameWindow
         
         foreach (var chunk in _chunks)
         {
-            float chunkDistanceSqr = (chunk.Value.chunkPosition - Player.Position).SqrMagnitude;
-            float renderDistanceSqr = Player.ChunkRenderDistance * Player.ChunkRenderDistance * Chunk.ChunkSize;
-            if (chunkDistanceSqr > renderDistanceSqr)
-                continue;
+            // float chunkDistanceSqr = (chunk.Value.chunkPosition - Player.Position).SqrMagnitude;
+            // float renderDistanceSqr = Player.ChunkRenderDistance * Player.ChunkRenderDistance * Chunk.ChunkSize;
+            // if (chunkDistanceSqr > renderDistanceSqr)
+            //     continue;
             chunk.Value.Render(Player);
         }
 

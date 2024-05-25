@@ -1,4 +1,5 @@
 ﻿using OpenTK.Mathematics;
+using SimplexNoise;
 using VoxelGame.Maths;
 using Random = VoxelGame.Maths.Random;
 using Vector2 = VoxelGame.Maths.Vector2;
@@ -8,7 +9,7 @@ namespace VoxelGame.Rendering;
 
 public sealed class Chunk
 {
-    public const int ChunkSize = 8;
+    public const int ChunkSize = 16;
     public const int ChunkArea = ChunkSize * ChunkSize;
     public const int ChunkVolume = ChunkArea * ChunkSize;
     
@@ -37,7 +38,10 @@ public sealed class Chunk
         // Array.Fill<uint>(_voxels, 1);
         for (int i = 0; i < ChunkVolume; i++)
         {
-            voxels[i] = Random.Value >= 0.5f ? 1u : 2u;
+            int x = i % ChunkSize;
+            int y = (i / ChunkSize) % ChunkSize;
+            int z = i / ChunkArea;
+            voxels[i] = Noise.CalcPixel3D(x + this.chunkPosition.X, y + this.chunkPosition.Y, z + this.chunkPosition.Z, 0.1f) / 255f > 0.55f ? (uint)Random.Range(1, 3) : 0u;
         }
 
         _vao = GL.GenVertexArray();
@@ -294,9 +298,6 @@ public sealed class Chunk
         ErrorCode glError = GL.GetError();
         if (glError != ErrorCode.NoError)
         {
-            Console.WriteLine(_vao);
-            Console.WriteLine(_vbo);
-            Console.WriteLine(_ebo);
             throw new GLException($"OpenGL error: {glError}");
         }
         GL.BindVertexArray(0);
