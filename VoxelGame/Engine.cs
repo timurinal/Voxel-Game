@@ -16,19 +16,20 @@ public sealed class Engine : GameWindow
     public new bool IsFullscreen { get; set; }
     public new bool IsWireframe { get; set; }
 
-    public readonly Camera Camera;
+    public readonly Player Player;
 
     internal static int TriangleCount;
     internal static int VertexCount;
     
     private Shader _shader;
-    private Chunk[,,] _chunks;
+    private Dictionary<Vector3Int, Chunk> _chunks;
 
     public Engine(GameWindowSettings gws, NativeWindowSettings nws) : base(gws, nws)
     {
         CenterWindow();
 
-        Camera = new Camera(Size);
+        Player = new Player(Size);
+        CursorState = CursorState.Grabbed;
     }
 
     protected override void OnLoad()
@@ -51,16 +52,27 @@ public sealed class Engine : GameWindow
         IsVisible = true;
 
         _shader = Shader.Load("Shaders/shader.vert", "Shaders/shader.frag");
-        _chunks = new Chunk[4, 4, 4];
+        _chunks = new();
         Title = $"Generating chunks...";
-        for (int x = 0; x < _chunks.GetLength(0); x++)
+        // precompute the voxels for the chunk so faces can be culled between chunks
+        const int worldSize = 32;
+        for (int x = 0; x < worldSize; x++)
         {
-            for (int y = 0; y < _chunks.GetLength(1); y++)
+            for (int y = 0; y < worldSize; y++)
             {
-                for (int z = 0; z < _chunks.GetLength(2); z++)
+                for (int z = 0; z < worldSize; z++)
                 {
-                    _chunks[x, y, z] = new Chunk(new Vector3Int(x, y, z) * Chunk.ChunkSize, _shader);
-                    _chunks[x, y, z].BuildChunk();
+                    _chunks.Add(new(x, y, z), new Chunk(new Vector3Int(x, y, z) * Chunk.ChunkSize, _shader));
+                }
+            }
+        }
+        for (int x = 0; x < worldSize; x++)
+        {
+            for (int y = 0; y < worldSize; y++)
+            {
+                for (int z = 0; z < worldSize; z++)
+                {
+                    _chunks[new(x, y, z)].BuildChunk(_chunks);
                 }
             }
         }
@@ -73,7 +85,7 @@ public sealed class Engine : GameWindow
         Input._keyboardState = KeyboardState;
         Time.DeltaTime = (float)args.Time;
         
-        Camera.Update(Size);
+        Player.Update(Size);
         
         // Close game window
         if (Input.GetKeyDown(Keys.Escape))
@@ -103,9 +115,14 @@ public sealed class Engine : GameWindow
         VertexCount = 0;
         
         // Render here
+        
         foreach (var chunk in _chunks)
         {
-            chunk.Render(Camera);
+            float chunkDistanceSqr = (chunk.Value.chunkPosition - Player.Position).SqrMagnitude;
+            float renderDistanceSqr = Player.ChunkRenderDistance * Player.ChunkRenderDistance * Chunk.ChunkSize;
+            if (chunkDistanceSqr > renderDistanceSqr)
+                continue;
+            chunk.Value.Render(Player);
         }
 
         Title = $"FPS: {Time.Fps} | Vertices: {VertexCount:N0} Triangles: {TriangleCount:N0}";
@@ -118,7 +135,14 @@ public sealed class Engine : GameWindow
         base.OnResize(e);
         
         GL.Viewport(0, 0, e.Width, e.Height);
-        Camera.UpdateProjection(Size);
+        Player.UpdateProjection(Size);
+    }
+
+    protected override void OnMouseMove(MouseMoveEventArgs e)
+    {
+        base.OnMouseMove(e);
+        
+        Player.Rotate(e.DeltaX, e.DeltaY);
     }
 
     [StructLayout(LayoutKind.Sequential)]

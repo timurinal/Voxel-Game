@@ -8,13 +8,15 @@ namespace VoxelGame.Rendering;
 
 public sealed class Chunk
 {
-    public const int ChunkSize = 32;
+    public const int ChunkSize = 8;
     public const int ChunkArea = ChunkSize * ChunkSize;
     public const int ChunkVolume = ChunkArea * ChunkSize;
     
     public Vector3Int chunkPosition;
+    
+    public uint solidVoxelCount { get; private set; }
 
-    private uint[] _voxels;
+    public uint[] voxels { get; private set; }
 
     private Shader _shader;
     private int _vao, _vbo, _ebo;
@@ -29,13 +31,13 @@ public sealed class Chunk
         this.chunkPosition = chunkPosition;
         _shader = shader;
 
-        _voxels = new uint[ChunkVolume];
+        voxels = new uint[ChunkVolume];
 
         // TODO: Remove this line
         // Array.Fill<uint>(_voxels, 1);
         for (int i = 0; i < ChunkVolume; i++)
         {
-            _voxels[i] = Random.Value >= 0.5f ? 1u : 2u;
+            voxels[i] = Random.Value >= 0.5f ? 1u : 2u;
         }
 
         _vao = GL.GenVertexArray();
@@ -45,28 +47,33 @@ public sealed class Chunk
         m_model = Matrix4.CreateTranslation(chunkPosition);
     }
 
-    internal void BuildChunk()
+    internal void BuildChunk(Dictionary<Vector3Int, Chunk> chunks)
     {
+        solidVoxelCount = 0;
+        
         List<Vector3> vertices = new();
         List<Vector2> uvs = new();
         List<int> triangles = new();
 
-        for (int i = 0, triangleIndex = 0; i < _voxels.Length; i++)
+        for (int i = 0, triangleIndex = 0; i < voxels.Length; i++)
         {
             int x = i % ChunkSize;
             int y = (i / ChunkSize) % ChunkSize;
             int z = i / ChunkArea;
             Vector3Int voxelPosition = new(x, y, z);
             Vector3Int worldPosition = chunkPosition * ChunkSize + new Vector3Int(x, y, z);
-            if (_voxels[i] != 0)
+            if (voxels[i] != 0)
             {
-                int voxelID = (int)_voxels[i];
+                solidVoxelCount++;
+                
+                int voxelID = (int)voxels[i];
                 Vector2 uv00 = GetUVForVoxel(voxelID - 1, 1, 1);
                 Vector2 uv01 = GetUVForVoxel(voxelID - 1, 1, 0);
                 Vector2 uv10 = GetUVForVoxel(voxelID - 1, 0, 1);
                 Vector2 uv11 = GetUVForVoxel(voxelID - 1, 0, 0);
 
-                if (IsAir(voxelPosition + new Vector3Int(0, 0, -1), _voxels))
+                // TODO: Cull faces between chunks
+                if (IsAir(voxelPosition + new Vector3Int(0, 0, -1), voxels, chunks))
                 {
                     // Front face
                     vertices.AddRange(new Vector3[]
@@ -87,8 +94,7 @@ public sealed class Chunk
                     });
                     triangleIndex += 4;
                 }
-
-                if (IsAir(voxelPosition + new Vector3Int(0, 0, 1), _voxels))
+                if (IsAir(voxelPosition + new Vector3Int(0, 0, 1), voxels, chunks))
                 {
                     // Back face
                     vertices.AddRange(new Vector3[]
@@ -109,8 +115,7 @@ public sealed class Chunk
                     });
                     triangleIndex += 4;
                 }
-
-                if (IsAir(voxelPosition + new Vector3Int(0, 1, 0), _voxels))
+                if (IsAir(voxelPosition + new Vector3Int(0, 1, 0), voxels, chunks))
                 {
                     // Top face
                     vertices.AddRange(new Vector3[]
@@ -131,8 +136,7 @@ public sealed class Chunk
                     });
                     triangleIndex += 4;
                 }
-
-                if (IsAir(voxelPosition + new Vector3Int(0, -1, 0), _voxels))
+                if (IsAir(voxelPosition + new Vector3Int(0, -1, 0), voxels, chunks))
                 {
                     // Bottom face
                     vertices.AddRange(new Vector3[]
@@ -153,8 +157,7 @@ public sealed class Chunk
                     });
                     triangleIndex += 4;
                 }
-
-                if (IsAir(voxelPosition + new Vector3Int(1, 0, 0), _voxels))
+                if (IsAir(voxelPosition + new Vector3Int(1, 0, 0), voxels, chunks))
                 {
                     // Right face
                     vertices.AddRange(new Vector3[]
@@ -175,8 +178,7 @@ public sealed class Chunk
                     });
                     triangleIndex += 4;
                 }
-
-                if (IsAir(voxelPosition + new Vector3Int(-1, 0, 0), _voxels))
+                if (IsAir(voxelPosition + new Vector3Int(-1, 0, 0), voxels, chunks))
                 {
                     // Left face
                     vertices.AddRange(new Vector3[]
@@ -245,7 +247,7 @@ public sealed class Chunk
         return new Vector2(x + u * adjustedUnit, y + v * adjustedUnit);
     }
 
-    public static bool IsAir(Vector3Int voxelPos, uint[] voxels)
+    private static bool IsAir(Vector3Int voxelPos, uint[] voxels, Dictionary<Vector3Int, Chunk> chunks)
     {
         if (voxelPos.X >= 0 && voxelPos.X < ChunkSize &&
             voxelPos.Y >= 0 && voxelPos.Y < ChunkSize &&
@@ -260,10 +262,29 @@ public sealed class Chunk
         }
     }
 
-    internal void Render(Camera camera)
+    internal AABB[] GenerateCollisions()
     {
-        _shader.SetUniform("m_proj", ref camera.ProjectionMatrix);
-        _shader.SetUniform("m_view", ref camera.ViewMatrix);
+        var aabbs = new AABB[solidVoxelCount];
+        
+        for (int i = 0; i < voxels.Length; i++)
+        {
+            if (voxels[i] == 0) continue;
+            
+            int x = i % ChunkSize;
+            int y = (i / ChunkSize) % ChunkSize;
+            int z = i / ChunkArea;
+            Vector3Int worldPosition = chunkPosition + new Vector3Int(x, y, z);
+
+            aabbs[i] = AABB.CreateVoxelAABB(worldPosition);
+        }
+
+        return aabbs;
+    }
+
+    internal void Render(Player player)
+    {
+        _shader.SetUniform("m_proj", ref player.ProjectionMatrix);
+        _shader.SetUniform("m_view", ref player.ViewMatrix);
         _shader.SetUniform("m_model", ref m_model);
         
         GL.BindVertexArray(_vao);
@@ -280,8 +301,8 @@ public sealed class Chunk
         }
         GL.BindVertexArray(0);
 
-        Engine.VertexCount = _vertexCount;
-        Engine.TriangleCount = _triangleCount / 3;
+        Engine.VertexCount += _vertexCount;
+        Engine.TriangleCount += _triangleCount / 3;
     }
 }
 

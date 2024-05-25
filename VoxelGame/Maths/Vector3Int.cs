@@ -88,7 +88,12 @@ public struct Vector3Int
     /// Size of a Vector3Int in bytes
     /// </summary>
     public const int Size = 12;
-    
+
+    public override string ToString()
+    {
+        return $"({X}, {Y}, {Z})";
+    }
+
     #region Operators
 
     public static Vector3Int operator +(Vector3Int a, Vector3Int b)

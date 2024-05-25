@@ -5,8 +5,10 @@ using Vector3 = VoxelGame.Maths.Vector3;
 
 namespace VoxelGame.Rendering;
 
-public class Camera
+public class Player
 {
+    public const int ChunkRenderDistance = 16;
+    
     public Vector3 Position => cameraPosition;
     public float Yaw => yaw;
     public float Pitch => pitch;
@@ -29,7 +31,7 @@ public class Camera
 
     private float fov;
 
-    public Camera(Vector2Int screenSize, float moveSpeed = 5f, float rotateSpeed = 90f, float fov = 65f)
+    public Player(Vector2Int screenSize, float moveSpeed = 5f, float rotateSpeed = 45f, float fov = 65f)
     {
         MoveSpeed = moveSpeed;
         RotateSpeed = rotateSpeed;
@@ -52,11 +54,6 @@ public class Camera
 
         if (Input.GetKey(Keys.E)) cameraPosition.Y += MoveSpeed * Time.DeltaTime;
         if (Input.GetKey(Keys.Q)) cameraPosition.Y -= MoveSpeed * Time.DeltaTime;
-
-        if (Input.GetKey(Keys.Up)) pitch += RotateSpeed * Time.DeltaTime;
-        if (Input.GetKey(Keys.Down)) pitch -= RotateSpeed * Time.DeltaTime;
-        if (Input.GetKey(Keys.Right)) yaw += RotateSpeed * Time.DeltaTime;
-        if (Input.GetKey(Keys.Left)) yaw -= RotateSpeed * Time.DeltaTime;
 
         pitch = Mathf.Clamp(pitch, -89, 89);
 
@@ -89,6 +86,12 @@ public class Camera
         cameraPosition += dir;
     }
 
+    public void Rotate(float yaw, float pitch)
+    {
+        this.yaw += yaw * RotateSpeed * Time.DeltaTime;
+        this.pitch += -pitch * RotateSpeed * Time.DeltaTime;
+    }
+    
     public void SetPosition(Vector3 pos)
     {
         cameraPosition = pos;

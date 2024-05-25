@@ -31,6 +31,7 @@ public struct Vector3
     /// Returns the magnitude of the vector
     /// </summary>
     public float Magnitude => (float)Math.Sqrt((X * X) + (Y * Y) + (Z * Z));
+    public float SqrMagnitude => (X * X) + (Y * Y) + (Z * Z);
 
     /// <summary>
     /// Returns the normalized vector.
