@@ -14,6 +14,8 @@ public sealed class Chunk
     public const int ChunkVolume = ChunkArea * ChunkSize;
     
     public Vector3Int chunkPosition;
+    
+    public AABB Bounds { get; private set; }
 
     // if this is true, it means the chunk has been modified since generation
     public bool IsDirty { get; private set; } = false;
@@ -37,14 +39,12 @@ public sealed class Chunk
 
         voxels = new uint[ChunkVolume];
 
-        // TODO: Remove this line
-        // Array.Fill<uint>(_voxels, 1);
         for (int i = 0; i < ChunkVolume; i++)
         {
             int x = i % ChunkSize;
             int y = (i / ChunkSize) % ChunkSize;
             int z = i / ChunkArea;
-            voxels[i] = Noise.CalcPixel3D(x + this.chunkPosition.X, y + this.chunkPosition.Y, z + this.chunkPosition.Z, 0.1f) / 255f > 0.55f ? (uint)Random.Range(1, 3) : 0u;
+            voxels[i] = Noise.CalcPixel3D(x + this.chunkPosition.X, y + this.chunkPosition.Y, z + this.chunkPosition.Z, 0.1f) / 255f > 0.55f ? (uint)Random.Range(2, 2) : 0u;
         }
 
         _vao = GL.GenVertexArray();
@@ -52,6 +52,11 @@ public sealed class Chunk
         _ebo = GL.GenBuffer();
         
         m_model = Matrix4.CreateTranslation(chunkPosition);
+        
+        Vector3 chunkCentre = chunkPosition + new Vector3(ChunkSize / 2f, ChunkSize / 2f, ChunkSize / 2f);
+
+        // Create the AABB using the centre and half dimensions
+        Bounds = new AABB(chunkCentre, ChunkSize / 2f, ChunkSize / 2f, ChunkSize / 2f);
     }
 
     internal void BuildChunk(Dictionary<Vector3Int, Chunk> chunks)
@@ -60,6 +65,7 @@ public sealed class Chunk
         
         List<Vector3> vertices = new();
         List<Vector2> uvs = new();
+        List<int> faceIds = new(); // 0 = up, 1 = down, 2 = front, 3 = back, 4 = right, 5 = left
         List<int> triangles = new();
 
         for (int i = 0, triangleIndex = 0; i < voxels.Length; i++)
@@ -94,6 +100,8 @@ public sealed class Chunk
                     {
                         uv00, uv01, uv10, uv11
                     });
+                    for (int j = 0; j < 4; j++)
+                        faceIds.Add(0);
                     triangles.AddRange(new[]
                     {
                         0 + triangleIndex, 1 + triangleIndex, 2 + triangleIndex,
@@ -115,6 +123,8 @@ public sealed class Chunk
                     {
                         uv00, uv01, uv10, uv11
                     });
+                    for (int j = 0; j < 4; j++)
+                        faceIds.Add(1);
                     triangles.AddRange(new[]
                     {
                         0 + triangleIndex, 2 + triangleIndex, 1 + triangleIndex,
@@ -136,6 +146,8 @@ public sealed class Chunk
                     {
                         uv00, uv01, uv10, uv11
                     });
+                    for (int j = 0; j < 4; j++)
+                        faceIds.Add(2);
                     triangles.AddRange(new[]
                     {
                         0 + triangleIndex, 2 + triangleIndex, 1 + triangleIndex,
@@ -157,6 +169,8 @@ public sealed class Chunk
                     {
                         uv00, uv01, uv10, uv11
                     });
+                    for (int j = 0; j < 4; j++)
+                        faceIds.Add(3);
                     triangles.AddRange(new[]
                     {
                         0 + triangleIndex, 1 + triangleIndex, 2 + triangleIndex,
@@ -178,6 +192,8 @@ public sealed class Chunk
                     {
                         uv00, uv01, uv10, uv11
                     });
+                    for (int j = 0; j < 4; j++)
+                        faceIds.Add(4);
                     triangles.AddRange(new[]
                     {
                         0 + triangleIndex, 1 + triangleIndex, 2 + triangleIndex,
@@ -199,6 +215,8 @@ public sealed class Chunk
                     {
                         uv00, uv01, uv10, uv11
                     });
+                    for (int j = 0; j < 4; j++)
+                        faceIds.Add(5);
                     triangles.AddRange(new[]
                     {
                         0 + triangleIndex, 2 + triangleIndex, 1 + triangleIndex,
@@ -212,16 +230,19 @@ public sealed class Chunk
         _triangleCount = triangles.Count;
         _vertexCount = vertices.Count;
 
-        const int stride = 5; // each vertex has 3 position floats and 2 UV floats
+        const int stride = 6; // each vertex has 3 position floats, 2 UV floats, and 1 faceid integer
         float[] data = new float[vertices.Count * stride];
-
+        
         for (int i = 0; i < vertices.Count; i++)
         {
             data[i * stride + 0] = vertices[i].X;
             data[i * stride + 1] = vertices[i].Y;
             data[i * stride + 2] = vertices[i].Z;
+            
             data[i * stride + 3] = uvs[i].X;
             data[i * stride + 4] = uvs[i].Y;
+            
+            data[i * stride + 5] = faceIds[i];
         }
 
         GL.BindVertexArray(_vao);
@@ -231,10 +252,12 @@ public sealed class Chunk
         GL.BindBuffer(BufferTarget.ElementArrayBuffer, _ebo);
         GL.BufferData(BufferTarget.ElementArrayBuffer, triangles.Count * sizeof(int), triangles.ToArray(), BufferUsageHint.StaticDraw);
 
-        GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, stride * sizeof(float), 0);
-        GL.EnableVertexAttribArray(0);
+        GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, stride * sizeof(float), 0 * sizeof(float));
         GL.VertexAttribPointer(1, 2, VertexAttribPointerType.Float, false, stride * sizeof(float), 3 * sizeof(float));
+        GL.VertexAttribPointer(2, 1, VertexAttribPointerType.Float, false, stride * sizeof(float), 5 * sizeof(float));
+        GL.EnableVertexAttribArray(0);
         GL.EnableVertexAttribArray(1);
+        GL.EnableVertexAttribArray(2);
 
         GL.BindVertexArray(0);
     }

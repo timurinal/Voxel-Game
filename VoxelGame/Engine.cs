@@ -16,10 +16,14 @@ public sealed class Engine : GameWindow
     public new bool IsFullscreen { get; set; }
     public new bool IsWireframe { get; set; }
 
+    public const bool EnableFrustumCulling = false;
+
     public readonly Player Player;
 
     internal static int TriangleCount;
     internal static int VertexCount;
+    internal static int LoadedChunks;
+    internal static int VisibleChunks;
     
     private Shader _shader;
     private Dictionary<Vector3Int, Chunk> _chunks;
@@ -121,7 +125,7 @@ public sealed class Engine : GameWindow
                     Vector3Int chunkPosition = new Vector3Int(x, y, z) + playerPosition;
                     Vector3Int chunkWorldPosition = chunkPosition * Chunk.ChunkSize;
 
-                    if (!_chunks.ContainsKey(chunkPosition))
+                    if (!_chunks.ContainsKey(chunkPosition)) // TODO: optimise this? the containskey call is apparently allocating 3gb of memory
                     {
                         var chunk = new Chunk(chunkWorldPosition, _shader);
                         chunk.BuildChunk(null);
@@ -139,19 +143,27 @@ public sealed class Engine : GameWindow
         GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
         TriangleCount = 0;
         VertexCount = 0;
+        LoadedChunks = 0;
+        VisibleChunks = 0;
         
         // Render here
         
         foreach (var chunk in _chunks)
         {
-            // float chunkDistanceSqr = (chunk.Value.chunkPosition - Player.Position).SqrMagnitude;
-            // float renderDistanceSqr = Player.ChunkRenderDistance * Player.ChunkRenderDistance * Chunk.ChunkSize;
-            // if (chunkDistanceSqr > renderDistanceSqr)
-            //     continue;
-            chunk.Value.Render(Player);
+            LoadedChunks++;
+            if (Player.IsBoxInFrustum(chunk.Value.Bounds) && EnableFrustumCulling)
+            {
+                VisibleChunks++;
+                chunk.Value.Render(Player);
+            }
+            else
+            {
+                VisibleChunks++;
+                chunk.Value.Render(Player);
+            }
         }
 
-        Title = $"FPS: {Time.Fps} | Vertices: {VertexCount:N0} Triangles: {TriangleCount:N0}";
+        Title = $"FPS: {Time.Fps} | Vertices: {VertexCount:N0} Triangles: {TriangleCount:N0} | Loaded Chunks: {LoadedChunks} Visible Chunks: {VisibleChunks}";
         
         SwapBuffers();
     }

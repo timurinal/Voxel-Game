@@ -15,8 +15,11 @@ public class Player
     
     public AABB Collider = AABB.PlayerAABB(Vector3.Zero);
     
-    internal Matrix4 ProjectionMatrix;
-    internal Matrix4 ViewMatrix;
+    public Matrix4 ProjectionMatrix;
+    public Matrix4 ViewMatrix;
+    public Matrix4 VPMatrix { get; private set; }
+    
+    public Plane[] Planes { get; private set; } = new Plane[6];
 
     private Vector3 cameraTarget = Vector3.Zero;
     private Vector3 cameraPosition = new(32, 75, 32);
@@ -74,6 +77,51 @@ public class Player
         ViewMatrix = Matrix4.LookAt(cameraPosition, cameraPosition + cameraFront, cameraUp);
         ProjectionMatrix = Matrix4.CreatePerspectiveFieldOfView(fov * Mathf.Deg2Rad, (float)screenSize.X / screenSize.Y, 
             0.1f, 100f);
+
+        VPMatrix = ViewMatrix * ProjectionMatrix;
+        
+        // Extract the planes from the view-projection matrix
+        Planes[0] = new Plane(
+            VPMatrix.M41 + VPMatrix.M11,
+            VPMatrix.M42 + VPMatrix.M12,
+            VPMatrix.M43 + VPMatrix.M13,
+            VPMatrix.M44 + VPMatrix.M14); // Left
+
+        Planes[1] = new Plane(
+            VPMatrix.M41 - VPMatrix.M11,
+            VPMatrix.M42 - VPMatrix.M12,
+            VPMatrix.M43 - VPMatrix.M13,
+            VPMatrix.M44 - VPMatrix.M14); // Right
+
+        Planes[2] = new Plane(
+            VPMatrix.M41 + VPMatrix.M21,
+            VPMatrix.M42 + VPMatrix.M22,
+            VPMatrix.M43 + VPMatrix.M23,
+            VPMatrix.M44 + VPMatrix.M24); // Bottom
+
+        Planes[3] = new Plane(
+            VPMatrix.M41 - VPMatrix.M21,
+            VPMatrix.M42 - VPMatrix.M22,
+            VPMatrix.M43 - VPMatrix.M23,
+            VPMatrix.M44 - VPMatrix.M24); // Top
+
+        Planes[4] = new Plane(
+            VPMatrix.M41 + VPMatrix.M31,
+            VPMatrix.M42 + VPMatrix.M32,
+            VPMatrix.M43 + VPMatrix.M33,
+            VPMatrix.M44 + VPMatrix.M34); // Near
+
+        Planes[5] = new Plane(
+            VPMatrix.M41 - VPMatrix.M31,
+            VPMatrix.M42 - VPMatrix.M32,
+            VPMatrix.M43 - VPMatrix.M33,
+            VPMatrix.M44 - VPMatrix.M34); // Far
+
+        // Normalize the planes
+        for (int i = 0; i < 6; i++)
+        {
+            Planes[i].Normalize();
+        }
     }
 
     internal void UpdateProjection(Vector2Int screenSize, float fov = 65f)
@@ -98,5 +146,28 @@ public class Player
     public void SetPosition(Vector3 pos)
     {
         cameraPosition = pos;
+    }
+
+    public bool IsPointInFrustum(Vector3 point)
+    {
+        return Planes.All(plane => plane.DistanceToPoint(point) >= 0);
+    }
+    
+    public bool IsBoxInFrustum(AABB box)
+    {
+        foreach (var plane in Planes)
+        {
+            Vector3 positiveVertex = new Vector3(
+                plane.A >= 0 ? box.Max.X : box.Min.X,
+                plane.B >= 0 ? box.Max.Y : box.Min.Y,
+                plane.C >= 0 ? box.Max.Z : box.Min.Z);
+
+            if (plane.DistanceToPoint(positiveVertex) < 0)
+            {
+                return false; // The box is outside this plane
+            }
+        }
+
+        return true; // The box is inside or intersects the frustum
     }
 }
