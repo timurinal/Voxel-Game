@@ -22,14 +22,14 @@ public class Player
     public Plane[] Planes { get; private set; } = new Plane[6];
 
     private Vector3 cameraTarget = Vector3.Zero;
-    private Vector3 cameraPosition = new(32, 75, 32);
+    private Vector3 cameraPosition = new(32, 10, 32);
     private Vector3 cameraDirection = Vector3.Zero;
     private Vector3 cameraUp = Vector3.Up;
     private Vector3 cameraRight = Vector3.Right;
     private Vector3 cameraFront = Vector3.Back;
     private Vector3 _cameraDirection;
 
-    private float yaw, pitch;
+    private float yaw = 180, pitch;
 
     private float MoveSpeed;
     private float RotateSpeed;

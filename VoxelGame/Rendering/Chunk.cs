@@ -9,7 +9,7 @@ namespace VoxelGame.Rendering;
 
 public sealed class Chunk
 {
-    public const int ChunkSize = 8;
+    public const int ChunkSize = 16;
     public const int ChunkArea = ChunkSize * ChunkSize;
     public const int ChunkVolume = ChunkArea * ChunkSize;
     
@@ -44,7 +44,15 @@ public sealed class Chunk
             int x = i % ChunkSize;
             int y = (i / ChunkSize) % ChunkSize;
             int z = i / ChunkArea;
-            voxels[i] = Noise.CalcPixel3D(x + this.chunkPosition.X, y + this.chunkPosition.Y, z + this.chunkPosition.Z, 0.1f) / 255f > 0.55f ? (uint)Random.Range(2, 2) : 0u;
+
+            // Calculate the global y position
+            int globalY = y + this.chunkPosition.Y;
+
+            // Generate a flat plane only at the bottom of the world
+            if (globalY <= ChunkSize)
+                voxels[i] = 4u;
+            else
+                voxels[i] = 0u;
         }
 
         _vao = GL.GenVertexArray();

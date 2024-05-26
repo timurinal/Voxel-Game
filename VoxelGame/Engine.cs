@@ -45,7 +45,7 @@ public sealed class Engine : GameWindow
         CursorState = CursorState.Grabbed;
     }
 
-    protected override async void OnLoad()
+    protected override void OnLoad()
     {
         base.OnLoad();
 
@@ -146,7 +146,7 @@ public sealed class Engine : GameWindow
                     Vector3Int chunkPosition = new Vector3Int(x, y, z) + playerPosition;
                     Vector3Int chunkWorldPosition = chunkPosition * Chunk.ChunkSize;
 
-                    if (!_chunks.ContainsKey(chunkPosition))
+                    if (!_chunks.ContainsKey(chunkPosition) && chunkWorldPosition.Y > 0)
                     {
                         if (LoadChunk(chunkPosition, out var chunk))
                         {

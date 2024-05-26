@@ -121,4 +121,27 @@ public static class Mathf
 
         return v + Mathf.Sign(target - v) * maxDelta;
     }
+
+    public static float Max(params float[] values)
+    {
+        return values.Max();
+    }
+    public static int Max(params int[] values)
+    {
+        return values.Max();
+    }
+    
+    public static float Min(params float[] values)
+    {
+        return values.Min();
+    }
+    public static int Min(params int[] values)
+    {
+        return values.Min();
+    }
+
+    public static float InverseLerp(float a, float b, float value)
+    {
+        return (value - a) / (b - a);
+    }
 }

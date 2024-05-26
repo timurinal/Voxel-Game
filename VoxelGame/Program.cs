@@ -1,4 +1,5 @@
 ﻿using OpenTK.Windowing.Desktop;
+using VoxelGame.Rendering.Font;
 
 namespace VoxelGame;
 
@@ -6,6 +7,9 @@ class Program
 {
     static void Main(string[] args)
     {
+        FontReader.ParseFont("Assets/Fonts/JetBrainsMono-bold.ttf");
+        return;
+        
         GameWindowSettings gws = new()
         {
             UpdateFrequency = -1
