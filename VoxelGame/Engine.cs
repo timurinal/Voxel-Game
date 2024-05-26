@@ -170,12 +170,4 @@ public sealed class Engine : GameWindow
         
         Player.Rotate(e.DeltaX, e.DeltaY);
     }
-
-    [StructLayout(LayoutKind.Sequential)]
-    struct VertexData(Vector3 position, Vector2 uv, Colour colour)
-    {
-        public Vector3 position = position;
-        public Vector2 uv = uv;
-        public Colour colour = colour;
-    }
 }
