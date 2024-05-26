@@ -9,11 +9,14 @@ namespace VoxelGame.Rendering;
 
 public sealed class Chunk
 {
-    public const int ChunkSize = 32;
+    public const int ChunkSize = 8;
     public const int ChunkArea = ChunkSize * ChunkSize;
     public const int ChunkVolume = ChunkArea * ChunkSize;
     
     public Vector3Int chunkPosition;
+
+    // if this is true, it means the chunk has been modified since generation
+    public bool IsDirty { get; private set; } = false;
     
     public uint solidVoxelCount { get; private set; }
 

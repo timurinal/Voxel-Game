@@ -64,6 +64,34 @@ public sealed class Engine : GameWindow
         Input._keyboardState = KeyboardState;
         Time.DeltaTime = (float)args.Time;
         
+        Vector3Int playerPosition = Vector3.Round(Player.Position / Chunk.ChunkSize);
+        int renderDistance = Player.ChunkRenderDistance;
+
+        List<Vector3Int> chunksToRemove = new List<Vector3Int>();
+
+        foreach (var chunk in _chunks)
+        {
+            var chunkPos = chunk.Key;
+            int dx = chunkPos.X - playerPosition.X;
+            int dy = chunkPos.Y - playerPosition.Y;
+            int dz = chunkPos.Z - playerPosition.Z;
+
+            if (Math.Abs(dx) > renderDistance || Math.Abs(dy) > renderDistance || Math.Abs(dz) > renderDistance)
+            {
+                var chunkObj = chunk.Value;
+                if (chunkObj.IsDirty)
+                {
+                    // TODO: Implement chunk saving
+                }
+                chunksToRemove.Add(chunkPos);
+            }
+        }
+
+        foreach (var chunkPos in chunksToRemove)
+        {
+            _chunks.Remove(chunkPos);
+        }
+        
         Player.Update(Size);
         
         // Close game window
@@ -90,7 +118,6 @@ public sealed class Engine : GameWindow
             {
                 for (int z = -Player.ChunkRenderDistance; z < Player.ChunkRenderDistance; z++)
                 {
-                    Vector3Int playerPosition = Vector3.Round(Player.Position / Chunk.ChunkSize);
                     Vector3Int chunkPosition = new Vector3Int(x, y, z) + playerPosition;
                     Vector3Int chunkWorldPosition = chunkPosition * Chunk.ChunkSize;
 
