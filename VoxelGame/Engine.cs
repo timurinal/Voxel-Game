@@ -127,6 +127,7 @@ public sealed class Engine : GameWindow
 
                     if (!_chunks.ContainsKey(chunkPosition)) // TODO: optimise this? the containskey call is apparently allocating 3gb of memory
                     {
+                        // TODO: Add async chunk building
                         var chunk = new Chunk(chunkWorldPosition, _shader);
                         chunk.BuildChunk(null);
                         _chunks.Add(chunkPosition, chunk);
