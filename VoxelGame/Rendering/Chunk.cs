@@ -22,7 +22,7 @@ public sealed class Chunk
     
     public uint solidVoxelCount { get; private set; }
 
-    public uint[] voxels { get; private set; }
+    public uint[] voxels { get; set; }
 
     private Shader _shader;
     private int _vao, _vbo, _ebo;
@@ -262,6 +262,12 @@ public sealed class Chunk
         GL.BindVertexArray(0);
     }
     
+    internal void RebuildChunk(Dictionary<Vector3Int, Chunk> chunks)
+    {
+        BuildChunk(chunks);
+        IsDirty = true;
+    }
+    
     private async Task<(float[] vertices, int[] triangles)> BuildChunkAsync(Dictionary<Vector3Int, Chunk> chunks)
     {
         return await Task.Run(() =>
@@ -435,6 +441,8 @@ public sealed class Chunk
         Engine.VertexCount += _vertexCount;
         Engine.TriangleCount += _triangleCount / 3;
     }
+
+    internal void OnSaved() => IsDirty = false;
 }
 
 public class GLException : Exception

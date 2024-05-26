@@ -1,4 +1,6 @@
 ﻿using System.Runtime.InteropServices;
+using System.Runtime.Serialization.Formatters.Binary;
+using System.Text.Json;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.Common;
 using OpenTK.Windowing.Desktop;
@@ -6,6 +8,7 @@ using OpenTK.Windowing.GraphicsLibraryFramework;
 using VoxelGame.Maths;
 using VoxelGame.Rendering;
 using VoxelGame.Rendering.Font;
+using Random = VoxelGame.Maths.Random;
 using Vector2 = VoxelGame.Maths.Vector2;
 using Vector3 = VoxelGame.Maths.Vector3;
 
@@ -13,6 +16,8 @@ namespace VoxelGame;
 
 public sealed class Engine : GameWindow
 {
+    public static string DataPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VoxelGame");
+    
     public new bool IsFullscreen { get; set; }
     public new bool IsWireframe { get; set; }
 
@@ -27,6 +32,8 @@ public sealed class Engine : GameWindow
     
     private Shader _shader;
     private Dictionary<Vector3Int, Chunk> _chunks;
+    private Queue<Vector3Int> _chunksToBuild;
+    private const int MaxChunksToBuildPerFrame = 8;
 
     private Vector3 _velocity;
 
@@ -58,10 +65,11 @@ public sealed class Engine : GameWindow
         IsVisible = true;
 
         _shader = Shader.Load("Shaders/shader.vert", "Shaders/shader.frag");
-        _chunks = new();
+        _chunks = new Dictionary<Vector3Int, Chunk>();
+        _chunksToBuild = new Queue<Vector3Int>();
     }
 
-    protected override void OnUpdateFrame(FrameEventArgs args)
+    protected override async void OnUpdateFrame(FrameEventArgs args)
     {
         base.OnUpdateFrame(args);
 
@@ -85,7 +93,8 @@ public sealed class Engine : GameWindow
                 var chunkObj = chunk.Value;
                 if (chunkObj.IsDirty)
                 {
-                    // TODO: Implement chunk saving
+                    Console.WriteLine($"Chunk at position {chunk.Key} is dirty. Saving chunk...");
+                    await SaveChunk(chunk.Key, chunkObj);
                 }
                 chunksToRemove.Add(chunkPos);
             }
@@ -116,6 +125,18 @@ public sealed class Engine : GameWindow
             GL.PolygonMode(MaterialFace.FrontAndBack, IsWireframe ? PolygonMode.Line : PolygonMode.Fill);
         }
 
+        if (Input.GetKeyDown(Keys.Space))
+        {
+            Console.WriteLine("Attempting to rebuild chunk...");
+            var chunk = _chunks.First().Value;
+            for (int i = 0; i < chunk.voxels.Length; i++)
+            {
+                chunk.voxels[i] = i % 3 == 0 ? 1u : 0u;
+            }
+            chunk.RebuildChunk(null);
+            Console.WriteLine($"Rebuilt chunk at position {chunk.chunkPosition} (local chunk-space position; {chunk.chunkPosition / Chunk.ChunkSize})");
+        }
+
         for (int x = -Player.ChunkRenderDistance; x < Player.ChunkRenderDistance; x++)
         {
             for (int y = -Player.ChunkRenderDistance; y < Player.ChunkRenderDistance; y++)
@@ -125,16 +146,84 @@ public sealed class Engine : GameWindow
                     Vector3Int chunkPosition = new Vector3Int(x, y, z) + playerPosition;
                     Vector3Int chunkWorldPosition = chunkPosition * Chunk.ChunkSize;
 
-                    if (!_chunks.ContainsKey(chunkPosition)) // TODO: optimise this? the containskey call is apparently allocating 3gb of memory
+                    if (!_chunks.ContainsKey(chunkPosition))
                     {
-                        // TODO: Add async chunk building
-                        var chunk = new Chunk(chunkWorldPosition, _shader);
-                        chunk.BuildChunk(null);
-                        _chunks.Add(chunkPosition, chunk);
+                        if (LoadChunk(chunkPosition, out var chunk))
+                        {
+                            _chunksToBuild.Enqueue(chunkPosition); // Queue the chunk for building
+                            _chunks[chunkPosition] = chunk; // Add the chunk to the dictionary
+                        }
+                        else
+                        {
+                            var newChunk = new Chunk(chunkWorldPosition, _shader);
+                            _chunksToBuild.Enqueue(chunkPosition); // Queue the chunk for building
+                            _chunks[chunkPosition] = newChunk; // Add the chunk to the dictionary
+                        }
                     }
                 }
             }
         }
+
+        // Build a limited number of chunks per frame
+        for (int i = 0; i < MaxChunksToBuildPerFrame && _chunksToBuild.Count > 0; i++)
+        {
+            try
+            {
+                var chunkPosition = _chunksToBuild.Dequeue();
+                _chunks[chunkPosition].BuildChunk(null);
+            }
+            catch
+            {
+            }
+        }
+    }
+
+    private async Task SaveChunk(Vector3Int chunkPosition, Chunk chunk)
+    {
+        // Ensure directory exists
+        var dirPath = Engine.DataPath;
+        Directory.CreateDirectory(dirPath);
+
+        // Prepare file path
+        var filePath = Path.Combine(dirPath, $"{chunkPosition}.chunk");
+
+        var options = new JsonSerializerOptions
+        {
+            WriteIndented = true, // use indentation for readability
+        };
+
+        // Serialize & save chunk data
+        using var stream = File.Create(filePath);
+        await JsonSerializer.SerializeAsync(stream, chunk.voxels, options);
+        
+        chunk.OnSaved();
+    }
+
+    private bool LoadChunk(Vector3Int chunkPosition, out Chunk chunk)
+    {
+        string filePath = Path.Combine(DataPath, $"{chunkPosition}.chunk");
+
+        if (File.Exists(filePath))
+        {
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true, // use indentation for readability
+            };
+
+            using (var stream = File.OpenRead(filePath))
+            {
+                var chunkVoxels = JsonSerializer.DeserializeAsync<uint[]>(stream, options).Result;
+                chunk = new Chunk(chunkPosition, _shader);
+                chunk.voxels = chunkVoxels;
+            }
+
+            // Add Chunk to our managed list
+            _chunks[chunkPosition] = chunk;
+            return true;
+        }
+
+        chunk = null;
+        return false;
     }
 
     protected override void OnRenderFrame(FrameEventArgs args)
@@ -164,7 +253,7 @@ public sealed class Engine : GameWindow
             }
         }
 
-        Title = $"FPS: {Time.Fps} | Vertices: {VertexCount:N0} Triangles: {TriangleCount:N0} | Loaded Chunks: {LoadedChunks} Visible Chunks: {VisibleChunks}";
+        Title = $"Vertices: {VertexCount:N0} Triangles: {TriangleCount:N0} | Loaded Chunks: {LoadedChunks} Visible Chunks: {VisibleChunks} | FPS: {Time.Fps}";
         
         SwapBuffers();
     }
