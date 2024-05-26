@@ -23,3 +23,4 @@ Then, download one of the releases in Github and run the executable. All the fil
 ### Source code
 Start by cloning the repository.
 The project was made in JetBrains Rider and the project-specific IDE files are included so formatting may differ between IDEs
+Any required packages should automatically be installed by your IDE's package manager.
