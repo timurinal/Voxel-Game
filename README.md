@@ -21,6 +21,6 @@ First, start by ensuring you have .NET 8 installed by downloading it from the [o
 Then, download one of the releases in Github and run the executable. All the files are compiled into the executable so there is only one file.
 
 ### Source code
-Start by cloning the repository.
-The project was made in JetBrains Rider and the project-specific IDE files are included so formatting may differ between IDEs
+Start by cloning the repository.<br>
+The project was made in JetBrains Rider and the project-specific IDE files are included so formatting may differ between IDEs<br>
 Any required packages should automatically be installed by your IDE's package manager.
