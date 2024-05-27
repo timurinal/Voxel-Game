@@ -7,7 +7,7 @@ using Vector3 = VoxelGame.Maths.Vector3;
 
 namespace VoxelGame.Rendering;
 
-public sealed class Chunk
+public sealed class Chunk : IRenderable
 {
     public const int ChunkSize = 16;
     public const int ChunkArea = ChunkSize * ChunkSize;
@@ -397,16 +397,51 @@ public sealed class Chunk
 
     private static bool IsAir(Vector3Int voxelPos, uint[] voxels, Dictionary<Vector3Int, Chunk> chunks)
     {
+        // Function to get voxel value from a specific chunk
+        bool GetVoxelValue(Vector3Int pos, uint[] voxelsArray)
+        {
+            int index = (pos.Z * ChunkSize * ChunkSize) + (pos.Y * ChunkSize) + (pos.X);
+            return voxelsArray[index] == 0;
+        }
+
+        // Check if voxel is within current chunk bounds
         if (voxelPos.X >= 0 && voxelPos.X < ChunkSize &&
             voxelPos.Y >= 0 && voxelPos.Y < ChunkSize &&
             voxelPos.Z >= 0 && voxelPos.Z < ChunkSize)
         {
-            int index = (voxelPos.Z * ChunkSize * ChunkSize) + (voxelPos.Y * ChunkSize) + voxelPos.X;
-            return voxels[index] == 0;
+            return GetVoxelValue(voxelPos, voxels);
         }
         else
         {
-            return true;
+            // Determine the chunk position in chunk space
+            Vector3Int chunkPos = new Vector3Int(
+                Mathf.FloorToInt((float)voxelPos.X / ChunkSize),
+                Mathf.FloorToInt((float)voxelPos.Y / ChunkSize),
+                Mathf.FloorToInt((float)voxelPos.Z / ChunkSize)
+            );
+
+            // Local position within the new chunk
+            Vector3Int localPos = new Vector3Int(
+                voxelPos.X % ChunkSize,
+                voxelPos.Y % ChunkSize,
+                voxelPos.Z % ChunkSize
+            );
+
+            // Adjust local position and chunk position for negative coordinates
+            if (localPos.X < 0) { localPos.X += ChunkSize; chunkPos.X -= 1; }
+            if (localPos.Y < 0) { localPos.Y += ChunkSize; chunkPos.Y -= 1; }
+            if (localPos.Z < 0) { localPos.Z += ChunkSize; chunkPos.Z -= 1; }
+
+            // Check if the chunk exists
+            if (chunks.TryGetValue(chunkPos, out Chunk chunk))
+            {
+                return GetVoxelValue(localPos, chunk.voxels);
+            }
+            else
+            {
+                // If the chunk does not exist, assume it is air
+                return true;
+            }
         }
     }
 
@@ -429,7 +464,7 @@ public sealed class Chunk
         return aabbs.ToArray();
     }
 
-    internal void Render(Player player)
+    public (int vertexCount, int triangleCount) Render(Player player)
     {
         _shader.SetUniform("m_proj", ref player.ProjectionMatrix);
         _shader.SetUniform("m_view", ref player.ViewMatrix);
@@ -442,28 +477,12 @@ public sealed class Chunk
         ErrorCode glError = GL.GetError();
         if (glError != ErrorCode.NoError)
         {
-            throw new GLException($"OpenGL error: {glError}");
+            throw new GLException($"OpenGL Error: {glError}");
         }
         GL.BindVertexArray(0);
 
-        Engine.VertexCount += _vertexCount;
-        Engine.TriangleCount += _triangleCount / 3;
+        return (_vertexCount, _triangleCount / 3);
     }
 
     internal void OnSaved() => IsDirty = false;
-}
-
-public class GLException : Exception
-{
-    public GLException(string message) : base(message)
-    {
-    }
-
-    public GLException(ErrorCode code, string message) : base($"GL Error Code: {code}. {message}")
-    {
-    }
-    
-    public GLException(ErrorCode code) : base($"GL Error: {code}")
-    {
-    }
 }

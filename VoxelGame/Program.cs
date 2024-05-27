@@ -7,8 +7,8 @@ class Program
 {
     static void Main(string[] args)
     {
-        FontReader.ParseFont("Assets/Fonts/JetBrainsMono-bold.ttf");
-        return;
+        // FontReader.ParseFont("Assets/Fonts/JetBrainsMono-bold.ttf");
+        // return;
         
         GameWindowSettings gws = new()
         {

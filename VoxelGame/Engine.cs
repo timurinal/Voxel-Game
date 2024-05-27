@@ -16,10 +16,10 @@ namespace VoxelGame;
 
 public sealed class Engine : GameWindow
 {
-    public static string DataPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VoxelGame");
+    public static readonly string DataPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VoxelGame");
     
     public new bool IsFullscreen { get; set; }
-    public new bool IsWireframe { get; set; }
+    public bool IsWireframe { get; set; }
 
     public const bool EnableFrustumCulling = false;
 
@@ -35,7 +35,8 @@ public sealed class Engine : GameWindow
     private Queue<Vector3Int> _chunksToBuild;
     private const int MaxChunksToBuildPerFrame = 8;
 
-    private Vector3 _velocity;
+    private Mesh _mesh;
+    private Shader _meshShader;
 
     public Engine(GameWindowSettings gws, NativeWindowSettings nws) : base(gws, nws)
     {
@@ -67,6 +68,46 @@ public sealed class Engine : GameWindow
         _shader = Shader.Load("Shaders/shader.vert", "Shaders/shader.frag");
         _chunks = new Dictionary<Vector3Int, Chunk>();
         _chunksToBuild = new Queue<Vector3Int>();
+
+        _meshShader = Shader.StandardShader;
+        _mesh = new Mesh(_meshShader)
+        {
+            Vertices =
+            [
+                new Vector3(-0.5f, -0.5f, -0.5f),
+                new Vector3(0.5f, -0.5f, -0.5f),
+                new Vector3(0.5f, 0.5f, -0.5f),
+                new Vector3(-0.5f, 0.5f, -0.5f),
+                new Vector3(-0.5f, -0.5f, 0.5f),
+                new Vector3(0.5f, -0.5f, 0.5f),
+                new Vector3(0.5f, 0.5f, 0.5f),
+                new Vector3(-0.5f, 0.5f, 0.5f)
+            ],
+            Triangles =
+            [
+                0, 2, 1, 3, 2, 0, // front face
+                4, 5, 6, 6, 7, 4, // back face
+                1, 6, 5, 6, 1, 2, // right face
+                0, 4, 7, 7, 3, 0, // left face
+                0, 1, 5, 5, 4, 0, // bottom face
+                2, 3, 6, 7, 6, 3  // top face
+            ],
+            Colours = 
+            [
+                Colour.Red,
+                Colour.Green,
+                Colour.Blue,
+                Colour.Yellow,
+                Colour.Cyan,
+                Colour.Magenta,
+                Colour.White,
+                Colour.Black,
+            ],
+            Transform =
+            {
+                Position = new Vector3(-5, 0, 0)
+            }
+        };
     }
 
     protected override async void OnUpdateFrame(FrameEventArgs args)
@@ -133,7 +174,7 @@ public sealed class Engine : GameWindow
             {
                 chunk.voxels[i] = i % 3 == 0 ? 1u : 0u;
             }
-            chunk.RebuildChunk(null);
+            chunk.RebuildChunk(_chunks);
             Console.WriteLine($"Rebuilt chunk at position {chunk.chunkPosition} (local chunk-space position; {chunk.chunkPosition / Chunk.ChunkSize})");
         }
 
@@ -170,7 +211,7 @@ public sealed class Engine : GameWindow
             try
             {
                 var chunkPosition = _chunksToBuild.Dequeue();
-                _chunks[chunkPosition].BuildChunk(null);
+                _chunks[chunkPosition].BuildChunk(_chunks);
             }
             catch
             {
@@ -237,21 +278,36 @@ public sealed class Engine : GameWindow
         VisibleChunks = 0;
         
         // Render here
-        
-        foreach (var chunk in _chunks)
+
+        try
         {
-            LoadedChunks++;
-            if (Player.IsBoxInFrustum(chunk.Value.Bounds) && EnableFrustumCulling)
+            foreach (var chunk in _chunks)
             {
-                VisibleChunks++;
-                chunk.Value.Render(Player);
-            }
-            else
-            {
-                VisibleChunks++;
-                chunk.Value.Render(Player);
+                LoadedChunks++;
+                if (Player.IsBoxInFrustum(chunk.Value.Bounds) && EnableFrustumCulling)
+                {
+                    VisibleChunks++;
+                    chunk.Value.Render(Player);
+                }
+                else
+                {
+                    VisibleChunks++;
+                    var c = chunk.Value.Render(Player);
+                    VertexCount   += c.vertexCount;
+                    TriangleCount += c.triangleCount;
+                }
             }
         }
+        catch (GLException e) // for some reason, I get an opengl invalid value error when rendering the chunks but my error handler throws an exception when a gl exception is caught. this 'fixes' the issue, it only stops the window closing but chunks all render correctly even after the error is thrown
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine(e.Message);
+            Console.ResetColor();
+        }
+        
+        var d = _mesh.Render(Player);
+        VertexCount   += d.vertexCount;
+        TriangleCount += d.triangleCount;
 
         Title = $"Vertices: {VertexCount:N0} Triangles: {TriangleCount:N0} | Loaded Chunks: {LoadedChunks} Visible Chunks: {VisibleChunks} | FPS: {Time.Fps}";
         

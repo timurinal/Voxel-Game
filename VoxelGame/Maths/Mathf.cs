@@ -144,4 +144,6 @@ public static class Mathf
     {
         return (value - a) / (b - a);
     }
+
+    public static int FloorToInt(float v) => (int)Math.Floor(v);
 }

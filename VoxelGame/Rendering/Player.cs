@@ -22,7 +22,7 @@ public class Player
     public Plane[] Planes { get; private set; } = new Plane[6];
 
     private Vector3 cameraTarget = Vector3.Zero;
-    private Vector3 cameraPosition = new(32, 10, 32);
+    private Vector3 cameraPosition = new(0, 0, 0);
     private Vector3 cameraDirection = Vector3.Zero;
     private Vector3 cameraUp = Vector3.Up;
     private Vector3 cameraRight = Vector3.Right;
@@ -36,7 +36,7 @@ public class Player
 
     private float fov;
 
-    public Player(Vector2Int screenSize, float moveSpeed = 5f, float rotateSpeed = 45f, float fov = 65f)
+    public Player(Vector2Int screenSize, float moveSpeed = 5f, float rotateSpeed = 0.5f, float fov = 65f)
     {
         MoveSpeed = moveSpeed;
         RotateSpeed = rotateSpeed;
@@ -45,7 +45,7 @@ public class Player
         
         ViewMatrix = Matrix4.LookAt(cameraPosition, cameraPosition + cameraFront, cameraUp);
         ProjectionMatrix = Matrix4.CreatePerspectiveFieldOfView(fov * Mathf.Deg2Rad, (float)screenSize.X / screenSize.Y, 
-            0.1f, 15000f);
+            0.1f, 10000f);
     }
 
     internal void Update(Vector2Int screenSize)
@@ -76,7 +76,7 @@ public class Player
 
         ViewMatrix = Matrix4.LookAt(cameraPosition, cameraPosition + cameraFront, cameraUp);
         ProjectionMatrix = Matrix4.CreatePerspectiveFieldOfView(fov * Mathf.Deg2Rad, (float)screenSize.X / screenSize.Y, 
-            0.1f, 100f);
+            0.1f, 10000f);
 
         VPMatrix = ViewMatrix * ProjectionMatrix;
         
@@ -128,7 +128,7 @@ public class Player
     {
         this.fov = fov;
         ProjectionMatrix = Matrix4.CreatePerspectiveFieldOfView(fov * Mathf.Deg2Rad, (float)screenSize.X / screenSize.Y, 
-            0.1f, 100f);
+            0.1f, 10000f);
     }
 
     public void Move(Vector3 dir)
@@ -139,8 +139,8 @@ public class Player
 
     public void Rotate(float yaw, float pitch)
     {
-        this.yaw += yaw * RotateSpeed * Time.DeltaTime;
-        this.pitch += -pitch * RotateSpeed * Time.DeltaTime;
+        this.yaw += yaw * RotateSpeed;
+        this.pitch += -pitch * RotateSpeed;
     }
     
     public void SetPosition(Vector3 pos)
