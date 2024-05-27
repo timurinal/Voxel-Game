@@ -1,4 +1,6 @@
-﻿namespace VoxelGame.Rendering.Font;
+﻿using System.Text;
+
+namespace VoxelGame.Rendering.Font;
 
 public sealed class FontReader : IDisposable
 {
@@ -34,11 +36,8 @@ public sealed class FontReader : IDisposable
         }
         
         reader.Goto(tableLocationLookup["glyf"]);
-        Glyph glyph = reader.ReadGlyph();
-        Console.WriteLine(glyph.NumPoints);
-        reader.SkipBytes(glyph.GetSize());
-        glyph = reader.ReadGlyph();
-        Console.WriteLine(glyph.NumPoints);
+        Glyph glyph = reader.ReadSimpleGlyph();
+        Console.WriteLine(glyph.ToString());
     }
 
     private GlyphHeader ReadGlyphHeader()
@@ -55,19 +54,79 @@ public sealed class FontReader : IDisposable
         return header;
     }
 
-    private Glyph ReadGlyph()
+    private Glyph ReadSimpleGlyph()
     {
-        Glyph glyph = new Glyph
-        {
-            Header = ReadGlyphHeader()
-        };
-
+        Glyph glyph = new Glyph();
+        glyph.Header = ReadGlyphHeader();
         glyph.EndPtsOfContours = ReadUInt16Array(glyph.Header.NumContours);
         glyph.NumPoints = (UInt16)(glyph.EndPtsOfContours[^1] + 1);
         glyph.InstructionLength = ReadUInt16();
         glyph.Instructions = ReadByteArray(glyph.InstructionLength);
-        // TODO: flags and positions
+
+        var flags = new Byte[glyph.NumPoints];
+        for (int i = 0; i < glyph.NumPoints; i++)
+        {
+            Byte flag = reader.ReadByte();
+            flags[i] = flag;
+
+            // check repeat bit, if it is on, the next byte determines how many times this flag repeats
+            if (FlagBitSet(flag, 3))
+            {
+                int repeatCount = reader.ReadByte();
+                for (int r = 0; r < repeatCount; r++)
+                {
+                    flags[++i] = flag;
+                }
+            }
+        }
+
+        glyph.XCoordinates = ReadCoordinates(flags, readingX: true);
+        glyph.YCoordinates = ReadCoordinates(flags, readingX: false);
+
+        glyph.Flags = flags;
+
         return glyph;
+
+        Int16[] ReadCoordinates(Byte[] allFlags, bool readingX)
+        {
+            int offsetSizeFlagBit = readingX ? 1 : 2;
+            int signFlagBit = readingX ? 4 : 5;
+            var coordinates = new Int16[allFlags.Length];
+            Int16 currentCoordinate = 0;
+
+            for (int i = 0; i < coordinates.Length; i++)
+            {
+                Byte flag = allFlags[i];
+                Console.WriteLine($"Flag {i}: {Convert.ToString(flag, 2).PadLeft(8, '0')}");
+
+                if (FlagBitSet(flag, offsetSizeFlagBit))
+                {
+                    Byte offset = reader.ReadByte();
+                    Console.WriteLine($"Offset (byte) {i}: {offset}");
+
+                    if (FlagBitSet(flag, signFlagBit))
+                    {
+                        currentCoordinate += offset;
+                    }
+                    else
+                    {
+                        currentCoordinate -= offset;
+                    }
+                }
+                else if (!FlagBitSet(flag, signFlagBit))
+                {
+                    Int16 offset = ReadInt16();
+                    Console.WriteLine($"Offset (short) {i}: {offset}");
+                    currentCoordinate += offset;
+                }
+                // Implicit handling when neither sizeFlag nor signFlag are set (coordinate remains the same)
+
+                coordinates[i] = currentCoordinate;
+                Console.WriteLine($"Coordinate {i}: {currentCoordinate}");
+            }
+
+            return coordinates;
+        }
     }
 
     private UInt16[] ReadUInt16Array(int len)
@@ -143,6 +202,11 @@ public sealed class FontReader : IDisposable
         return tag.ToString();
     }
 
+    private bool FlagBitSet(byte flag, int bitIndex)
+    {
+        return (flag & (1 << bitIndex)) != 0;
+    }
+
     private void SkipBytes(uint bytes) => stream.Position += bytes;
     private void Goto(uint bytePosition) => stream.Position = bytePosition;
     
@@ -170,23 +234,25 @@ public sealed class FontReader : IDisposable
         public Byte[] Flags;
         public Int16[] XCoordinates, YCoordinates;
 
-        public uint GetSize()
+        public override string ToString()
         {
-            int size = 0;
+            var sb = new StringBuilder();
+            sb.AppendLine($"Glyph {{");
+            sb.AppendLine($"\tNum Contours: {Header.NumContours} Num Points: {NumPoints}\n");
 
-            //Size of GlyphHeader is fixed
-            size += sizeof(Int16) * 5; //GlyphHeader consists of 5 Int16 types.
+            for (int i = 0; i < Header.NumContours; i++)
+            {
+                sb.AppendLine($"\tContour {i} end index: {EndPtsOfContours[i]}");
+            }
 
-            //Accounting arrays' sizes, considering that each item occupies memory in bytes equals to sizeof(type)
-            size += (this.EndPtsOfContours?.Length ?? 0) * sizeof(UInt16);
-            size += sizeof(UInt16); //NumPoints
-            size += sizeof(UInt16); //InstructionLength
-            size += (this.Instructions?.Length ?? 0) * sizeof(Byte);
-            size += (this.Flags?.Length ?? 0) * sizeof(Byte);
-            size += (this.XCoordinates?.Length ?? 0) * sizeof(Int16);
-            size += (this.YCoordinates?.Length ?? 0) * sizeof(Int16);
+            sb.AppendLine("");
+            for (int i = 0; i < NumPoints; i++)
+            {
+                sb.AppendLine($"\tPoint {i}: (X: {XCoordinates[i]} Y: {YCoordinates[i]})");
+            }
 
-            return (uint)size;
+            sb.AppendLine("}");
+            return sb.ToString();
         }
     }
 }
