@@ -1,4 +1,5 @@
-﻿using OpenTK.Windowing.Desktop;
+﻿using System.Reflection;
+using OpenTK.Windowing.Desktop;
 using VoxelGame.Rendering.Font;
 
 namespace VoxelGame;

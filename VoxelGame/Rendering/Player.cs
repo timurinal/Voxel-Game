@@ -19,6 +19,9 @@ public class Player
     public Matrix4 ViewMatrix;
     public Matrix4 VPMatrix { get; private set; }
     
+    public float NearClipPlane { get; set; }
+    public float FarClipPlane { get; set; }
+    
     public Plane[] Planes { get; private set; } = new Plane[6];
 
     private Vector3 cameraTarget = Vector3.Zero;
@@ -36,16 +39,19 @@ public class Player
 
     private float fov;
 
-    public Player(Vector2Int screenSize, float moveSpeed = 5f, float rotateSpeed = 0.5f, float fov = 65f)
+    public Player(Vector2Int screenSize, float moveSpeed = 5f, float rotateSpeed = 0.5f, float fov = 65f, float near = 0.1f, float far = 7500f)
     {
         MoveSpeed = moveSpeed;
         RotateSpeed = rotateSpeed;
+
+        NearClipPlane = near;
+        FarClipPlane = far;
 
         this.fov = fov;
         
         ViewMatrix = Matrix4.LookAt(cameraPosition, cameraPosition + cameraFront, cameraUp);
         ProjectionMatrix = Matrix4.CreatePerspectiveFieldOfView(fov * Mathf.Deg2Rad, (float)screenSize.X / screenSize.Y, 
-            0.1f, 10000f);
+            NearClipPlane, FarClipPlane);
     }
 
     internal void Update(Vector2Int screenSize)
@@ -76,7 +82,7 @@ public class Player
 
         ViewMatrix = Matrix4.LookAt(cameraPosition, cameraPosition + cameraFront, cameraUp);
         ProjectionMatrix = Matrix4.CreatePerspectiveFieldOfView(fov * Mathf.Deg2Rad, (float)screenSize.X / screenSize.Y, 
-            0.1f, 10000f);
+            NearClipPlane, FarClipPlane);
 
         VPMatrix = ViewMatrix * ProjectionMatrix;
         
@@ -128,7 +134,7 @@ public class Player
     {
         this.fov = fov;
         ProjectionMatrix = Matrix4.CreatePerspectiveFieldOfView(fov * Mathf.Deg2Rad, (float)screenSize.X / screenSize.Y, 
-            0.1f, 10000f);
+            NearClipPlane, FarClipPlane);
     }
 
     public void Move(Vector3 dir)

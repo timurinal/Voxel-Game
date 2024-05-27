@@ -35,7 +35,7 @@ public sealed class Engine : GameWindow
     private Queue<Vector3Int> _chunksToBuild;
     private const int MaxChunksToBuildPerFrame = 8;
 
-    private Mesh _mesh;
+    private Mesh _skybox;
     private Shader _meshShader;
 
     public Engine(GameWindowSettings gws, NativeWindowSettings nws) : base(gws, nws)
@@ -58,19 +58,21 @@ public sealed class Engine : GameWindow
         GL.CullFace(CullFaceMode.Front);
         GL.FrontFace(FrontFaceDirection.Cw);
 
-        GL.ClearColor(0.6f, 0.75f, 1f, 1f);
+        // GL.ClearColor(0.6f, 0.75f, 1f, 1f);
+        GL.ClearColor(Colour.Black);
 
         TextureAtlas.Init();
+        // Physics.Init();
 
         // Make the window visible after setting up so it appears in place and not in a random location
         IsVisible = true;
 
-        _shader = Shader.Load("Shaders/shader.vert", "Shaders/shader.frag");
+        _shader = Shader.Load("Assets/Shaders/chunk-shader.vert", "Assets/Shaders/chunk-shader.frag");
         _chunks = new Dictionary<Vector3Int, Chunk>();
         _chunksToBuild = new Queue<Vector3Int>();
 
         _meshShader = Shader.StandardShader;
-        _mesh = new Mesh(_meshShader)
+        _skybox = new Mesh(_meshShader)
         {
             Vertices =
             [
@@ -85,12 +87,12 @@ public sealed class Engine : GameWindow
             ],
             Triangles =
             [
-                0, 2, 1, 3, 2, 0, // front face
-                4, 5, 6, 6, 7, 4, // back face
-                1, 6, 5, 6, 1, 2, // right face
-                0, 4, 7, 7, 3, 0, // left face
-                0, 1, 5, 5, 4, 0, // bottom face
-                2, 3, 6, 7, 6, 3  // top face
+                0, 1, 2, 2, 3, 0, // front face
+                5, 4, 6, 7, 6, 4, // back face
+                6, 1, 5, 1, 6, 2, // right face
+                4, 0, 7, 3, 7, 0, // left face
+                0, 5, 1, 4, 5, 0, // bottom face
+                3, 2, 6, 6, 7, 3  // top face
             ],
             Colours = 
             [
@@ -105,7 +107,7 @@ public sealed class Engine : GameWindow
             ],
             Transform =
             {
-                Position = new Vector3(-5, 0, 0)
+                Scale = Vector3.One * Player.FarClipPlane
             }
         };
     }
@@ -145,6 +147,8 @@ public sealed class Engine : GameWindow
         {
             _chunks.Remove(chunkPos);
         }
+        
+        // Physics.Update();
         
         Player.Update(Size);
         
@@ -217,6 +221,8 @@ public sealed class Engine : GameWindow
             {
             }
         }
+
+        _skybox.Transform.Position = Player.Position;
     }
 
     private async Task SaveChunk(Vector3Int chunkPosition, Chunk chunk)
@@ -305,7 +311,7 @@ public sealed class Engine : GameWindow
             Console.ResetColor();
         }
         
-        var d = _mesh.Render(Player);
+        var d = _skybox.Render(Player);
         VertexCount   += d.vertexCount;
         TriangleCount += d.triangleCount;
 
