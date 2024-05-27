@@ -110,6 +110,8 @@ public sealed class Engine : GameWindow
                 Scale = Vector3.One * Player.FarClipPlane
             }
         };
+        
+        UIRenderer.CreateQuad(Vector2.Zero, Vector3.One);
     }
 
     protected override async void OnUpdateFrame(FrameEventArgs args)
@@ -314,10 +316,15 @@ public sealed class Engine : GameWindow
         var d = _skybox.Render(Player);
         VertexCount   += d.vertexCount;
         TriangleCount += d.triangleCount;
+        
+        GL.Disable(EnableCap.DepthTest);
+        UIRenderer.Render(Player);
+        GL.Enable(EnableCap.DepthTest);
 
         Title = $"Vertices: {VertexCount:N0} Triangles: {TriangleCount:N0} | Loaded Chunks: {LoadedChunks} Visible Chunks: {VisibleChunks} | FPS: {Time.Fps}";
         
         SwapBuffers();
+        
     }
 
     protected override void OnResize(ResizeEventArgs e)
