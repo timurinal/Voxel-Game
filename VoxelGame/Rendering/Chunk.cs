@@ -9,7 +9,7 @@ namespace VoxelGame.Rendering;
 
 public sealed class Chunk : IRenderable
 {
-    public const int ChunkSize = 16;
+    public const int ChunkSize = 8;
     public const int ChunkArea = ChunkSize * ChunkSize;
     public const int ChunkVolume = ChunkArea * ChunkSize;
     
@@ -49,8 +49,12 @@ public sealed class Chunk : IRenderable
             int globalY = y + this.chunkPosition.Y;
 
             // Generate a flat plane only at the bottom of the world
-            if (globalY <= ChunkSize)
+            if (globalY <= 0)
                 voxels[i] = 4u;
+            else if (globalY <= 3)
+                voxels[i] = 3u;
+            else if (globalY <= 4)
+                voxels[i] = 1u;
             else
                 voxels[i] = 0u;
         }
@@ -94,7 +98,8 @@ public sealed class Chunk : IRenderable
                 Vector2 uv11 = GetUVForVoxel(voxelID - 1, 0, 0);
 
                 // TODO: Cull faces between chunks
-                if (IsAir(voxelPosition + new Vector3Int(0, 0, -1), voxels, chunks))
+                if (IsAir(voxelPosition.X, voxelPosition.Y, voxelPosition.Z - 1, voxels, chunks,
+                        (Vector3Int)(chunkPosition / ChunkSize)))
                 {
                     // Front face
                     vertices.AddRange(new Vector3[]
@@ -117,7 +122,8 @@ public sealed class Chunk : IRenderable
                     });
                     triangleIndex += 4;
                 }
-                if (IsAir(voxelPosition + new Vector3Int(0, 0, 1), voxels, chunks))
+                if (IsAir(voxelPosition.X, voxelPosition.Y, voxelPosition.Z + 1, voxels, chunks,
+                    (Vector3Int)(chunkPosition / ChunkSize)))
                 {
                     // Back face
                     vertices.AddRange(new Vector3[]
@@ -140,7 +146,8 @@ public sealed class Chunk : IRenderable
                     });
                     triangleIndex += 4;
                 }
-                if (IsAir(voxelPosition + new Vector3Int(0, 1, 0), voxels, chunks))
+                if (IsAir(voxelPosition.X, voxelPosition.Y + 1, voxelPosition.Z, voxels, chunks,
+                        (Vector3Int)(chunkPosition / ChunkSize)))
                 {
                     // Top face
                     vertices.AddRange(new Vector3[]
@@ -163,7 +170,8 @@ public sealed class Chunk : IRenderable
                     });
                     triangleIndex += 4;
                 }
-                if (IsAir(voxelPosition + new Vector3Int(0, -1, 0), voxels, chunks))
+                if (IsAir(voxelPosition.X, voxelPosition.Y - 1, voxelPosition.Z, voxels, chunks,
+                        (Vector3Int)(chunkPosition / ChunkSize)))
                 {
                     // Bottom face
                     vertices.AddRange(new Vector3[]
@@ -186,7 +194,8 @@ public sealed class Chunk : IRenderable
                     });
                     triangleIndex += 4;
                 }
-                if (IsAir(voxelPosition + new Vector3Int(1, 0, 0), voxels, chunks))
+                if (IsAir(voxelPosition.X + 1, voxelPosition.Y, voxelPosition.Z, voxels, chunks,
+                        (Vector3Int)(chunkPosition / ChunkSize)))
                 {
                     // Right face
                     vertices.AddRange(new Vector3[]
@@ -209,7 +218,8 @@ public sealed class Chunk : IRenderable
                     });
                     triangleIndex += 4;
                 }
-                if (IsAir(voxelPosition + new Vector3Int(-1, 0, 0), voxels, chunks))
+                if (IsAir(voxelPosition.X - 1, voxelPosition.Y, voxelPosition.Z, voxels, chunks,
+                        (Vector3Int)(chunkPosition / ChunkSize)))
                 {
                     // Left face
                     vertices.AddRange(new Vector3[]
@@ -270,84 +280,106 @@ public sealed class Chunk : IRenderable
         GL.BindVertexArray(0);
     }
     
-    internal void RebuildChunk(Dictionary<Vector3Int, Chunk> chunks)
+    internal void RebuildChunk(Dictionary<Vector3Int, Chunk> chunks, bool recursive = false)
     {
         BuildChunk(chunks);
+
+        Vector3Int[] neighbourChunkOffsets =
+        [
+            new Vector3Int(0, 0, 1),
+            new Vector3Int(0, 0, -1),
+            new Vector3Int(0, 1, 0),
+            new Vector3Int(0, -1, 0),
+            new Vector3Int(1, 0, 0),
+            new Vector3Int(-1, 0, 0),
+        ];
+
+        if (recursive)
+        {
+            foreach (var offset in neighbourChunkOffsets)
+            {
+                if (chunks.TryGetValue(chunkPosition + offset, out var neighbour))
+                {
+                    neighbour.RebuildChunk(chunks);
+                }
+            }
+        }
+        
         IsDirty = true;
     }
     
-    private async Task<(float[] vertices, int[] triangles)> BuildChunkAsync(Dictionary<Vector3Int, Chunk> chunks)
-    {
-        return await Task.Run(() =>
-        {
-            List<Vector3> vertexList = new();
-            List<Vector2> uvList = new();
-            List<int> faceIdList = new(); // 0 = up, 1 = down, 2 = front, 3 = back, 4 = right, 5 = left
-            List<int> triangleList = new();
-
-            solidVoxelCount = 0;
-
-            for (int i = 0, triangleIndex = 0; i < voxels.Length; i++)
-            {
-                int x = i % ChunkSize;
-                int y = (i / ChunkSize) % ChunkSize;
-                int z = i / ChunkArea;
-                Vector3Int voxelPosition = new(x, y, z);
-                Vector3Int worldPosition = chunkPosition * ChunkSize + new Vector3Int(x, y, z);
-
-                if (voxels[i] != 0)
-                {
-                    solidVoxelCount++;
-
-                    int voxelID = (int)voxels[i];
-                    Vector2 uv00 = GetUVForVoxel(voxelID - 1, 1, 1);
-                    Vector2 uv01 = GetUVForVoxel(voxelID - 1, 1, 0);
-                    Vector2 uv10 = GetUVForVoxel(voxelID - 1, 0, 1);
-                    Vector2 uv11 = GetUVForVoxel(voxelID - 1, 0, 0);
-
-                    if (IsAir(voxelPosition + new Vector3Int(0, 0, -1), voxels, chunks))
-                    {
-                        // Front face
-                        vertexList.AddRange(new Vector3[]
-                        {
-                            new(x - 0.5f, y - 0.5f, z - 0.5f),
-                            new(x - 0.5f, y + 0.5f, z - 0.5f),
-                            new(x + 0.5f, y - 0.5f, z - 0.5f),
-                            new(x + 0.5f, y + 0.5f, z - 0.5f),
-                        });
-                        uvList.AddRange(new[]
-                        {
-                            uv00, uv01, uv10, uv11
-                        });
-                        for (int j = 0; j < 4; j++)
-                            faceIdList.Add(0);
-                        triangleList.AddRange(new[]
-                        {
-                            0 + triangleIndex, 1 + triangleIndex, 2 + triangleIndex,
-                            2 + triangleIndex, 1 + triangleIndex, 3 + triangleIndex,
-                        });
-                        triangleIndex += 4;
-                    }
-
-                    // Repeat for other faces...
-                }
-            }
-
-            const int stride = 6;
-            float[] data = new float[vertexList.Count * stride];
-            for (int i = 0; i < vertexList.Count; i++)
-            {
-                data[i * stride + 0] = vertexList[i].X;
-                data[i * stride + 1] = vertexList[i].Y;
-                data[i * stride + 2] = vertexList[i].Z;
-                data[i * stride + 3] = uvList[i].X;
-                data[i * stride + 4] = uvList[i].Y;
-                data[i * stride + 5] = faceIdList[i];
-            }
-
-            return (data, triangleList.ToArray());
-        });
-    }
+    // private async Task<(float[] vertices, int[] triangles)> BuildChunkAsync(Dictionary<Vector3Int, Chunk> chunks)
+    // {
+    //     return await Task.Run(() =>
+    //     {
+    //         List<Vector3> vertexList = new();
+    //         List<Vector2> uvList = new();
+    //         List<int> faceIdList = new(); // 0 = up, 1 = down, 2 = front, 3 = back, 4 = right, 5 = left
+    //         List<int> triangleList = new();
+    //
+    //         solidVoxelCount = 0;
+    //
+    //         for (int i = 0, triangleIndex = 0; i < voxels.Length; i++)
+    //         {
+    //             int x = i % ChunkSize;
+    //             int y = (i / ChunkSize) % ChunkSize;
+    //             int z = i / ChunkArea;
+    //             Vector3Int voxelPosition = new(x, y, z);
+    //             Vector3Int worldPosition = chunkPosition * ChunkSize + new Vector3Int(x, y, z);
+    //
+    //             if (voxels[i] != 0)
+    //             {
+    //                 solidVoxelCount++;
+    //
+    //                 int voxelID = (int)voxels[i];
+    //                 Vector2 uv00 = GetUVForVoxel(voxelID - 1, 1, 1);
+    //                 Vector2 uv01 = GetUVForVoxel(voxelID - 1, 1, 0);
+    //                 Vector2 uv10 = GetUVForVoxel(voxelID - 1, 0, 1);
+    //                 Vector2 uv11 = GetUVForVoxel(voxelID - 1, 0, 0);
+    //
+    //                 if (IsAir(voxelPosition + new Vector3Int(0, 0, -1), voxels, chunks))
+    //                 {
+    //                     // Front face
+    //                     vertexList.AddRange(new Vector3[]
+    //                     {
+    //                         new(x - 0.5f, y - 0.5f, z - 0.5f),
+    //                         new(x - 0.5f, y + 0.5f, z - 0.5f),
+    //                         new(x + 0.5f, y - 0.5f, z - 0.5f),
+    //                         new(x + 0.5f, y + 0.5f, z - 0.5f),
+    //                     });
+    //                     uvList.AddRange(new[]
+    //                     {
+    //                         uv00, uv01, uv10, uv11
+    //                     });
+    //                     for (int j = 0; j < 4; j++)
+    //                         faceIdList.Add(0);
+    //                     triangleList.AddRange(new[]
+    //                     {
+    //                         0 + triangleIndex, 1 + triangleIndex, 2 + triangleIndex,
+    //                         2 + triangleIndex, 1 + triangleIndex, 3 + triangleIndex,
+    //                     });
+    //                     triangleIndex += 4;
+    //                 }
+    //
+    //                 // Repeat for other faces...
+    //             }
+    //         }
+    //
+    //         const int stride = 6;
+    //         float[] data = new float[vertexList.Count * stride];
+    //         for (int i = 0; i < vertexList.Count; i++)
+    //         {
+    //             data[i * stride + 0] = vertexList[i].X;
+    //             data[i * stride + 1] = vertexList[i].Y;
+    //             data[i * stride + 2] = vertexList[i].Z;
+    //             data[i * stride + 3] = uvList[i].X;
+    //             data[i * stride + 4] = uvList[i].Y;
+    //             data[i * stride + 5] = faceIdList[i];
+    //         }
+    //
+    //         return (data, triangleList.ToArray());
+    //     });
+    // }
     private void SetupGLBuffers(float[] vertices, int[] triangles)
     {
         _triangleCount = triangles.Length;
@@ -372,13 +404,13 @@ public sealed class Chunk : IRenderable
         GL.BindVertexArray(0);
     }
     
-    internal async Task CreateChunkAsync(Dictionary<Vector3Int, Chunk> chunks)
-    {
-        var (vertices, triangles) = await BuildChunkAsync(chunks);
-
-        // OpenGL setup should be done on the main thread
-        SetupGLBuffers(vertices, triangles);
-    }
+    // internal async Task CreateChunkAsync(Dictionary<Vector3Int, Chunk> chunks)
+    // {
+    //     var (vertices, triangles) = await BuildChunkAsync(chunks);
+    //
+    //     // OpenGL setup should be done on the main thread
+    //     SetupGLBuffers(vertices, triangles);
+    // }
 
     private Vector2 GetUVForVoxel(int voxelID, int u, int v)
     {
@@ -395,54 +427,53 @@ public sealed class Chunk : IRenderable
         return new Vector2(x + u * adjustedUnit, y + v * adjustedUnit);
     }
 
-    private static bool IsAir(Vector3Int voxelPos, uint[] voxels, Dictionary<Vector3Int, Chunk> chunks)
+    public static bool IsAir(int x, int y, int z, uint[] voxels, Dictionary<Vector3Int, Chunk> chunks, Vector3Int currentChunkPosition)
     {
-        // Function to get voxel value from a specific chunk
-        bool GetVoxelValue(Vector3Int pos, uint[] voxelsArray)
+        // Check if the coordinates are outside of the current chunk boundaries
+        if (x < 0 || y < 0 || z < 0 || x >= ChunkSize || y >= ChunkSize || z >= ChunkSize)
         {
-            int index = (pos.Z * ChunkSize * ChunkSize) + (pos.Y * ChunkSize) + (pos.X);
-            return voxelsArray[index] == 0;
-        }
-
-        // Check if voxel is within current chunk bounds
-        if (voxelPos.X >= 0 && voxelPos.X < ChunkSize &&
-            voxelPos.Y >= 0 && voxelPos.Y < ChunkSize &&
-            voxelPos.Z >= 0 && voxelPos.Z < ChunkSize)
-        {
-            return GetVoxelValue(voxelPos, voxels);
-        }
-        else
-        {
-            // Determine the chunk position in chunk space
-            Vector3Int chunkPos = new Vector3Int(
-                Mathf.FloorToInt((float)voxelPos.X / ChunkSize),
-                Mathf.FloorToInt((float)voxelPos.Y / ChunkSize),
-                Mathf.FloorToInt((float)voxelPos.Z / ChunkSize)
+            // Calculate which chunk the voxel would be in
+            Vector3Int neighborChunkPosition = currentChunkPosition + new Vector3Int(
+                x < 0 ? -1 : (x >= ChunkSize ? 1 : 0),
+                y < 0 ? -1 : (y >= ChunkSize ? 1 : 0),
+                z < 0 ? -1 : (z >= ChunkSize ? 1 : 0)
             );
 
-            // Local position within the new chunk
-            Vector3Int localPos = new Vector3Int(
-                voxelPos.X % ChunkSize,
-                voxelPos.Y % ChunkSize,
-                voxelPos.Z % ChunkSize
-            );
-
-            // Adjust local position and chunk position for negative coordinates
-            if (localPos.X < 0) { localPos.X += ChunkSize; chunkPos.X -= 1; }
-            if (localPos.Y < 0) { localPos.Y += ChunkSize; chunkPos.Y -= 1; }
-            if (localPos.Z < 0) { localPos.Z += ChunkSize; chunkPos.Z -= 1; }
-
-            // Check if the chunk exists
-            if (chunks.TryGetValue(chunkPos, out Chunk chunk))
+            // Try to get the neighbouring chunk
+            if (chunks.TryGetValue(neighborChunkPosition, out Chunk neighborChunk))
             {
-                return GetVoxelValue(localPos, chunk.voxels);
+                // Convert global coordinates to local coordinates within the neighbouring chunk
+                int localX = (x + ChunkSize) % ChunkSize;
+                int localY = (y + ChunkSize) % ChunkSize;
+                int localZ = (z + ChunkSize) % ChunkSize;
+                int index = FlattenIndex3D(localX, localY, localZ, ChunkSize, ChunkSize);
+                return neighborChunk.voxels[index] == 0;
             }
             else
             {
-                // If the chunk does not exist, assume it is air
-                return true;
+                return false;
             }
         }
+        else
+        {
+            // Inside current chunk
+            int index = FlattenIndex3D(x, y, z, ChunkSize, ChunkSize);
+            return voxels[index] == 0;
+        }
+    }
+    
+    public static int FlattenIndex3D(int x, int y, int z, int width, int height)
+    {
+        return x + (y * width) + (z * width * height);
+    }
+
+    public static Vector3 UnflattenIndex1D(int index, int width, int height)
+    {
+        int z = index / (width * height);
+        index -= (z * width * height);
+        int y = index / width;
+        int x = index % width;
+        return new Vector3(x, y, z);
     }
 
     internal AABB[] GenerateCollisions()

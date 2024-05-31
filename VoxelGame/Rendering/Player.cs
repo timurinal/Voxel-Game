@@ -5,9 +5,9 @@ using Vector3 = VoxelGame.Maths.Vector3;
 
 namespace VoxelGame.Rendering;
 
-public class Player
+public sealed class Player
 {
-    public const int ChunkRenderDistance = 4;
+    public const int ChunkRenderDistance = 6;
     
     public Vector3 Position => cameraPosition;
     public float Yaw => yaw;

@@ -33,7 +33,7 @@ public sealed class Engine : GameWindow
     private Shader _shader;
     private Dictionary<Vector3Int, Chunk> _chunks;
     private Queue<Vector3Int> _chunksToBuild;
-    private const int MaxChunksToBuildPerFrame = 8;
+    private const int MaxChunksToBuildPerFrame = 32;
 
     private Mesh _skybox;
     private Shader _meshShader;
@@ -135,12 +135,7 @@ public sealed class Engine : GameWindow
 
             if (Math.Abs(dx) > renderDistance || Math.Abs(dy) > renderDistance || Math.Abs(dz) > renderDistance)
             {
-                var chunkObj = chunk.Value;
-                if (chunkObj.IsDirty)
-                {
-                    Console.WriteLine($"Chunk at position {chunk.Key} is dirty. Saving chunk...");
-                    await SaveChunk(chunk.Key, chunkObj);
-                }
+                // TODO: Save dirty chunks to the disk
                 chunksToRemove.Add(chunkPos);
             }
         }
@@ -174,14 +169,12 @@ public sealed class Engine : GameWindow
 
         if (Input.GetKeyDown(Keys.Space))
         {
-            Console.WriteLine("Attempting to rebuild chunk...");
-            var chunk = _chunks.First().Value;
+            var chunk = _chunks[Vector3Int.Zero];
             for (int i = 0; i < chunk.voxels.Length; i++)
             {
-                chunk.voxels[i] = i % 3 == 0 ? 1u : 0u;
+                chunk.voxels[i] = chunk.voxels[i] == 4u ? 4u : 0u;
             }
-            chunk.RebuildChunk(_chunks);
-            Console.WriteLine($"Rebuilt chunk at position {chunk.chunkPosition} (local chunk-space position; {chunk.chunkPosition / Chunk.ChunkSize})");
+            chunk.RebuildChunk(_chunks, recursive: true);
         }
 
         for (int x = -Player.ChunkRenderDistance; x < Player.ChunkRenderDistance; x++)
@@ -193,19 +186,12 @@ public sealed class Engine : GameWindow
                     Vector3Int chunkPosition = new Vector3Int(x, y, z) + playerPosition;
                     Vector3Int chunkWorldPosition = chunkPosition * Chunk.ChunkSize;
 
-                    if (!_chunks.ContainsKey(chunkPosition) && chunkWorldPosition.Y > 0)
+                    if (!_chunks.ContainsKey(chunkPosition) && chunkWorldPosition.Y >= 0)
                     {
-                        if (LoadChunk(chunkPosition, out var chunk))
-                        {
-                            _chunksToBuild.Enqueue(chunkPosition); // Queue the chunk for building
-                            _chunks[chunkPosition] = chunk; // Add the chunk to the dictionary
-                        }
-                        else
-                        {
-                            var newChunk = new Chunk(chunkWorldPosition, _shader);
-                            _chunksToBuild.Enqueue(chunkPosition); // Queue the chunk for building
-                            _chunks[chunkPosition] = newChunk; // Add the chunk to the dictionary
-                        }
+                        // TODO: Load chunks from disk
+                        var newChunk = new Chunk(chunkWorldPosition, _shader);
+                        _chunksToBuild.Enqueue(chunkPosition); // Queue the chunk for building
+                        _chunks[chunkPosition] = newChunk; // Add the chunk to the dictionary
                     }
                 }
             }
