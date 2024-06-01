@@ -51,9 +51,11 @@ public sealed class Chunk : IRenderable
             // Generate a flat plane only at the bottom of the world
             if (globalY <= 0)
                 voxels[i] = 4u;
-            else if (globalY <= 3)
-                voxels[i] = 3u;
             else if (globalY <= 4)
+                voxels[i] = 2u;
+            else if (globalY <= 6)
+                voxels[i] = 3u;
+            else if (globalY <= 7)
                 voxels[i] = 1u;
             else
                 voxels[i] = 0u;
@@ -76,6 +78,7 @@ public sealed class Chunk : IRenderable
         solidVoxelCount = 0;
         
         List<Vector3> vertices = new();
+        List<Vector3> normals = new();
         List<Vector2> uvs = new();
         List<int> faceIds = new(); // 0 = front, 1 = back, 2 = up, 3 = down, 4 = right, 5 = left
         List<int> triangles = new();
@@ -109,6 +112,8 @@ public sealed class Chunk : IRenderable
                         new(x + 0.5f, y - 0.5f, z - 0.5f),
                         new(x + 0.5f, y + 0.5f, z - 0.5f),
                     });
+                    for (int j = 0; j < 4; j++)
+                        normals.Add(new Vector3(0, 0, -1));
                     uvs.AddRange(new[]
                     {
                         uv00, uv01, uv10, uv11
@@ -133,6 +138,8 @@ public sealed class Chunk : IRenderable
                         new(x + 0.5f, y - 0.5f, z + 0.5f),
                         new(x + 0.5f, y + 0.5f, z + 0.5f),
                     });
+                    for (int j = 0; j < 4; j++)
+                        normals.Add(new Vector3(0, 0, 1));
                     uvs.AddRange(new[]
                     {
                         uv00, uv01, uv10, uv11
@@ -157,6 +164,8 @@ public sealed class Chunk : IRenderable
                         new(x - 0.5f, y + 0.5f, z + 0.5f),
                         new(x + 0.5f, y + 0.5f, z + 0.5f),
                     });
+                    for (int j = 0; j < 4; j++)
+                        normals.Add(new Vector3(0, 1, 0));
                     uvs.AddRange(new[]
                     {
                         uv00, uv01, uv10, uv11
@@ -181,6 +190,8 @@ public sealed class Chunk : IRenderable
                         new(x - 0.5f, y - 0.5f, z + 0.5f),
                         new(x + 0.5f, y - 0.5f, z + 0.5f),
                     });
+                    for (int j = 0; j < 4; j++)
+                        normals.Add(new Vector3(0, -1, 0));
                     uvs.AddRange(new[]
                     {
                         uv00, uv01, uv10, uv11
@@ -205,6 +216,8 @@ public sealed class Chunk : IRenderable
                         new(x + 0.5f, y - 0.5f, z + 0.5f),
                         new(x + 0.5f, y + 0.5f, z + 0.5f),
                     });
+                    for (int j = 0; j < 4; j++)
+                        normals.Add(new Vector3(1, 0, 0));
                     uvs.AddRange(new[]
                     {
                         uv00, uv01, uv10, uv11
@@ -229,6 +242,8 @@ public sealed class Chunk : IRenderable
                         new(x - 0.5f, y - 0.5f, z + 0.5f),
                         new(x - 0.5f, y + 0.5f, z + 0.5f),
                     });
+                    for (int j = 0; j < 4; j++)
+                        normals.Add(new Vector3(-1, 0, 1));
                     uvs.AddRange(new[]
                     {
                         uv00, uv01, uv10, uv11
@@ -248,7 +263,7 @@ public sealed class Chunk : IRenderable
         _triangleCount = triangles.Count;
         _vertexCount = vertices.Count;
 
-        const int stride = 6; // each vertex has 3 position floats, 2 UV floats, and 1 faceid integer
+        const int stride = 9; // each vertex has 3 position floats, 3 normal floats, 2 UV floats, and 1 faceid integer
         float[] data = new float[vertices.Count * stride];
         
         for (int i = 0; i < vertices.Count; i++)
@@ -257,10 +272,14 @@ public sealed class Chunk : IRenderable
             data[i * stride + 1] = vertices[i].Y;
             data[i * stride + 2] = vertices[i].Z;
             
-            data[i * stride + 3] = uvs[i].X;
-            data[i * stride + 4] = uvs[i].Y;
+            data[i * stride + 3] = normals[i].X;
+            data[i * stride + 4] = normals[i].Y;
+            data[i * stride + 5] = normals[i].Z;
             
-            data[i * stride + 5] = faceIds[i];
+            data[i * stride + 6] = uvs[i].X;
+            data[i * stride + 7] = uvs[i].Y;
+            
+            data[i * stride + 8] = faceIds[i];
         }
 
         GL.BindVertexArray(_vao);
@@ -271,11 +290,13 @@ public sealed class Chunk : IRenderable
         GL.BufferData(BufferTarget.ElementArrayBuffer, triangles.Count * sizeof(int), triangles.ToArray(), BufferUsageHint.StaticDraw);
 
         GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, stride * sizeof(float), 0 * sizeof(float));
-        GL.VertexAttribPointer(1, 2, VertexAttribPointerType.Float, false, stride * sizeof(float), 3 * sizeof(float));
-        GL.VertexAttribPointer(2, 1, VertexAttribPointerType.Float, false, stride * sizeof(float), 5 * sizeof(float));
+        GL.VertexAttribPointer(1, 3, VertexAttribPointerType.Float, false, stride * sizeof(float), 3 * sizeof(float));
+        GL.VertexAttribPointer(2, 2, VertexAttribPointerType.Float, false, stride * sizeof(float), 6 * sizeof(float));
+        GL.VertexAttribPointer(3, 1, VertexAttribPointerType.Float, false, stride * sizeof(float), 8 * sizeof(float));
         GL.EnableVertexAttribArray(0);
         GL.EnableVertexAttribArray(1);
         GL.EnableVertexAttribArray(2);
+        GL.EnableVertexAttribArray(3);
 
         GL.BindVertexArray(0);
     }
@@ -451,7 +472,7 @@ public sealed class Chunk : IRenderable
             }
             else
             {
-                return false;
+                return y <= 0;
             }
         }
         else
@@ -503,7 +524,8 @@ public sealed class Chunk : IRenderable
         
         GL.BindVertexArray(_vao);
         _shader.Use();
-        TextureAtlas.AtlasTexture.Use();
+        TextureAtlas.AlbedoTexture.Use(TextureUnit.Texture0);
+        TextureAtlas.SpecularTexture.Use(TextureUnit.Texture1);
         GL.DrawElements(PrimitiveType.Triangles, _triangleCount, DrawElementsType.UnsignedInt, 0);
         ErrorCode glError = GL.GetError();
         if (glError != ErrorCode.NoError)

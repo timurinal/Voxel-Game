@@ -27,6 +27,16 @@ public class Mesh : IRenderable
             isMeshUpdated = false;
         } 
     }
+    
+    public Vector2[] Uvs
+    {
+        get => _uvs;
+        set
+        {
+            _uvs = value;
+            isMeshUpdated = false;
+        } 
+    }
 
     public Colour[] Colours
     {
@@ -49,6 +59,7 @@ public class Mesh : IRenderable
 
     private Vector3[] _vertices;
     private Vector3[] _normals;
+    private Vector2[] _uvs;
     private Colour[] _colours;
     private int[] _triangles;
 
@@ -108,7 +119,7 @@ public class Mesh : IRenderable
     {
         GL.BindVertexArray(_vao);
 
-        int stride = 10; // each vertex has 3 position floats, 3 normal floats, and 4 colour floats
+        int stride = 12; // each vertex has 3 position floats, 3 normal floats, 2 uv floats, and 4 colour floats
         float[] data = new float[stride * _vertices.Length];
 
         for (int i = 0; i < _vertices.Length; i++)
@@ -129,20 +140,31 @@ public class Mesh : IRenderable
                 data[i * stride + 4] = 0;
                 data[i * stride + 5] = 1;
             }
-
-            if (_colours != null && _colours.Length == _vertices.Length)
+            
+            if (_uvs != null && _uvs.Length == _vertices.Length)
             {
-                data[i * stride + 6] = _colours[i].R;
-                data[i * stride + 7] = _colours[i].G;
-                data[i * stride + 8] = _colours[i].B;
-                data[i * stride + 9] = _colours[i].A;
+                data[i * stride + 6] = _uvs[i].X;
+                data[i * stride + 7] = _uvs[i].Y;
             }
             else
             {
                 data[i * stride + 6] = 1;
                 data[i * stride + 7] = 0;
-                data[i * stride + 8] = 1;
-                data[i * stride + 9] = 1;
+            }
+
+            if (_colours != null && _colours.Length == _vertices.Length)
+            {
+                data[i * stride + 8]  = _colours[i].R;
+                data[i * stride + 9]  = _colours[i].G;
+                data[i * stride + 10] = _colours[i].B;
+                data[i * stride + 11] = _colours[i].A;
+            }
+            else
+            {
+                data[i * stride + 8]  = 1;
+                data[i * stride + 9]  = 0;
+                data[i * stride + 10] = 1;
+                data[i * stride + 11] = 1;
             }
         }
         
@@ -154,12 +176,15 @@ public class Mesh : IRenderable
         // setup vertex attributes
         int vLoc = _shader.GetAttribLocation("vPosition");
         int nLoc = _shader.GetAttribLocation("vNormal");
+        int tLoc = _shader.GetAttribLocation("vTexcoord");
         int cLoc = _shader.GetAttribLocation("vColour");
-        GL.VertexAttribPointer(vLoc, 3, VertexAttribPointerType.Float, false, stride * sizeof(float), 0);
+        GL.VertexAttribPointer(vLoc, 3, VertexAttribPointerType.Float, false, stride * sizeof(float), 0 * sizeof(float));
         GL.VertexAttribPointer(nLoc, 3, VertexAttribPointerType.Float, false, stride * sizeof(float), 3 * sizeof(float));
-        GL.VertexAttribPointer(cLoc, 4, VertexAttribPointerType.Float, false, stride * sizeof(float), 6 * sizeof(float));
+        GL.VertexAttribPointer(tLoc, 2, VertexAttribPointerType.Float, false, stride * sizeof(float), 6 * sizeof(float));
+        GL.VertexAttribPointer(cLoc, 4, VertexAttribPointerType.Float, false, stride * sizeof(float), 8 * sizeof(float));
         GL.EnableVertexAttribArray(vLoc);
         GL.EnableVertexAttribArray(nLoc);
+        GL.EnableVertexAttribArray(tLoc);
         GL.EnableVertexAttribArray(cLoc);
         
         // generate and bind the ebo
@@ -184,8 +209,8 @@ public class Mesh : IRenderable
         m_model = Transform.GetModelMatrix();
         
         _shader.Use();
-        _shader.SetUniform("m_proj", ref player.ProjectionMatrix);
-        _shader.SetUniform("m_view", ref player.ViewMatrix);
+        _shader.SetUniform("m_proj" , ref player.ProjectionMatrix);
+        _shader.SetUniform("m_view" , ref player.ViewMatrix);
         _shader.SetUniform("m_model", ref m_model);
         
         GL.BindVertexArray(_vao);

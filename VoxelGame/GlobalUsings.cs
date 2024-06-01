@@ -1,3 +1,3 @@
 ﻿// Global using directives
 
-global using OpenTK.Graphics.OpenGL;
+global using OpenTK.Graphics.OpenGL4;

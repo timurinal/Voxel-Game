@@ -8,6 +8,7 @@ using OpenTK.Windowing.GraphicsLibraryFramework;
 using VoxelGame.Maths;
 using VoxelGame.Rendering;
 using VoxelGame.Rendering.Font;
+using ErrorCode = OpenTK.Graphics.OpenGL4.ErrorCode;
 using Random = VoxelGame.Maths.Random;
 using Vector2 = VoxelGame.Maths.Vector2;
 using Vector3 = VoxelGame.Maths.Vector3;
@@ -35,8 +36,13 @@ public sealed class Engine : GameWindow
     private Queue<Vector3Int> _chunksToBuild;
     private const int MaxChunksToBuildPerFrame = 32;
 
-    private Mesh _skybox;
     private Shader _meshShader;
+
+    private Skybox _skybox;
+    private Shader _skyboxSkyShader;
+    private Shader _skyboxVoidShader;
+    
+    private readonly Vector3 _lightColour = new Vector3(1.0f, 0.898f, 0.7f);
 
     public Engine(GameWindowSettings gws, NativeWindowSettings nws) : base(gws, nws)
     {
@@ -58,8 +64,7 @@ public sealed class Engine : GameWindow
         GL.CullFace(CullFaceMode.Front);
         GL.FrontFace(FrontFaceDirection.Cw);
 
-        // GL.ClearColor(0.6f, 0.75f, 1f, 1f);
-        GL.ClearColor(Colour.Black);
+        GL.ClearColor(0.6f, 0.75f, 1f, 1f);
 
         TextureAtlas.Init();
         // Physics.Init();
@@ -68,53 +73,37 @@ public sealed class Engine : GameWindow
         IsVisible = true;
 
         _shader = Shader.Load("Assets/Shaders/chunk-shader.vert", "Assets/Shaders/chunk-shader.frag");
+
+        _shader.SetUniform("material.diffuse", 0);
+        _shader.SetUniform("material.specular", 1);
+        _shader.SetUniform("material.shininess", 128.0f);
+
+        Vector3 ambientLighting = Vector3.One * 0.2f;
+        DirLight dirLight = new(new Vector3(-0.5f, -1, -2f), ambientLighting, Vector3.One * 1f, _lightColour);
+        _shader.SetUniform("dirLight.direction", dirLight.direction);
+        _shader.SetUniform("dirLight.ambient"  , dirLight.ambient);
+        _shader.SetUniform("dirLight.diffuse"  , dirLight.diffuse);
+        _shader.SetUniform("dirLight.specular" , dirLight.specular);
+        
+        _shader.SetUniform("fogColour", new Vector3(0.6f, 0.75f, 1f));
+        _shader.SetUniform("fogDensity", 0.03f);
+
+        _skyboxSkyShader = Shader.Load("Assets/Shaders/skybox.vert", "Assets/Shaders/skybox.frag");
+        _skyboxSkyShader.SetUniform("fogColour", new Vector3(0.6f, 0.75f, 1f));
+        _skyboxSkyShader.SetUniform("fogDensity", 0.07f);
+        _skyboxVoidShader = Shader.Load("Assets/Shaders/skybox.vert", "Assets/Shaders/skybox.frag");
+        _skyboxVoidShader.SetUniform("fogColour", new Vector3(0.6f, 0.75f, 1f));
+        _skyboxVoidShader.SetUniform("fogDensity", 0.03f);
+        // _skyboxShader = Shader.StandardShader;
+        _skybox = new Skybox(_skyboxSkyShader, _skyboxVoidShader);
+        
         _chunks = new Dictionary<Vector3Int, Chunk>();
         _chunksToBuild = new Queue<Vector3Int>();
-
-        _meshShader = Shader.StandardShader;
-        _skybox = new Mesh(_meshShader)
-        {
-            Vertices =
-            [
-                new Vector3(-0.5f, -0.5f, -0.5f),
-                new Vector3(0.5f, -0.5f, -0.5f),
-                new Vector3(0.5f, 0.5f, -0.5f),
-                new Vector3(-0.5f, 0.5f, -0.5f),
-                new Vector3(-0.5f, -0.5f, 0.5f),
-                new Vector3(0.5f, -0.5f, 0.5f),
-                new Vector3(0.5f, 0.5f, 0.5f),
-                new Vector3(-0.5f, 0.5f, 0.5f)
-            ],
-            Triangles =
-            [
-                0, 1, 2, 2, 3, 0, // front face
-                5, 4, 6, 7, 6, 4, // back face
-                6, 1, 5, 1, 6, 2, // right face
-                4, 0, 7, 3, 7, 0, // left face
-                0, 5, 1, 4, 5, 0, // bottom face
-                3, 2, 6, 6, 7, 3  // top face
-            ],
-            Colours = 
-            [
-                Colour.Red,
-                Colour.Green,
-                Colour.Blue,
-                Colour.Yellow,
-                Colour.Cyan,
-                Colour.Magenta,
-                Colour.White,
-                Colour.Black,
-            ],
-            Transform =
-            {
-                Scale = Vector3.One * Player.FarClipPlane
-            }
-        };
         
-        UIRenderer.CreateQuad(Vector2.Zero, Vector3.One);
+        // UIRenderer.CreateQuad(Vector2.Zero, Vector3.One);
     }
 
-    protected override async void OnUpdateFrame(FrameEventArgs args)
+    protected override void OnUpdateFrame(FrameEventArgs args)
     {
         base.OnUpdateFrame(args);
 
@@ -210,7 +199,11 @@ public sealed class Engine : GameWindow
             }
         }
 
-        _skybox.Transform.Position = Player.Position;
+        // _skybox.Transform.Position = Player.Position;
+        // _skybox.Transform.Rotation += Vector3.Forward * (2f * Time.DeltaTime);
+        
+        _shader.SetUniform("viewPos", Player.Position);
+        _skyboxSkyShader.SetUniform("viewPos", Player.Position);
     }
 
     private async Task SaveChunk(Vector3Int chunkPosition, Chunk chunk)
@@ -271,7 +264,17 @@ public sealed class Engine : GameWindow
         LoadedChunks = 0;
         VisibleChunks = 0;
         
-        // Render here
+        // Render skybox with depth write disabled
+        GL.DepthMask(false);
+        //_skyboxShader.Use();
+        _skybox.Render(Player);
+        GL.DepthMask(true);
+
+        // {
+        //     var e = GL.GetError();
+        //     if (e != ErrorCode.NoError)
+        //         throw new GLException(e);
+        // }
 
         try
         {
@@ -299,10 +302,6 @@ public sealed class Engine : GameWindow
             Console.ResetColor();
         }
         
-        var d = _skybox.Render(Player);
-        VertexCount   += d.vertexCount;
-        TriangleCount += d.triangleCount;
-        
         GL.Disable(EnableCap.DepthTest);
         UIRenderer.Render(Player);
         GL.Enable(EnableCap.DepthTest);
@@ -310,7 +309,6 @@ public sealed class Engine : GameWindow
         Title = $"Vertices: {VertexCount:N0} Triangles: {TriangleCount:N0} | Loaded Chunks: {LoadedChunks} Visible Chunks: {VisibleChunks} | FPS: {Time.Fps}";
         
         SwapBuffers();
-        
     }
 
     protected override void OnResize(ResizeEventArgs e)
@@ -326,5 +324,22 @@ public sealed class Engine : GameWindow
         base.OnMouseMove(e);
         
         Player.Rotate(e.DeltaX, e.DeltaY);
+    }
+
+    struct DirLight 
+    {
+        public Vector3 direction;
+
+        public Vector3 ambient;
+        public Vector3 diffuse;
+        public Vector3 specular;
+
+        public DirLight(Vector3 direction, Vector3 ambient, Vector3 diffuse, Vector3 specular)
+        {
+            this.direction = direction;
+            this.ambient = ambient;
+            this.diffuse = diffuse;
+            this.specular = specular;
+        }
     }
 }
