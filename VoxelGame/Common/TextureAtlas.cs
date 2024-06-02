@@ -44,7 +44,7 @@ public static class TextureAtlas
         float unit = 1.0f / texturePerRow;
 
         // Padding to avoid bleeding
-        float padding = 0.001f;
+        const float padding = 0.0001f;
 
         float x = (textureID % texturePerRow) * unit + padding;
         float y = (textureID / texturePerRow) * unit + padding;

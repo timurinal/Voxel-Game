@@ -40,7 +40,7 @@ public sealed class Engine : GameWindow
     internal readonly ShadowMapper ShadowMapper;
     private Shader _depthShader;
     
-    private Shader _shader;
+    private Shader _chunkShader;
     private Dictionary<Vector3Int, Chunk> _chunks;
     private Queue<Vector3Int> _chunksToBuild;
     private const int MaxChunksToBuildPerFrame = 32;
@@ -50,8 +50,6 @@ public sealed class Engine : GameWindow
     private Skybox _skybox;
     private Shader _skyboxSkyShader;
     private Shader _skyboxVoidShader;
-
-    private Shader _depthVisualise;
     
     private readonly Vector3 _lightColour = new Vector3(1.0f, 0.898f, 0.7f);
 
@@ -92,24 +90,21 @@ public sealed class Engine : GameWindow
         IsVisible = true;
 
         _depthShader = Shader.Load("Assets/Shaders/depth.vert", "Assets/Shaders/depth.frag");
-        _shader = Shader.Load("Assets/Shaders/chunk-shader.vert", "Assets/Shaders/chunk-shader.frag");
+        _chunkShader = Shader.Load("Assets/Shaders/chunk-shader.vert", "Assets/Shaders/chunk-shader.frag");
 
-        _depthVisualise = Shader.Load("Assets/Shaders/depth-visualise.vert", "Assets/Shaders/depth-visualise.frag");
-        InitializeScreenQuad();
-
-        _shader.SetUniform("material.diffuse", 0);
-        _shader.SetUniform("material.specular", 1);
-        _shader.SetUniform("material.shininess", 128.0f);
+        _chunkShader.SetUniform("material.diffuse", 0);
+        _chunkShader.SetUniform("material.specular", 1);
+        _chunkShader.SetUniform("material.shininess", 128.0f);
 
         Vector3 ambientLighting = Vector3.One * 0.08f;
         DirLight dirLight = new(_lightDir, ambientLighting, Vector3.One * 1f, _lightColour);
-        _shader.SetUniform("dirLight.direction", dirLight.direction);
-        _shader.SetUniform("dirLight.ambient"  , dirLight.ambient);
-        _shader.SetUniform("dirLight.diffuse"  , dirLight.diffuse);
-        _shader.SetUniform("dirLight.specular" , dirLight.specular);
+        _chunkShader.SetUniform("dirLight.direction", dirLight.direction);
+        _chunkShader.SetUniform("dirLight.ambient"  , dirLight.ambient);
+        _chunkShader.SetUniform("dirLight.diffuse"  , dirLight.diffuse);
+        _chunkShader.SetUniform("dirLight.specular" , dirLight.specular);
         
-        _shader.SetUniform("fogColour", new Vector3(0.6f, 0.75f, 1f));
-        _shader.SetUniform("fogDensity", 0.03f);
+        _chunkShader.SetUniform("fogColour", new Vector3(0.6f, 0.75f, 1f));
+        _chunkShader.SetUniform("fogDensity", 0.03f);
 
         _skyboxSkyShader = Shader.Load("Assets/Shaders/skybox.vert", "Assets/Shaders/skybox.frag");
         _skyboxSkyShader.SetUniform("fogColour", new Vector3(0.6f, 0.75f, 1f));
@@ -213,7 +208,7 @@ public sealed class Engine : GameWindow
                     if (!_chunks.ContainsKey(chunkPosition) && chunkWorldPosition.Y >= 0)
                     {
                         // TODO: Load chunks from disk
-                        var newChunk = new Chunk(chunkWorldPosition, _shader);
+                        var newChunk = new Chunk(chunkWorldPosition, _chunkShader);
                         _chunksToBuild.Enqueue(chunkPosition); // Queue the chunk for building
                         _chunks[chunkPosition] = newChunk; // Add the chunk to the dictionary
                     }
@@ -241,7 +236,7 @@ public sealed class Engine : GameWindow
         // update light direction to rotate in a circle
         //_lightDir = Vector3.RotateX(_lightDir, sunSpeed * Time.DeltaTime);
         
-        _shader.SetUniform("viewPos", Player.Position);
+        _chunkShader.SetUniform("viewPos", Player.Position);
         
         //_shader.SetUniform("dirLight.direction", _lightDir);
         
@@ -250,54 +245,6 @@ public sealed class Engine : GameWindow
         ShadowMapper.UpdateMatrix(Player, _lightDir);
 
         Time.ElapsedTime += (float)args.Time;
-    }
-
-    private async Task SaveChunk(Vector3Int chunkPosition, Chunk chunk)
-    {
-        // Ensure directory exists
-        var dirPath = Engine.DataPath;
-        Directory.CreateDirectory(dirPath);
-
-        // Prepare file path
-        var filePath = Path.Combine(dirPath, $"{chunkPosition}.chunk");
-
-        var options = new JsonSerializerOptions
-        {
-            WriteIndented = true, // use indentation for readability
-        };
-
-        // Serialize & save chunk data
-        using var stream = File.Create(filePath);
-        await JsonSerializer.SerializeAsync(stream, chunk.voxels, options);
-        
-        chunk.OnSaved();
-    }
-
-    private bool LoadChunk(Vector3Int chunkPosition, out Chunk chunk)
-    {
-        string filePath = Path.Combine(DataPath, $"{chunkPosition}.chunk");
-
-        if (File.Exists(filePath))
-        {
-            var options = new JsonSerializerOptions
-            {
-                WriteIndented = true, // use indentation for readability
-            };
-
-            using (var stream = File.OpenRead(filePath))
-            {
-                var chunkVoxels = JsonSerializer.DeserializeAsync<uint[]>(stream, options).Result;
-                chunk = new Chunk(chunkPosition, _shader);
-                chunk.voxels = chunkVoxels;
-            }
-
-            // Add Chunk to our managed list
-            _chunks[chunkPosition] = chunk;
-            return true;
-        }
-
-        chunk = null;
-        return false;
     }
 
     protected override void OnRenderFrame(FrameEventArgs args)
@@ -315,12 +262,6 @@ public sealed class Engine : GameWindow
         //_skyboxShader.Use();
         // _skybox.Render(Player);
         GL.DepthMask(true);
-
-        // {
-        //     var e = GL.GetError();
-        //     if (e != ErrorCode.NoError)
-        //         throw new GLException(e);
-        // }
         
         ShadowMapper.Use();
         Render(mode: 0);
@@ -332,13 +273,6 @@ public sealed class Engine : GameWindow
         GL.Enable(EnableCap.DepthTest);
 
         Title = $"Vertices: {VertexCount:N0} Triangles: {TriangleCount:N0} | Loaded Chunks: {LoadedChunks} Visible Chunks: {VisibleChunks} | FPS: {Time.Fps}";
-        
-        // Visualise depth buffer
-        // _depthVisualise.Use();
-        // GL.ActiveTexture(TextureUnit.Texture0);
-        // GL.BindTexture(TextureTarget.Texture2D, ShadowMapper.DepthMap); // Bind the depth map texture
-        // _depthVisualise.SetUniform("depthMap", 0);
-        // RenderQuad();
         
         SwapBuffers();
     }
@@ -426,7 +360,7 @@ public sealed class Engine : GameWindow
        
         GL.BufferData(BufferTarget.ShaderStorageBuffer, numLights * Marshal.SizeOf<PointLight>(), Lights.ToArray(), BufferUsageHint.DynamicDraw);
         GL.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 0, _lightBuffer);
-        _shader.SetUniform("NumPointLights", Lights.Count);
+        _chunkShader.SetUniform("NumPointLights", Lights.Count);
     }
 
     struct DirLight 
@@ -484,46 +418,4 @@ public sealed class Engine : GameWindow
             _padding5 = 4;
         }
     }
-    
-    private int _quadVao, _quadVbo;
-
-    private void InitializeScreenQuad()
-    {
-        float[] quadVertices = {
-            // positions     // texture Coords
-            -1.0f,  1.0f, 0.0f,  0.0f, 1.0f,
-            -1.0f, -1.0f, 0.0f,  0.0f, 0.0f,
-            1.0f, -1.0f, 0.0f,  1.0f, 0.0f,
-         
-            -1.0f,  1.0f, 0.0f,  0.0f, 1.0f,
-            1.0f, -1.0f, 0.0f,  1.0f, 0.0f,
-            1.0f,  1.0f, 0.0f,  1.0f, 1.0f
-        };
-
-        _quadVao = GL.GenVertexArray();
-        _quadVbo = GL.GenBuffer();
-
-        GL.BindVertexArray(_quadVao);
-
-        GL.BindBuffer(BufferTarget.ArrayBuffer, _quadVbo);
-        GL.BufferData(BufferTarget.ArrayBuffer, quadVertices.Length * sizeof(float), quadVertices, BufferUsageHint.StaticDraw);
-
-        GL.EnableVertexAttribArray(0);
-        GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 5 * sizeof(float), 0);
-        GL.EnableVertexAttribArray(1);
-        GL.VertexAttribPointer(1, 2, VertexAttribPointerType.Float, false, 5 * sizeof(float), 3 * sizeof(float));
-
-        GL.BindVertexArray(0);
-    }
-
-    private void RenderQuad()
-    {
-        if (_quadVao == 0)
-            InitializeScreenQuad();
-    
-        GL.BindVertexArray(_quadVao);
-        GL.DrawArrays(PrimitiveType.Triangles, 0, 6);
-        GL.BindVertexArray(0);
-    }
-
 }

@@ -61,18 +61,7 @@ public sealed class Chunk
 
             // voxels[i] = TerrainGenerator.Sample(globalX, globalY, globalZ) > 0.5f ? 2u : 0u;
 
-            if (globalY <= 0)
-                voxels[i] = TextureAtlas.NameToVoxelId("bedrock");
-            else if (globalY <= 4)
-                voxels[i] = TextureAtlas.NameToVoxelId("stone");
-            else if (globalY <= 6)
-                voxels[i] = TextureAtlas.NameToVoxelId("dirt");
-            else if (globalY <= 7)
-                voxels[i] = TerrainGenerator.Sample(globalX, globalZ) > 0.5f ? TextureAtlas.NameToVoxelId("grass_block") : TextureAtlas.NameToVoxelId("dirt");
-            else if (globalY <= 8)
-                voxels[i] = TerrainGenerator.Sample(globalX, globalZ) > 0.5f ? 0u : TextureAtlas.NameToVoxelId("grass_block");
-            else
-                voxels[i] = 0u;
+            voxels[i] = TerrainGenerator.SampleTerrain(globalX, globalY, globalZ);
         }
 
         _vao = GL.GenVertexArray();
@@ -377,110 +366,6 @@ public sealed class Chunk
         
         IsDirty = true;
     }
-    
-    // private async Task<(float[] vertices, int[] triangles)> BuildChunkAsync(Dictionary<Vector3Int, Chunk> chunks)
-    // {
-    //     return await Task.Run(() =>
-    //     {
-    //         List<Vector3> vertexList = new();
-    //         List<Vector2> uvList = new();
-    //         List<int> faceIdList = new(); // 0 = up, 1 = down, 2 = front, 3 = back, 4 = right, 5 = left
-    //         List<int> triangleList = new();
-    //
-    //         solidVoxelCount = 0;
-    //
-    //         for (int i = 0, triangleIndex = 0; i < voxels.Length; i++)
-    //         {
-    //             int x = i % ChunkSize;
-    //             int y = (i / ChunkSize) % ChunkSize;
-    //             int z = i / ChunkArea;
-    //             Vector3Int voxelPosition = new(x, y, z);
-    //             Vector3Int worldPosition = chunkPosition * ChunkSize + new Vector3Int(x, y, z);
-    //
-    //             if (voxels[i] != 0)
-    //             {
-    //                 solidVoxelCount++;
-    //
-    //                 int voxelID = (int)voxels[i];
-    //                 Vector2 uv00 = GetUVForVoxel(voxelID - 1, 1, 1);
-    //                 Vector2 uv01 = GetUVForVoxel(voxelID - 1, 1, 0);
-    //                 Vector2 uv10 = GetUVForVoxel(voxelID - 1, 0, 1);
-    //                 Vector2 uv11 = GetUVForVoxel(voxelID - 1, 0, 0);
-    //
-    //                 if (IsAir(voxelPosition + new Vector3Int(0, 0, -1), voxels, chunks))
-    //                 {
-    //                     // Front face
-    //                     vertexList.AddRange(new Vector3[]
-    //                     {
-    //                         new(x - 0.5f, y - 0.5f, z - 0.5f),
-    //                         new(x - 0.5f, y + 0.5f, z - 0.5f),
-    //                         new(x + 0.5f, y - 0.5f, z - 0.5f),
-    //                         new(x + 0.5f, y + 0.5f, z - 0.5f),
-    //                     });
-    //                     uvList.AddRange(new[]
-    //                     {
-    //                         uv00, uv01, uv10, uv11
-    //                     });
-    //                     for (int j = 0; j < 4; j++)
-    //                         faceIdList.Add(0);
-    //                     triangleList.AddRange(new[]
-    //                     {
-    //                         0 + triangleIndex, 1 + triangleIndex, 2 + triangleIndex,
-    //                         2 + triangleIndex, 1 + triangleIndex, 3 + triangleIndex,
-    //                     });
-    //                     triangleIndex += 4;
-    //                 }
-    //
-    //                 // Repeat for other faces...
-    //             }
-    //         }
-    //
-    //         const int stride = 6;
-    //         float[] data = new float[vertexList.Count * stride];
-    //         for (int i = 0; i < vertexList.Count; i++)
-    //         {
-    //             data[i * stride + 0] = vertexList[i].X;
-    //             data[i * stride + 1] = vertexList[i].Y;
-    //             data[i * stride + 2] = vertexList[i].Z;
-    //             data[i * stride + 3] = uvList[i].X;
-    //             data[i * stride + 4] = uvList[i].Y;
-    //             data[i * stride + 5] = faceIdList[i];
-    //         }
-    //
-    //         return (data, triangleList.ToArray());
-    //     });
-    // }
-    private void SetupGLBuffers(float[] vertices, int[] triangles)
-    {
-        _triangleCount = triangles.Length;
-        _vertexCount = vertices.Length / 6;
-
-        const int stride = 6; // each vertex has 3 position floats, 2 UV floats, and 1 faceid integer
-
-        GL.BindVertexArray(_vao);
-        GL.BindBuffer(BufferTarget.ArrayBuffer, _vbo);
-        GL.BufferData(BufferTarget.ArrayBuffer, vertices.Length * sizeof(float), vertices, BufferUsageHint.StaticDraw);
-
-        GL.BindBuffer(BufferTarget.ElementArrayBuffer, _ebo);
-        GL.BufferData(BufferTarget.ElementArrayBuffer, triangles.Length * sizeof(int), triangles, BufferUsageHint.StaticDraw);
-
-        GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, stride * sizeof(float), 0 * sizeof(float));
-        GL.VertexAttribPointer(1, 2, VertexAttribPointerType.Float, false, stride * sizeof(float), 3 * sizeof(float));
-        GL.VertexAttribPointer(2, 1, VertexAttribPointerType.Float, false, stride * sizeof(float), 5 * sizeof(float));
-        GL.EnableVertexAttribArray(0);
-        GL.EnableVertexAttribArray(1);
-        GL.EnableVertexAttribArray(2);
-
-        GL.BindVertexArray(0);
-    }
-    
-    // internal async Task CreateChunkAsync(Dictionary<Vector3Int, Chunk> chunks)
-    // {
-    //     var (vertices, triangles) = await BuildChunkAsync(chunks);
-    //
-    //     // OpenGL setup should be done on the main thread
-    //     SetupGLBuffers(vertices, triangles);
-    // }
 
     public static bool IsAir(int x, int y, int z, uint[] voxels, Dictionary<Vector3Int, Chunk> chunks, Vector3Int currentChunkPosition)
     {
@@ -520,34 +405,6 @@ public sealed class Chunk
     public static int FlattenIndex3D(int x, int y, int z, int width, int height)
     {
         return x + (y * width) + (z * width * height);
-    }
-
-    public static Vector3 UnflattenIndex1D(int index, int width, int height)
-    {
-        int z = index / (width * height);
-        index -= (z * width * height);
-        int y = index / width;
-        int x = index % width;
-        return new Vector3(x, y, z);
-    }
-
-    internal AABB[] GenerateCollisions()
-    {
-        List<AABB> aabbs = new();
-        
-        for (int i = 0; i < voxels.Length; i++)
-        {
-            if (voxels[i] == 0) continue;
-            
-            int x = i % ChunkSize;
-            int y = (i / ChunkSize) % ChunkSize;
-            int z = i / ChunkArea;
-            Vector3Int worldPosition = chunkPosition + new Vector3Int(x, y, z);
-
-            aabbs.Add(AABB.CreateVoxelAABB(worldPosition));
-        }
-
-        return aabbs.ToArray();
     }
 
     internal (int vertexCount, int triangleCount) Render(Player player, ShadowMapper shadowMapper)
