@@ -142,15 +142,24 @@ float calcShadow(vec4 lightSpaceFragPos) {
     // transform to [0-1] range
     projCoords = projCoords * 0.5 + 0.5;
 
-    float closestDepth = texture(shadowMap, projCoords.xy).r;
+    // float closestDepth = texture(shadowMap, projCoords.xy).r;
     float currentDepth = projCoords.z;
 
-    float bias = max(0.05 * (1.0 - dot(normal, -dirLight.direction)), 0.0001);
-    float shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
+    float bias = max(0.05 * (1.0 - dot(normal, -dirLight.direction)), 0.0005);
+    // float shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
+    float shadow = 0.0;
+    vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+    for (int x = -2; x <= 2; x++) {
+        for (int y = -2; y <= 2; y++) {
+            float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r;
+            shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
+        }
+    }
+    shadow /= 16.0;
 
     // keep shadow at 0 ouside far plane
     if (projCoords.z > 1.0)
-    shadow = 0.0;
+        shadow = 0.0;
 
     return shadow;
 }

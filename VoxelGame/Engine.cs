@@ -190,14 +190,14 @@ public sealed class Engine : GameWindow
             var chunk = _chunks[Vector3Int.Zero];
             for (int i = 0; i < chunk.voxels.Length; i++)
             {
-                chunk.voxels[i] = 2u;
+                chunk.voxels[i] = chunk.voxels[i] == 4u ? 4u : 0u;
             }
             chunk.RebuildChunk(_chunks, recursive: true);
         }
 
         if (Input.GetKeyDown(Keys.Enter))
         {
-            Lights.Add(new PointLight(Player.Position, 25f, Vector3.Zero, _lightColour, _lightColour));
+            Lights.Add(new PointLight(Player.Position, 50f, Vector3.Zero, _lightColour, _lightColour));
             RecalculateLightBuffer(Lights.Count);
         }
 
