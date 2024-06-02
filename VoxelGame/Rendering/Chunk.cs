@@ -1,4 +1,5 @@
-﻿using OpenTK.Mathematics;
+﻿using System.Runtime.CompilerServices;
+using OpenTK.Mathematics;
 using SimplexNoise;
 using VoxelGame.Maths;
 using Random = VoxelGame.Maths.Random;

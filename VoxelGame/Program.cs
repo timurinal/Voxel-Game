@@ -21,7 +21,7 @@ class Program
             ClientSize = new(1280, 720), 
             MinimumClientSize = new(640, 360),
             Title = "Voxel Game",
-            NumberOfSamples = 4
+            NumberOfSamples = 16
         };
 
         using var engine = new Engine(gws, nws);

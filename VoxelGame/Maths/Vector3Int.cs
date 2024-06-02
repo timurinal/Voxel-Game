@@ -3,7 +3,7 @@
 /// <summary>
 /// Represents a 3D vector with integer values.
 /// </summary>
-public struct Vector3Int
+public struct Vector3Int : IEquatable<Vector3Int>
 {
     /// <summary>
     /// X component of the vector
@@ -95,6 +95,16 @@ public struct Vector3Int
         return $"({X}, {Y}, {Z})";
     }
 
+    public override bool Equals(object? obj)
+    {
+        return obj is Vector3Int other && Equals(other);
+    }
+
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(X, Y, Z);
+    }
+
     #region Operators
 
     public static Vector3Int operator +(Vector3Int a, Vector3Int b)
@@ -181,4 +191,9 @@ public struct Vector3Int
     }
 
     #endregion
+
+    public bool Equals(Vector3Int other)
+    {
+        return X == other.X && Y == other.Y && Z == other.Z;
+    }
 }

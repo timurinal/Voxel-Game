@@ -1,4 +1,5 @@
-﻿using System.Runtime.InteropServices;
+﻿using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Text.Json;
 using OpenTK.Mathematics;
@@ -26,6 +27,8 @@ public sealed class Engine : GameWindow
 
     public readonly Player Player;
 
+    internal static List<PointLight> Lights = new();
+
     internal static int TriangleCount;
     internal static int VertexCount;
     internal static int LoadedChunks;
@@ -43,6 +46,12 @@ public sealed class Engine : GameWindow
     private Shader _skyboxVoidShader;
     
     private readonly Vector3 _lightColour = new Vector3(1.0f, 0.898f, 0.7f);
+
+    private bool _newLightThisFrame = true; // this is true when a (or multiple) new light is added to the scene. The light buffer is recalculated when this is true
+
+    private int _lightBuffer;
+
+    private Vector3 _lightDir = new Vector3(0, -1, 0);
 
     public Engine(GameWindowSettings gws, NativeWindowSettings nws) : base(gws, nws)
     {
@@ -65,6 +74,7 @@ public sealed class Engine : GameWindow
         GL.FrontFace(FrontFaceDirection.Cw);
 
         GL.ClearColor(0.6f, 0.75f, 1f, 1f);
+        // GL.ClearColor(Colour.Black);
 
         TextureAtlas.Init();
         // Physics.Init();
@@ -78,9 +88,10 @@ public sealed class Engine : GameWindow
         _shader.SetUniform("material.specular", 1);
         _shader.SetUniform("material.shininess", 128.0f);
 
-        Vector3 ambientLighting = Vector3.One * 0.2f;
+        Vector3 ambientLighting = Vector3.One * 0.08f;
         DirLight dirLight = new(new Vector3(-0.5f, -1, -2f), ambientLighting, Vector3.One * 1f, _lightColour);
-        _shader.SetUniform("dirLight.direction", dirLight.direction);
+        // _shader.SetUniform("dirLight.direction", dirLight.direction);
+        _shader.SetUniform("dirLight.direction", new Vector3(-2, -1, -0.5f));
         _shader.SetUniform("dirLight.ambient"  , dirLight.ambient);
         _shader.SetUniform("dirLight.diffuse"  , dirLight.diffuse);
         _shader.SetUniform("dirLight.specular" , dirLight.specular);
@@ -99,7 +110,13 @@ public sealed class Engine : GameWindow
         
         _chunks = new Dictionary<Vector3Int, Chunk>();
         _chunksToBuild = new Queue<Vector3Int>();
+
+        _lightBuffer = GL.GenBuffer();
         
+        // Lights.Add(new PointLight(Player.Position, 50f, ambientLighting, new(1.0f, 1.0f, 1.0f), new Vector3(1.0f, 1.0f, 1.0f)));
+        // RecalculateLightBuffer(1);
+        // _shader.SetUniform("NumPointLights", 1);
+
         // UIRenderer.CreateQuad(Vector2.Zero, Vector3.One);
     }
 
@@ -166,6 +183,12 @@ public sealed class Engine : GameWindow
             chunk.RebuildChunk(_chunks, recursive: true);
         }
 
+        if (Input.GetKeyDown(Keys.Enter))
+        {
+            Lights.Add(new PointLight(Player.Position, 25f, Vector3.Zero, _lightColour, _lightColour));
+            RecalculateLightBuffer(Lights.Count);
+        }
+
         for (int x = -Player.ChunkRenderDistance; x < Player.ChunkRenderDistance; x++)
         {
             for (int y = -Player.ChunkRenderDistance; y < Player.ChunkRenderDistance; y++)
@@ -201,9 +224,12 @@ public sealed class Engine : GameWindow
 
         // _skybox.Transform.Position = Player.Position;
         // _skybox.Transform.Rotation += Vector3.Forward * (2f * Time.DeltaTime);
-        
+
         _shader.SetUniform("viewPos", Player.Position);
+        
         _skyboxSkyShader.SetUniform("viewPos", Player.Position);
+
+        Time.ElapsedTime += (float)args.Time;
     }
 
     private async Task SaveChunk(Vector3Int chunkPosition, Chunk chunk)
@@ -276,6 +302,7 @@ public sealed class Engine : GameWindow
         //         throw new GLException(e);
         // }
 
+        GL.BindBuffer(BufferTarget.ShaderStorageBuffer, _lightBuffer);
         try
         {
             foreach (var chunk in _chunks)
@@ -326,6 +353,22 @@ public sealed class Engine : GameWindow
         Player.Rotate(e.DeltaX, e.DeltaY);
     }
 
+    protected override void OnUnload()
+    {
+        base.OnUnload();
+        
+        GL.DeleteBuffer(_lightBuffer);
+    }
+
+    internal void RecalculateLightBuffer(int numLights)
+    {
+        GL.BindBuffer(BufferTarget.ShaderStorageBuffer, _lightBuffer);
+       
+        GL.BufferData(BufferTarget.ShaderStorageBuffer, numLights * Marshal.SizeOf<PointLight>(), Lights.ToArray(), BufferUsageHint.DynamicDraw);
+        GL.BindBufferBase(BufferRangeTarget.ShaderStorageBuffer, 0, _lightBuffer);
+        _shader.SetUniform("NumPointLights", Lights.Count);
+    }
+
     struct DirLight 
     {
         public Vector3 direction;
@@ -340,6 +383,45 @@ public sealed class Engine : GameWindow
             this.ambient = ambient;
             this.diffuse = diffuse;
             this.specular = specular;
+        }
+    }
+    
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct PointLight 
+    {
+        public Vector3 position;
+        public float _padding1;
+        public float constant;
+        public float linear;
+        public float quadratic;
+        public float _padding2;
+
+        public Vector3 ambient;
+        public float _padding3;
+        public Vector3 diffuse;
+        public float _padding4;
+        public Vector3 specular;
+        public float _padding5;
+
+        public PointLight(Vector3 position, float range, Vector3 ambient, Vector3 diffuse, Vector3 specular)
+        {
+            this.position = position;
+            this.ambient = ambient;
+            this.diffuse = diffuse;
+            this.specular = specular;
+            
+            constant = 1.0f;
+            linear = 4.5f / range;
+            quadratic = 75.0f / (range * range);
+            
+            Lights.Add(this);
+
+            _padding1 = 1;
+            _padding1 = 2;
+            _padding2 = 3;
+            _padding3 = 4;
+            _padding4 = 4;
+            _padding5 = 4;
         }
     }
 }
