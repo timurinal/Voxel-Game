@@ -18,7 +18,7 @@ How to use
 **IT IS STRONGLY RECOMMENDED THAT YOU HAVE THE LATEST VERSION OF YOUR GPU DRIVERS BEFORE CONTINUING**
 
 First, start by ensuring you have .NET 8 installed by downloading it from the [official .NET site](https://dotnet.microsoft.com/en-us/download/dotnet/8.0)<br>
-Then, download one of the releases in Github and run the executable. All the files are compiled into the executable so there is only one file.
+Then, download one of the releases in Github and run the executable. There is a shortcut in the root of the folder that runs the correct executable. Binaries are found in the /bin/ folder as well as runtime assets being located in /bin/Assets
 
 ### Source code
 Start by cloning the repository.<br>
