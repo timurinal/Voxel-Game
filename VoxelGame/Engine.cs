@@ -50,6 +50,8 @@ public sealed class Engine : GameWindow
     private Skybox _skybox;
     private Shader _skyboxSkyShader;
     private Shader _skyboxVoidShader;
+
+    private Shader _depthVisualise;
     
     private readonly Vector3 _lightColour = new Vector3(1.0f, 0.898f, 0.7f);
 
@@ -91,6 +93,9 @@ public sealed class Engine : GameWindow
 
         _depthShader = Shader.Load("Assets/Shaders/depth.vert", "Assets/Shaders/depth.frag");
         _shader = Shader.Load("Assets/Shaders/chunk-shader.vert", "Assets/Shaders/chunk-shader.frag");
+
+        _depthVisualise = Shader.Load("Assets/Shaders/depth-visualise.vert", "Assets/Shaders/depth-visualise.frag");
+        InitializeScreenQuad();
 
         _shader.SetUniform("material.diffuse", 0);
         _shader.SetUniform("material.specular", 1);
@@ -185,7 +190,7 @@ public sealed class Engine : GameWindow
             var chunk = _chunks[Vector3Int.Zero];
             for (int i = 0; i < chunk.voxels.Length; i++)
             {
-                chunk.voxels[i] = chunk.voxels[i] == 4u ? 4u : 0u;
+                chunk.voxels[i] = 2u;
             }
             chunk.RebuildChunk(_chunks, recursive: true);
         }
@@ -322,6 +327,13 @@ public sealed class Engine : GameWindow
 
         Title = $"Vertices: {VertexCount:N0} Triangles: {TriangleCount:N0} | Loaded Chunks: {LoadedChunks} Visible Chunks: {VisibleChunks} | FPS: {Time.Fps}";
         
+        // Visualise depth buffer
+        // _depthVisualise.Use();
+        // GL.ActiveTexture(TextureUnit.Texture0);
+        // GL.BindTexture(TextureTarget.Texture2D, ShadowMapper.DepthMap); // Bind the depth map texture
+        // _depthVisualise.SetUniform("depthMap", 0);
+        // RenderQuad();
+        
         SwapBuffers();
     }
 
@@ -338,7 +350,7 @@ public sealed class Engine : GameWindow
                     if (Player.IsBoxInFrustum(chunk.Value.Bounds) && EnableFrustumCulling)
                     {
                         VisibleChunks++;
-                        chunk.Value.Render(Player);
+                        //chunk.Value.Render(Player);
                     }
                     else
                     {
@@ -367,12 +379,12 @@ public sealed class Engine : GameWindow
                     if (Player.IsBoxInFrustum(chunk.Value.Bounds) && EnableFrustumCulling)
                     {
                         VisibleChunks++;
-                        chunk.Value.Render(Player);
+                        //chunk.Value.Render(Player);
                     }
                     else
                     {
                         VisibleChunks++;
-                        var c = chunk.Value.Render(Player);
+                        var c = chunk.Value.Render(Player, ShadowMapper);
                         VertexCount   += c.vertexCount;
                         TriangleCount += c.triangleCount;
                     }
@@ -473,4 +485,46 @@ public sealed class Engine : GameWindow
             _padding5 = 4;
         }
     }
+    
+    private int _quadVao, _quadVbo;
+
+    private void InitializeScreenQuad()
+    {
+        float[] quadVertices = {
+            // positions     // texture Coords
+            -1.0f,  1.0f, 0.0f,  0.0f, 1.0f,
+            -1.0f, -1.0f, 0.0f,  0.0f, 0.0f,
+            1.0f, -1.0f, 0.0f,  1.0f, 0.0f,
+         
+            -1.0f,  1.0f, 0.0f,  0.0f, 1.0f,
+            1.0f, -1.0f, 0.0f,  1.0f, 0.0f,
+            1.0f,  1.0f, 0.0f,  1.0f, 1.0f
+        };
+
+        _quadVao = GL.GenVertexArray();
+        _quadVbo = GL.GenBuffer();
+
+        GL.BindVertexArray(_quadVao);
+
+        GL.BindBuffer(BufferTarget.ArrayBuffer, _quadVbo);
+        GL.BufferData(BufferTarget.ArrayBuffer, quadVertices.Length * sizeof(float), quadVertices, BufferUsageHint.StaticDraw);
+
+        GL.EnableVertexAttribArray(0);
+        GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 5 * sizeof(float), 0);
+        GL.EnableVertexAttribArray(1);
+        GL.VertexAttribPointer(1, 2, VertexAttribPointerType.Float, false, 5 * sizeof(float), 3 * sizeof(float));
+
+        GL.BindVertexArray(0);
+    }
+
+    private void RenderQuad()
+    {
+        if (_quadVao == 0)
+            InitializeScreenQuad();
+    
+        GL.BindVertexArray(_quadVao);
+        GL.DrawArrays(PrimitiveType.Triangles, 0, 6);
+        GL.BindVertexArray(0);
+    }
+
 }

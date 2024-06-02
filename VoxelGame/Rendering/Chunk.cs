@@ -530,9 +530,33 @@ public sealed class Chunk
         return aabbs.ToArray();
     }
 
-    public (int vertexCount, int triangleCount) Render(Player player)
+    internal (int vertexCount, int triangleCount) Render(Player player, ShadowMapper shadowMapper)
     {
-        return Render(player.ProjectionMatrix, player.ViewMatrix, Shader.None, false);
+        if (IsEmpty)
+            return (0, 0);
+        
+        _shader.Use();
+        _shader.SetUniform("m_proj", ref player.ProjectionMatrix, autoUse: false);
+        _shader.SetUniform("m_view", ref player.ViewMatrix, autoUse: false);
+        _shader.SetUniform("m_model", ref m_model, autoUse: false);
+        _shader.SetUniform("m_lightOrtho", ref shadowMapper.OrthographicMatrix, autoUse: false);
+        _shader.SetUniform("m_lightView", ref shadowMapper.ViewMatrix, autoUse: false);
+        _shader.SetUniform("shadowMap", 2, autoUse: false);
+        
+        GL.BindVertexArray(_vao);
+        TextureAtlas.AlbedoTexture.Use(TextureUnit.Texture0);
+        TextureAtlas.SpecularTexture.Use(TextureUnit.Texture1);
+        GL.ActiveTexture(TextureUnit.Texture2);
+        GL.BindTexture(TextureTarget.Texture2D, shadowMapper.DepthMap);
+        GL.DrawElements(PrimitiveType.Triangles, _triangleCount, DrawElementsType.UnsignedInt, 0);
+        ErrorCode glError = GL.GetError();
+        if (glError != ErrorCode.NoError)
+        {
+            throw new GLException($"OpenGL Error: {glError}");
+        }
+        GL.BindVertexArray(0);
+
+        return (_vertexCount, _triangleCount / 3);
     }
     public (int vertexCount, int triangleCount) Render(Matrix4 m_proj, Matrix4 m_view, Shader shaderOverride,
         bool overrideShader = false)

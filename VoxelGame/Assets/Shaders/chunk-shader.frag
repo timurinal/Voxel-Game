@@ -37,6 +37,7 @@ in vec2 texcoord;
 in float faceId;
 in vec3 normal;
 in vec3 fragPos;
+in vec4 fragPosLightSpace;
 
 uniform vec3 viewPos;
 
@@ -46,16 +47,22 @@ uniform float fogDensity;
 uniform Material material;
 uniform DirLight dirLight;
 
+uniform sampler2D shadowMap;
+
 vec2 hash2(vec2 p);
 
-vec3 calcDirLight(DirLight light, vec3 normal, vec3 viewDir);
+vec3 calcDirLight(DirLight light, vec3 normal, vec3 viewDir, float shadow);
 vec3 calcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir);
+
+float calcShadow(vec4 lightSpaceFragPos);
 
 void main() {
     vec3 norm = normalize(normal);
     vec3 viewDir = normalize(viewPos - fragPos);
     
-    vec3 result = calcDirLight(dirLight, norm, viewDir);
+    float shadow = calcShadow(fragPosLightSpace);
+    vec3 result = calcDirLight(dirLight, norm, viewDir, shadow);    
+    //result *= 1.0 - shadow;
 
     if (NumPointLights > 0)
         for (int i = 0; i < NumPointLights; i++)
@@ -81,7 +88,7 @@ void main() {
     finalCol = lit;
 }
 
-vec3 calcDirLight(DirLight light, vec3 normal, vec3 viewDir) {
+vec3 calcDirLight(DirLight light, vec3 normal, vec3 viewDir, float shadow) {
     vec3 lightDir = normalize(-light.direction);
 
     // diffuse lighting
@@ -95,7 +102,7 @@ vec3 calcDirLight(DirLight light, vec3 normal, vec3 viewDir) {
     vec3 ambient  = light.ambient  * vec3(texture(material.diffuse, texcoord));
     vec3 diffuse  = light.diffuse  * diff * vec3(texture(material.diffuse, texcoord));
     vec3 specular = light.specular * spec * vec3(texture(material.specular, texcoord));
-    return (ambient + diffuse + specular);
+    return (ambient + (1.0 - shadow) * (diffuse + specular));
 }
 
 vec3 calcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir) {
@@ -128,4 +135,22 @@ vec2 hash2(vec2 p) {
     p += viewPos.xy;
     p += viewPos.yx;
     return -1.0 + 2.0 * fract(sin(p) * 43758.5453123);
+}
+
+float calcShadow(vec4 lightSpaceFragPos) {
+    vec3 projCoords = lightSpaceFragPos.xyz / lightSpaceFragPos.w;
+    // transform to [0-1] range
+    projCoords = projCoords * 0.5 + 0.5;
+
+    float closestDepth = texture(shadowMap, projCoords.xy).r;
+    float currentDepth = projCoords.z;
+
+    float bias = max(0.05 * (1.0 - dot(normal, -dirLight.direction)), 0.0001);
+    float shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
+
+    // keep shadow at 0 ouside far plane
+    if (projCoords.z > 1.0)
+    shadow = 0.0;
+
+    return shadow;
 }

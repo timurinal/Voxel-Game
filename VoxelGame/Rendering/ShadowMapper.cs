@@ -6,14 +6,20 @@ namespace VoxelGame.Rendering;
 
 internal class ShadowMapper
 {
+    public int DepthMap => _depthMap;
+    
     public Matrix4 OrthographicMatrix;
     public Matrix4 ViewMatrix;
 
+    public Matrix4 LightSpaceMatrix => OrthographicMatrix * ViewMatrix;
+
     public const float SunViewDistance = 50f;
 
-    public const float NearPlane = 1.0f, FarPlane = 500f;
+    public const float NearPlane = 1.0f, FarPlane = 1000f;
 
-    public const int ShadowMapWidth = 1024, ShadowMapHeight = 1024;
+    public const int ShadowMapWidth = 2048, ShadowMapHeight = 2048;
+
+    public const float OrthographicSize = 50f;
 
     private int _depthMapFbo, _depthMap;
 
@@ -24,8 +30,12 @@ internal class ShadowMapper
         GL.BindTexture(TextureTarget.Texture2D, _depthMap);
         GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.DepthComponent, 
             ShadowMapWidth, ShadowMapHeight, 0, PixelFormat.DepthComponent, PixelType.Float, IntPtr.Zero);
-        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Nearest);
-        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Nearest);
+        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
+        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToBorder);
+        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToBorder);
+        float[] borderCol = [ 1.0f, 1.0f, 1.0f, 1.0f ];
+        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureBorderColor, borderCol);
         GL.BindFramebuffer(FramebufferTarget.Framebuffer, _depthMapFbo);
         GL.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthAttachment, TextureTarget.Texture2D, _depthMap, 0);
         GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
@@ -46,7 +56,7 @@ internal class ShadowMapper
 
     internal void UpdateMatrix(Player player, Vector3 lightDir)
     {
-        OrthographicMatrix = Matrix4.CreateOrthographicOffCenter(-10f, 10f, -10f, 10f, NearPlane, FarPlane);
+        OrthographicMatrix = Matrix4.CreateOrthographicOffCenter(-OrthographicSize, OrthographicSize, -OrthographicSize, OrthographicSize, NearPlane, FarPlane);
         Vector3 eyePosition = -lightDir * SunViewDistance + player.Position;
         ViewMatrix = Matrix4.LookAt(eyePosition, player.Position, Vector3.Up);
     }
