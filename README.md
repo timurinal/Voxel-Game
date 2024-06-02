@@ -17,7 +17,8 @@ How to use
 
 ### Ready-to-play release
 First, start by ensuring you have .NET 8 installed by downloading it from the [official .NET site](https://dotnet.microsoft.com/en-us/download/dotnet/8.0)<br>
-Then, download one of the releases in Github and run the executable. There is a shortcut in the root of the folder that runs the correct executable. Binaries are found in the /bin/ folder as well as runtime assets being located in /bin/Assets
+Then, download one of the releases in Github and run the executable.<br>
+There is a shortcut in the root of the folder that runs the correct executable. Binaries are found in the /bin/ folder as well as runtime assets being located in /bin/Assets
 
 ### Source code
 Start by cloning the repository.<br>
