@@ -237,7 +237,13 @@ public sealed class Engine : GameWindow
         // _skybox.Transform.Position = Player.Position;
         // _skybox.Transform.Rotation += Vector3.Forward * (2f * Time.DeltaTime);
 
+        const float sunSpeed = 1f;
+        // update light direction to rotate in a circle
+        //_lightDir = Vector3.RotateX(_lightDir, sunSpeed * Time.DeltaTime);
+        
         _shader.SetUniform("viewPos", Player.Position);
+        
+        //_shader.SetUniform("dirLight.direction", _lightDir);
         
         _skyboxSkyShader.SetUniform("viewPos", Player.Position);
         
@@ -347,18 +353,11 @@ public sealed class Engine : GameWindow
                 foreach (var chunk in _chunks)
                 {
                     LoadedChunks++;
-                    if (Player.IsBoxInFrustum(chunk.Value.Bounds) && EnableFrustumCulling)
-                    {
-                        VisibleChunks++;
-                        //chunk.Value.Render(Player);
-                    }
-                    else
-                    {
-                        VisibleChunks++;
-                        var c = chunk.Value.Render(ShadowMapper.OrthographicMatrix, ShadowMapper.ViewMatrix, overrideShader: true, shaderOverride: _depthShader);
-                        VertexCount   += c.vertexCount;
-                        TriangleCount += c.triangleCount;
-                    }
+                    VisibleChunks++;
+                    
+                    var c = chunk.Value.Render(ShadowMapper.OrthographicMatrix, ShadowMapper.ViewMatrix, overrideShader: true, shaderOverride: _depthShader);
+                    VertexCount   += c.vertexCount;
+                    TriangleCount += c.triangleCount;
                 }
             }
             catch (GLException e) // for some reason, I get an opengl invalid value error when rendering the chunks but my error handler throws an exception when a gl exception is caught. this 'fixes' the issue, it only stops the window closing but chunks all render correctly even after the error is thrown
@@ -376,17 +375,17 @@ public sealed class Engine : GameWindow
                 foreach (var chunk in _chunks)
                 {
                     LoadedChunks++;
-                    if (Player.IsBoxInFrustum(chunk.Value.Bounds) && EnableFrustumCulling)
+
+                    if (!chunk.Value.IsEmpty)
                     {
-                        VisibleChunks++;
-                        //chunk.Value.Render(Player);
-                    }
-                    else
-                    {
-                        VisibleChunks++;
-                        var c = chunk.Value.Render(Player, ShadowMapper);
-                        VertexCount   += c.vertexCount;
-                        TriangleCount += c.triangleCount;
+                        if (Player.Frustum.IsInFrustum(chunk.Value) || !EnableFrustumCulling)
+                        {
+                            VisibleChunks++;
+                    
+                            var c = chunk.Value.Render(Player, ShadowMapper);
+                            VertexCount   += c.vertexCount;
+                            TriangleCount += c.triangleCount;
+                        }
                     }
                 }
             }

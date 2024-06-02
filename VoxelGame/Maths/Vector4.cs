@@ -32,6 +32,13 @@ public struct Vector4
         W = w;
     }
 
+    public Vector4(Vector3 v, float w = 1)
+    {
+        X = v.X;
+        Y = v.Y;
+        Z = v.Z;
+        W = w;
+    }
 
     /// <summary>
     /// Gets the magnitude (length) of the vector.
@@ -177,6 +184,19 @@ public struct Vector4
     {
         return new OpenTK.Mathematics.Vector4(v.X, v.Y, v.Z, v.W);
     }
+    public static implicit operator Vector4(OpenTK.Mathematics.Vector4 v)
+    {
+        return new Vector4(v.X, v.Y, v.Z, v.W);
+    }
+    
+    public static implicit operator System.Numerics.Vector4(Vector4 v)
+    {
+        return new System.Numerics.Vector4(v.X, v.Y, v.Z, v.W);
+    }
+    public static implicit operator Vector4(System.Numerics.Vector4 v)
+    {
+        return new Vector4(v.X, v.Y, v.Z, v.W);
+    }
     
     #endregion
     
@@ -185,5 +205,13 @@ public struct Vector4
     public static float Dot(Vector4 a, Vector4 b)
     {
         return a.X * b.X + a.Y * b.Y + a.Z * b.Z + a.W * b.W;
+    }
+
+    public static Vector4 Transform(Vector4 vec, Matrix4 matrix)
+    {
+        return new Vector4(vec.X * matrix.M11 + vec.Y * matrix.M21 + vec.Z * matrix.M31 + vec.W * matrix.M41,
+            vec.X * matrix.M12 + vec.Y * matrix.M22 + vec.Z * matrix.M32 + vec.W * matrix.M42,
+            vec.X * matrix.M13 + vec.Y * matrix.M23 + vec.Z * matrix.M33 + vec.W * matrix.M43,
+            vec.X * matrix.M14 + vec.Y * matrix.M24 + vec.Z * matrix.M34 + vec.W * matrix.M44);
     }
 }

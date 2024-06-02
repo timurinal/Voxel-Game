@@ -242,5 +242,17 @@ public struct Vector3
     public static Vector3Int Round(Vector3 v) =>
         new(Mathf.RoundToInt(v.X), Mathf.RoundToInt(v.Y), Mathf.RoundToInt(v.Z));
 
+    public static Vector3 RotateX(Vector3 vector, float angle)
+    {
+        return new Vector3(vector.X, vector.Y * Mathf.Cos(angle) - vector.Z * Mathf.Sin(angle),
+            vector.Y * Mathf.Sin(angle) + vector.Z * Mathf.Cos(angle));
+    }
+    
+    public static Vector3 RotateY(Vector3 vector, float angle)
+    {
+        return new Vector3(vector.X * Mathf.Cos(angle) + vector.Z * Mathf.Sin(angle), vector.Y,
+            -vector.X * Mathf.Sin(angle) + vector.Z * Mathf.Cos(angle));
+    }
+    
     #endregion
 }

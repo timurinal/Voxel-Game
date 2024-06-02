@@ -2,17 +2,30 @@ using VoxelGame.Maths;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using Vector3 = VoxelGame.Maths.Vector3;
+using Plane = System.Numerics.Plane;
+using Vector4 = VoxelGame.Maths.Vector4;
 
 namespace VoxelGame.Rendering;
 
 public sealed class Player
 {
     public const int ChunkRenderDistance = 8;
+
+    public readonly Frustum Frustum;
     
     public Vector3 Position => cameraPosition;
     public float Yaw => yaw;
     public float Pitch => pitch;
-    
+
+    public float Aspect => _aspect;
+    public float Fov => fov;
+    public float VFov => fov * Mathf.Deg2Rad;
+    public float HFov => 2 * Mathf.Atan(Mathf.Tan(VFov * 0.5f) * Aspect);
+
+    public Vector3 Forward => cameraFront.Normalized;
+    public Vector3 Right => Vector3.Cross(Forward, Vector3.Up).Normalized;
+    public Vector3 Up => Vector3.Cross(Right, Forward).Normalized;
+
     public AABB Collider = AABB.PlayerAABB(Vector3.Zero);
     
     public Matrix4 ProjectionMatrix;
@@ -32,6 +45,8 @@ public sealed class Player
     private Vector3 cameraFront = Vector3.Back;
     private Vector3 _cameraDirection;
 
+    private float _aspect;
+
     private float yaw = 180, pitch;
 
     private float MoveSpeed;
@@ -41,6 +56,7 @@ public sealed class Player
 
     public Player(Vector2Int screenSize, float moveSpeed = 5f, float rotateSpeed = 0.5f, float fov = 65f, float near = 0.1f, float far = 7500f)
     {
+        Frustum = new(this);
         MoveSpeed = moveSpeed;
         RotateSpeed = rotateSpeed;
 
@@ -48,9 +64,11 @@ public sealed class Player
         FarClipPlane = far;
 
         this.fov = fov;
+
+        _aspect = (float)screenSize.X / screenSize.Y;
         
         ViewMatrix = Matrix4.LookAt(cameraPosition, cameraPosition + cameraFront, cameraUp);
-        ProjectionMatrix = Matrix4.CreatePerspectiveFieldOfView(fov * Mathf.Deg2Rad, (float)screenSize.X / screenSize.Y, 
+        ProjectionMatrix = Matrix4.CreatePerspectiveFieldOfView(VFov, _aspect, 
             NearClipPlane, FarClipPlane);
     }
 
@@ -85,49 +103,13 @@ public sealed class Player
             NearClipPlane, FarClipPlane);
 
         VPMatrix = ViewMatrix * ProjectionMatrix;
-        
-        // Extract the planes from the view-projection matrix
-        Planes[0] = new Plane(
-            VPMatrix.M41 + VPMatrix.M11,
-            VPMatrix.M42 + VPMatrix.M12,
-            VPMatrix.M43 + VPMatrix.M13,
-            VPMatrix.M44 + VPMatrix.M14); // Left
-
-        Planes[1] = new Plane(
-            VPMatrix.M41 - VPMatrix.M11,
-            VPMatrix.M42 - VPMatrix.M12,
-            VPMatrix.M43 - VPMatrix.M13,
-            VPMatrix.M44 - VPMatrix.M14); // Right
-
-        Planes[2] = new Plane(
-            VPMatrix.M41 + VPMatrix.M21,
-            VPMatrix.M42 + VPMatrix.M22,
-            VPMatrix.M43 + VPMatrix.M23,
-            VPMatrix.M44 + VPMatrix.M24); // Bottom
-
-        Planes[3] = new Plane(
-            VPMatrix.M41 - VPMatrix.M21,
-            VPMatrix.M42 - VPMatrix.M22,
-            VPMatrix.M43 - VPMatrix.M23,
-            VPMatrix.M44 - VPMatrix.M24); // Top
-
-        Planes[4] = new Plane(
-            VPMatrix.M41 + VPMatrix.M31,
-            VPMatrix.M42 + VPMatrix.M32,
-            VPMatrix.M43 + VPMatrix.M33,
-            VPMatrix.M44 + VPMatrix.M34); // Near
-
-        Planes[5] = new Plane(
-            VPMatrix.M41 - VPMatrix.M31,
-            VPMatrix.M42 - VPMatrix.M32,
-            VPMatrix.M43 - VPMatrix.M33,
-            VPMatrix.M44 - VPMatrix.M34); // Far
-
-        // Normalize the planes
-        for (int i = 0; i < 6; i++)
-        {
-            Planes[i].Normalize();
-        }
+    }
+    
+    private Plane TransformPlane(Plane plane, Matrix4 matrix)
+    {
+        Vector4 planeVec = new Vector4(plane.Normal.X, plane.Normal.Y, plane.Normal.Z, plane.D);
+        Vector4 transformedPlaneVec = Vector4.Transform(planeVec, matrix);
+        return new Plane(transformedPlaneVec);
     }
 
     internal void UpdateProjection(Vector2Int screenSize, float fov = 65f)
@@ -152,28 +134,5 @@ public sealed class Player
     public void SetPosition(Vector3 pos)
     {
         cameraPosition = pos;
-    }
-
-    public bool IsPointInFrustum(Vector3 point)
-    {
-        return Planes.All(plane => plane.DistanceToPoint(point) >= 0);
-    }
-    
-    public bool IsBoxInFrustum(AABB box)
-    {
-        foreach (var plane in Planes)
-        {
-            Vector3 positiveVertex = new Vector3(
-                plane.A >= 0 ? box.Max.X : box.Min.X,
-                plane.B >= 0 ? box.Max.Y : box.Min.Y,
-                plane.C >= 0 ? box.Max.Z : box.Min.Z);
-
-            if (plane.DistanceToPoint(positiveVertex) < 0)
-            {
-                return false; // The box is outside this plane
-            }
-        }
-
-        return true; // The box is inside or intersects the frustum
     }
 }

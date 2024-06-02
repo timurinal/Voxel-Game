@@ -121,6 +121,11 @@ public struct Vector3Int : IEquatable<Vector3Int>
     {
         return new Vector3Int(a.X + k, a.Y + k, a.Z + k);
     }
+    
+    public static Vector3 operator +(Vector3Int a, float k)
+    {
+        return new Vector3(a.X + k, a.Y +k, a.Z + k);
+    }
 
     public static Vector3Int operator -(Vector3Int a, int k)
     {

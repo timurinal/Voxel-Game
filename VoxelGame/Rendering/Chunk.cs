@@ -11,11 +11,17 @@ namespace VoxelGame.Rendering;
 public sealed class Chunk
 {
     public const int ChunkSize = 16;
+    public const int HChunkSize = ChunkSize / 2;
     public const int ChunkArea = ChunkSize * ChunkSize;
     public const int ChunkVolume = ChunkArea * ChunkSize;
+    public static readonly float ChunkSphereRadius = ChunkSize * Mathf.Sqrt(3) / 2f;
     
     public Vector3Int chunkPosition;
-    
+
+    public Vector3 Center =>
+        new(chunkPosition.X + ChunkSize / 2f, chunkPosition.Y + ChunkSize / 2f,
+            chunkPosition.Z + ChunkSize / 2f);
+
     public bool IsEmpty { get; private set; }
     
     public AABB Bounds { get; private set; }
@@ -49,17 +55,22 @@ public sealed class Chunk
             int z = i / ChunkArea;
 
             // Calculate the global y position
+            int globalX = x + this.chunkPosition.X;
             int globalY = y + this.chunkPosition.Y;
+            int globalZ = z + this.chunkPosition.Z;
 
-            // Generate a flat plane only at the bottom of the world
+            // voxels[i] = TerrainGenerator.Sample(globalX, globalY, globalZ) > 0.5f ? 2u : 0u;
+
             if (globalY <= 0)
-                voxels[i] = 4u;
+                voxels[i] = TextureAtlas.NameToVoxelId("bedrock");
             else if (globalY <= 4)
-                voxels[i] = 2u;
+                voxels[i] = TextureAtlas.NameToVoxelId("stone");
             else if (globalY <= 6)
-                voxels[i] = 3u;
+                voxels[i] = TextureAtlas.NameToVoxelId("dirt");
             else if (globalY <= 7)
-                voxels[i] = 1u;
+                voxels[i] = TerrainGenerator.Sample(globalX, globalZ) > 0.5f ? TextureAtlas.NameToVoxelId("grass_block") : TextureAtlas.NameToVoxelId("dirt");
+            else if (globalY <= 8)
+                voxels[i] = TerrainGenerator.Sample(globalX, globalZ) > 0.5f ? 0u : TextureAtlas.NameToVoxelId("grass_block");
             else
                 voxels[i] = 0u;
         }
@@ -95,7 +106,7 @@ public sealed class Chunk
             List<Vector2> uvs = new();
             List<int> faceIds = new(); // 0 = front, 1 = back, 2 = up, 3 = down, 4 = right, 5 = left
             List<int> triangles = new();
-            
+
             for (int i = 0, triangleIndex = 0; i < voxels.Length; i++)
             {
                 int x = i % ChunkSize;
@@ -108,16 +119,15 @@ public sealed class Chunk
                     solidVoxelCount++;
                     
                     int voxelID = (int)voxels[i];
-                    Vector2 uv00 = GetUVForVoxel(voxelID - 1, 1, 1);
-                    Vector2 uv01 = GetUVForVoxel(voxelID - 1, 1, 0);
-                    Vector2 uv10 = GetUVForVoxel(voxelID - 1, 0, 1);
-                    Vector2 uv11 = GetUVForVoxel(voxelID - 1, 0, 0);
 
-                    // TODO: Cull faces between chunks
+                    // Front face
                     if (IsAir(voxelPosition.X, voxelPosition.Y, voxelPosition.Z - 1, voxels, chunks,
                             (Vector3Int)(chunkPosition / ChunkSize)))
                     {
-                        // Front face
+                        Vector2 uv00 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Front, 1, 1);
+                        Vector2 uv01 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Front, 1, 0);
+                        Vector2 uv10 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Front, 0, 1);
+                        Vector2 uv11 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Front, 0, 0);
                         vertices.AddRange(new Vector3[]
                         {
                             new(x - 0.5f, y - 0.5f, z - 0.5f),
@@ -140,10 +150,15 @@ public sealed class Chunk
                         });
                         triangleIndex += 4;
                     }
+
+                    // Back face
                     if (IsAir(voxelPosition.X, voxelPosition.Y, voxelPosition.Z + 1, voxels, chunks,
                         (Vector3Int)(chunkPosition / ChunkSize)))
                     {
-                        // Back face
+                        Vector2 uv00 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Back, 1, 1);
+                        Vector2 uv01 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Back, 1, 0);
+                        Vector2 uv10 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Back, 0, 1);
+                        Vector2 uv11 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Back, 0, 0);
                         vertices.AddRange(new Vector3[]
                         {
                             new(x - 0.5f, y - 0.5f, z + 0.5f),
@@ -166,10 +181,15 @@ public sealed class Chunk
                         });
                         triangleIndex += 4;
                     }
+
+                    // Top face
                     if (IsAir(voxelPosition.X, voxelPosition.Y + 1, voxelPosition.Z, voxels, chunks,
                             (Vector3Int)(chunkPosition / ChunkSize)))
                     {
-                        // Top face
+                        Vector2 uv00 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Top, 1, 1);
+                        Vector2 uv01 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Top, 1, 0);
+                        Vector2 uv10 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Top, 0, 1);
+                        Vector2 uv11 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Top, 0, 0);
                         vertices.AddRange(new Vector3[]
                         {
                             new(x - 0.5f, y + 0.5f, z - 0.5f),
@@ -192,10 +212,15 @@ public sealed class Chunk
                         });
                         triangleIndex += 4;
                     }
+
+                    // Bottom face
                     if (IsAir(voxelPosition.X, voxelPosition.Y - 1, voxelPosition.Z, voxels, chunks,
                             (Vector3Int)(chunkPosition / ChunkSize)))
                     {
-                        // Bottom face
+                        Vector2 uv00 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Bottom, 1, 1);
+                        Vector2 uv01 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Bottom, 1, 0);
+                        Vector2 uv10 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Bottom, 0, 1);
+                        Vector2 uv11 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Bottom, 0, 0);
                         vertices.AddRange(new Vector3[]
                         {
                             new(x - 0.5f, y - 0.5f, z - 0.5f),
@@ -218,10 +243,15 @@ public sealed class Chunk
                         });
                         triangleIndex += 4;
                     }
+
+                    // Right face
                     if (IsAir(voxelPosition.X + 1, voxelPosition.Y, voxelPosition.Z, voxels, chunks,
                             (Vector3Int)(chunkPosition / ChunkSize)))
                     {
-                        // Right face
+                        Vector2 uv00 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Right, 1, 1);
+                        Vector2 uv01 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Right, 1, 0);
+                        Vector2 uv10 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Right, 0, 1);
+                        Vector2 uv11 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Right, 0, 0);
                         vertices.AddRange(new Vector3[]
                         {
                             new(x + 0.5f, y - 0.5f, z - 0.5f),
@@ -244,10 +274,15 @@ public sealed class Chunk
                         });
                         triangleIndex += 4;
                     }
+
+                    // Left face
                     if (IsAir(voxelPosition.X - 1, voxelPosition.Y, voxelPosition.Z, voxels, chunks,
                             (Vector3Int)(chunkPosition / ChunkSize)))
                     {
-                        // Left face
+                        Vector2 uv00 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Left, 1, 1);
+                        Vector2 uv01 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Left, 1, 0);
+                        Vector2 uv10 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Left, 0, 1);
+                        Vector2 uv11 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Left, 0, 0);
                         vertices.AddRange(new Vector3[]
                         {
                             new(x - 0.5f, y - 0.5f, z - 0.5f),
@@ -446,21 +481,6 @@ public sealed class Chunk
     //     // OpenGL setup should be done on the main thread
     //     SetupGLBuffers(vertices, triangles);
     // }
-
-    private Vector2 GetUVForVoxel(int voxelID, int u, int v)
-    {
-        int texturePerRow = TextureAtlas.AtlasWidth / TextureAtlas.VoxelTextureSize;
-        float unit = 1.0f / texturePerRow;
-
-        // Padding to avoid bleeding
-        float padding = 0.001f;
-
-        float x = (voxelID % texturePerRow) * unit + padding;
-        float y = (voxelID / texturePerRow) * unit + padding;
-        float adjustedUnit = unit - 2 * padding;
-
-        return new Vector2(x + u * adjustedUnit, y + v * adjustedUnit);
-    }
 
     public static bool IsAir(int x, int y, int z, uint[] voxels, Dictionary<Vector3Int, Chunk> chunks, Vector3Int currentChunkPosition)
     {
