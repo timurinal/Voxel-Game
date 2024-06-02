@@ -8,7 +8,7 @@ Features
 
 - Infinite procedural terrain in each direction
 - Fast chunk building
-- Custom-made lighting engine with realtime shadows for directional lights, and a large amount of point lights
+- Custom-made lighting engine with realtime shadows for directional lights, and a point light system with specular highlights
 
 How to use
 ---
