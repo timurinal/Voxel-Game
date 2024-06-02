@@ -5,10 +5,12 @@ using Vector4 = VoxelGame.Maths.Vector4;
 
 namespace VoxelGame.Rendering;
 
-public struct Shader
+public struct Shader : IEquatable<Shader>
 {
     private int _id;
 
+    public static Shader None => new() { _id = 0 };
+    
     public static Shader StandardShader
     {
         get
@@ -144,51 +146,60 @@ public struct Shader
         GL.UseProgram(_id);
     }
 
-    public int GetUniformLocation(string uniformName)
+    public int GetUniformLocation(string uniformName, bool autoUse = true)
     {
-        Use();
+        if (autoUse)
+            Use();
         return GL.GetUniformLocation(_id, uniformName);
     }
 
-    public int GetAttribLocation(string attribName)
+    public int GetAttribLocation(string attribName, bool autoUse = true)
     {
-        Use();
+        if (autoUse)
+            Use();
         return GL.GetAttribLocation(_id, attribName);
     }
 
-    public void SetUniform(string uniformName, float v)
+    public void SetUniform(string uniformName, float v, bool autoUse = true)
     {
-        Use();
+        if (autoUse)
+            Use();
         GL.Uniform1(GetUniformLocation(uniformName), v);
     }
-    public void SetUniform(string uniformName, Vector2 v)
+    public void SetUniform(string uniformName, Vector2 v, bool autoUse = true)
     {
-        Use();
+        if (autoUse)
+            Use();
         GL.Uniform2(GetUniformLocation(uniformName), v);
     }
-    public void SetUniform(string uniformName, Vector3 v)
+    public void SetUniform(string uniformName, Vector3 v, bool autoUse = true)
     {
-        Use();
+        if (autoUse)
+            Use();
         GL.Uniform3(GetUniformLocation(uniformName), v);
     }
-    public void SetUniform(string uniformName, Vector4 v)
+    public void SetUniform(string uniformName, Vector4 v, bool autoUse = true)
     {
-        Use();
+        if (autoUse)
+            Use();
         GL.Uniform4(GetUniformLocation(uniformName), v);
     }
-    public void SetUniform(string uniformName, Colour v)
+    public void SetUniform(string uniformName, Colour v, bool autoUse = true)
     {
-        Use();
+        if (autoUse)
+            Use();
         GL.Uniform4(GetUniformLocation(uniformName), v);
     }
-    public void SetUniform(string uniformName, int v)
+    public void SetUniform(string uniformName, int v, bool autoUse = true)
     {
-        Use();
+        if (autoUse)
+            Use();
         GL.Uniform1(GetUniformLocation(uniformName), v);
     }
-    public void SetUniform(string uniformName, ref Matrix4 m, bool transpose = false)
+    public void SetUniform(string uniformName, ref Matrix4 m, bool transpose = false, bool autoUse = true)
     {
-        Use();
+        if (autoUse)
+            Use();
         GL.UniformMatrix4(GetUniformLocation(uniformName), transpose, ref m);
     }
     
@@ -224,5 +235,30 @@ public struct Shader
         public ShaderErrorException(string path, string error) : base($"Error when compiling shader at path {path}: {error}")
         {
         }
+    }
+
+    public bool Equals(Shader other)
+    {
+        return _id == other._id;
+    }
+
+    public override bool Equals(object? obj)
+    {
+        return obj is Shader other && Equals(other);
+    }
+
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(_id);
+    }
+
+    public static bool operator ==(Shader a, Shader b)
+    {
+        return a._id == b._id;
+    }
+    
+    public static bool operator !=(Shader a, Shader b)
+    {
+        return !(a == b);
     }
 }

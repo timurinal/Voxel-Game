@@ -1,4 +1,7 @@
-﻿using System.Runtime.CompilerServices;
+﻿// 3,925 lines of code :D
+
+using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Text.Json;
@@ -33,6 +36,9 @@ public sealed class Engine : GameWindow
     internal static int VertexCount;
     internal static int LoadedChunks;
     internal static int VisibleChunks;
+
+    internal readonly ShadowMapper ShadowMapper;
+    private Shader _depthShader;
     
     private Shader _shader;
     private Dictionary<Vector3Int, Chunk> _chunks;
@@ -51,10 +57,11 @@ public sealed class Engine : GameWindow
 
     private int _lightBuffer;
 
-    private Vector3 _lightDir = new Vector3(0, -1, 0);
+    private Vector3 _lightDir = new Vector3(-2, -1, -0.5f);
 
     public Engine(GameWindowSettings gws, NativeWindowSettings nws) : base(gws, nws)
     {
+        ShadowMapper = new();
         CenterWindow();
 
         Player = new Player(Size);
@@ -82,6 +89,7 @@ public sealed class Engine : GameWindow
         // Make the window visible after setting up so it appears in place and not in a random location
         IsVisible = true;
 
+        _depthShader = Shader.Load("Assets/Shaders/depth.vert", "Assets/Shaders/depth.frag");
         _shader = Shader.Load("Assets/Shaders/chunk-shader.vert", "Assets/Shaders/chunk-shader.frag");
 
         _shader.SetUniform("material.diffuse", 0);
@@ -89,9 +97,8 @@ public sealed class Engine : GameWindow
         _shader.SetUniform("material.shininess", 128.0f);
 
         Vector3 ambientLighting = Vector3.One * 0.08f;
-        DirLight dirLight = new(new Vector3(-0.5f, -1, -2f), ambientLighting, Vector3.One * 1f, _lightColour);
-        // _shader.SetUniform("dirLight.direction", dirLight.direction);
-        _shader.SetUniform("dirLight.direction", new Vector3(-2, -1, -0.5f));
+        DirLight dirLight = new(_lightDir, ambientLighting, Vector3.One * 1f, _lightColour);
+        _shader.SetUniform("dirLight.direction", dirLight.direction);
         _shader.SetUniform("dirLight.ambient"  , dirLight.ambient);
         _shader.SetUniform("dirLight.diffuse"  , dirLight.diffuse);
         _shader.SetUniform("dirLight.specular" , dirLight.specular);
@@ -228,6 +235,8 @@ public sealed class Engine : GameWindow
         _shader.SetUniform("viewPos", Player.Position);
         
         _skyboxSkyShader.SetUniform("viewPos", Player.Position);
+        
+        ShadowMapper.UpdateMatrix(Player, _lightDir);
 
         Time.ElapsedTime += (float)args.Time;
     }
@@ -293,7 +302,7 @@ public sealed class Engine : GameWindow
         // Render skybox with depth write disabled
         GL.DepthMask(false);
         //_skyboxShader.Use();
-        _skybox.Render(Player);
+        // _skybox.Render(Player);
         GL.DepthMask(true);
 
         // {
@@ -301,33 +310,11 @@ public sealed class Engine : GameWindow
         //     if (e != ErrorCode.NoError)
         //         throw new GLException(e);
         // }
-
-        GL.BindBuffer(BufferTarget.ShaderStorageBuffer, _lightBuffer);
-        try
-        {
-            foreach (var chunk in _chunks)
-            {
-                LoadedChunks++;
-                if (Player.IsBoxInFrustum(chunk.Value.Bounds) && EnableFrustumCulling)
-                {
-                    VisibleChunks++;
-                    chunk.Value.Render(Player);
-                }
-                else
-                {
-                    VisibleChunks++;
-                    var c = chunk.Value.Render(Player);
-                    VertexCount   += c.vertexCount;
-                    TriangleCount += c.triangleCount;
-                }
-            }
-        }
-        catch (GLException e) // for some reason, I get an opengl invalid value error when rendering the chunks but my error handler throws an exception when a gl exception is caught. this 'fixes' the issue, it only stops the window closing but chunks all render correctly even after the error is thrown
-        {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine(e.Message);
-            Console.ResetColor();
-        }
+        
+        ShadowMapper.Use();
+        Render(mode: 0);
+        ShadowMapper.Unuse(Size);
+        Render(mode: 1);
         
         GL.Disable(EnableCap.DepthTest);
         UIRenderer.Render(Player);
@@ -336,6 +323,68 @@ public sealed class Engine : GameWindow
         Title = $"Vertices: {VertexCount:N0} Triangles: {TriangleCount:N0} | Loaded Chunks: {LoadedChunks} Visible Chunks: {VisibleChunks} | FPS: {Time.Fps}";
         
         SwapBuffers();
+    }
+
+    private void Render(int mode)
+    {
+        if (mode == 0) // 0 = shadow render pass
+        {
+            GL.BindBuffer(BufferTarget.ShaderStorageBuffer, _lightBuffer);
+            try
+            {
+                foreach (var chunk in _chunks)
+                {
+                    LoadedChunks++;
+                    if (Player.IsBoxInFrustum(chunk.Value.Bounds) && EnableFrustumCulling)
+                    {
+                        VisibleChunks++;
+                        chunk.Value.Render(Player);
+                    }
+                    else
+                    {
+                        VisibleChunks++;
+                        var c = chunk.Value.Render(ShadowMapper.OrthographicMatrix, ShadowMapper.ViewMatrix, overrideShader: true, shaderOverride: _depthShader);
+                        VertexCount   += c.vertexCount;
+                        TriangleCount += c.triangleCount;
+                    }
+                }
+            }
+            catch (GLException e) // for some reason, I get an opengl invalid value error when rendering the chunks but my error handler throws an exception when a gl exception is caught. this 'fixes' the issue, it only stops the window closing but chunks all render correctly even after the error is thrown
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine(e.Message);
+                Console.ResetColor();
+            }
+        }
+        else
+        {
+            GL.BindBuffer(BufferTarget.ShaderStorageBuffer, _lightBuffer);
+            try
+            {
+                foreach (var chunk in _chunks)
+                {
+                    LoadedChunks++;
+                    if (Player.IsBoxInFrustum(chunk.Value.Bounds) && EnableFrustumCulling)
+                    {
+                        VisibleChunks++;
+                        chunk.Value.Render(Player);
+                    }
+                    else
+                    {
+                        VisibleChunks++;
+                        var c = chunk.Value.Render(Player);
+                        VertexCount   += c.vertexCount;
+                        TriangleCount += c.triangleCount;
+                    }
+                }
+            }
+            catch (GLException e)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine(e.Message);
+                Console.ResetColor();
+            }
+        }
     }
 
     protected override void OnResize(ResizeEventArgs e)

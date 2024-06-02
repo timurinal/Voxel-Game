@@ -8,13 +8,15 @@ using Vector3 = VoxelGame.Maths.Vector3;
 
 namespace VoxelGame.Rendering;
 
-public sealed class Chunk : IRenderable
+public sealed class Chunk
 {
-    public const int ChunkSize = 8;
+    public const int ChunkSize = 16;
     public const int ChunkArea = ChunkSize * ChunkSize;
     public const int ChunkVolume = ChunkArea * ChunkSize;
     
     public Vector3Int chunkPosition;
+    
+    public bool IsEmpty { get; private set; }
     
     public AABB Bounds { get; private set; }
 
@@ -77,229 +79,240 @@ public sealed class Chunk : IRenderable
     internal void BuildChunk(Dictionary<Vector3Int, Chunk> chunks)
     {
         solidVoxelCount = 0;
-        
-        List<Vector3> vertices = new();
-        List<Vector3> normals = new();
-        List<Vector2> uvs = new();
-        List<int> faceIds = new(); // 0 = front, 1 = back, 2 = up, 3 = down, 4 = right, 5 = left
-        List<int> triangles = new();
 
-        for (int i = 0, triangleIndex = 0; i < voxels.Length; i++)
-        {
-            int x = i % ChunkSize;
-            int y = (i / ChunkSize) % ChunkSize;
-            int z = i / ChunkArea;
-            Vector3Int voxelPosition = new(x, y, z);
-            Vector3Int worldPosition = chunkPosition * ChunkSize + new Vector3Int(x, y, z);
-            if (voxels[i] != 0)
+        IsEmpty = true;
+        foreach (var v in voxels)
+            if (v != 0)
             {
-                solidVoxelCount++;
-                
-                int voxelID = (int)voxels[i];
-                Vector2 uv00 = GetUVForVoxel(voxelID - 1, 1, 1);
-                Vector2 uv01 = GetUVForVoxel(voxelID - 1, 1, 0);
-                Vector2 uv10 = GetUVForVoxel(voxelID - 1, 0, 1);
-                Vector2 uv11 = GetUVForVoxel(voxelID - 1, 0, 0);
+                IsEmpty = false;
+                break;
+            }
 
-                // TODO: Cull faces between chunks
-                if (IsAir(voxelPosition.X, voxelPosition.Y, voxelPosition.Z - 1, voxels, chunks,
+        if (!IsEmpty)
+        {
+            List<Vector3> vertices = new();
+            List<Vector3> normals = new();
+            List<Vector2> uvs = new();
+            List<int> faceIds = new(); // 0 = front, 1 = back, 2 = up, 3 = down, 4 = right, 5 = left
+            List<int> triangles = new();
+            
+            for (int i = 0, triangleIndex = 0; i < voxels.Length; i++)
+            {
+                int x = i % ChunkSize;
+                int y = (i / ChunkSize) % ChunkSize;
+                int z = i / ChunkArea;
+                Vector3Int voxelPosition = new(x, y, z);
+                Vector3Int worldPosition = chunkPosition * ChunkSize + new Vector3Int(x, y, z);
+                if (voxels[i] != 0)
+                {
+                    solidVoxelCount++;
+                    
+                    int voxelID = (int)voxels[i];
+                    Vector2 uv00 = GetUVForVoxel(voxelID - 1, 1, 1);
+                    Vector2 uv01 = GetUVForVoxel(voxelID - 1, 1, 0);
+                    Vector2 uv10 = GetUVForVoxel(voxelID - 1, 0, 1);
+                    Vector2 uv11 = GetUVForVoxel(voxelID - 1, 0, 0);
+
+                    // TODO: Cull faces between chunks
+                    if (IsAir(voxelPosition.X, voxelPosition.Y, voxelPosition.Z - 1, voxels, chunks,
+                            (Vector3Int)(chunkPosition / ChunkSize)))
+                    {
+                        // Front face
+                        vertices.AddRange(new Vector3[]
+                        {
+                            new(x - 0.5f, y - 0.5f, z - 0.5f),
+                            new(x - 0.5f, y + 0.5f, z - 0.5f),
+                            new(x + 0.5f, y - 0.5f, z - 0.5f),
+                            new(x + 0.5f, y + 0.5f, z - 0.5f),
+                        });
+                        for (int j = 0; j < 4; j++)
+                            normals.Add(new Vector3(0, 0, -1));
+                        uvs.AddRange(new[]
+                        {
+                            uv00, uv01, uv10, uv11
+                        });
+                        for (int j = 0; j < 4; j++)
+                            faceIds.Add(0);
+                        triangles.AddRange(new[]
+                        {
+                            0 + triangleIndex, 1 + triangleIndex, 2 + triangleIndex,
+                            2 + triangleIndex, 1 + triangleIndex, 3 + triangleIndex,
+                        });
+                        triangleIndex += 4;
+                    }
+                    if (IsAir(voxelPosition.X, voxelPosition.Y, voxelPosition.Z + 1, voxels, chunks,
                         (Vector3Int)(chunkPosition / ChunkSize)))
-                {
-                    // Front face
-                    vertices.AddRange(new Vector3[]
                     {
-                        new(x - 0.5f, y - 0.5f, z - 0.5f),
-                        new(x - 0.5f, y + 0.5f, z - 0.5f),
-                        new(x + 0.5f, y - 0.5f, z - 0.5f),
-                        new(x + 0.5f, y + 0.5f, z - 0.5f),
-                    });
-                    for (int j = 0; j < 4; j++)
-                        normals.Add(new Vector3(0, 0, -1));
-                    uvs.AddRange(new[]
+                        // Back face
+                        vertices.AddRange(new Vector3[]
+                        {
+                            new(x - 0.5f, y - 0.5f, z + 0.5f),
+                            new(x - 0.5f, y + 0.5f, z + 0.5f),
+                            new(x + 0.5f, y - 0.5f, z + 0.5f),
+                            new(x + 0.5f, y + 0.5f, z + 0.5f),
+                        });
+                        for (int j = 0; j < 4; j++)
+                            normals.Add(new Vector3(0, 0, 1));
+                        uvs.AddRange(new[]
+                        {
+                            uv00, uv01, uv10, uv11
+                        });
+                        for (int j = 0; j < 4; j++)
+                            faceIds.Add(1);
+                        triangles.AddRange(new[]
+                        {
+                            0 + triangleIndex, 2 + triangleIndex, 1 + triangleIndex,
+                            2 + triangleIndex, 3 + triangleIndex, 1 + triangleIndex,
+                        });
+                        triangleIndex += 4;
+                    }
+                    if (IsAir(voxelPosition.X, voxelPosition.Y + 1, voxelPosition.Z, voxels, chunks,
+                            (Vector3Int)(chunkPosition / ChunkSize)))
                     {
-                        uv00, uv01, uv10, uv11
-                    });
-                    for (int j = 0; j < 4; j++)
-                        faceIds.Add(0);
-                    triangles.AddRange(new[]
+                        // Top face
+                        vertices.AddRange(new Vector3[]
+                        {
+                            new(x - 0.5f, y + 0.5f, z - 0.5f),
+                            new(x + 0.5f, y + 0.5f, z - 0.5f),
+                            new(x - 0.5f, y + 0.5f, z + 0.5f),
+                            new(x + 0.5f, y + 0.5f, z + 0.5f),
+                        });
+                        for (int j = 0; j < 4; j++)
+                            normals.Add(new Vector3(0, 1, 0));
+                        uvs.AddRange(new[]
+                        {
+                            uv00, uv01, uv10, uv11
+                        });
+                        for (int j = 0; j < 4; j++)
+                            faceIds.Add(2);
+                        triangles.AddRange(new[]
+                        {
+                            0 + triangleIndex, 2 + triangleIndex, 1 + triangleIndex,
+                            2 + triangleIndex, 3 + triangleIndex, 1 + triangleIndex,
+                        });
+                        triangleIndex += 4;
+                    }
+                    if (IsAir(voxelPosition.X, voxelPosition.Y - 1, voxelPosition.Z, voxels, chunks,
+                            (Vector3Int)(chunkPosition / ChunkSize)))
                     {
-                        0 + triangleIndex, 1 + triangleIndex, 2 + triangleIndex,
-                        2 + triangleIndex, 1 + triangleIndex, 3 + triangleIndex,
-                    });
-                    triangleIndex += 4;
-                }
-                if (IsAir(voxelPosition.X, voxelPosition.Y, voxelPosition.Z + 1, voxels, chunks,
-                    (Vector3Int)(chunkPosition / ChunkSize)))
-                {
-                    // Back face
-                    vertices.AddRange(new Vector3[]
+                        // Bottom face
+                        vertices.AddRange(new Vector3[]
+                        {
+                            new(x - 0.5f, y - 0.5f, z - 0.5f),
+                            new(x + 0.5f, y - 0.5f, z - 0.5f),
+                            new(x - 0.5f, y - 0.5f, z + 0.5f),
+                            new(x + 0.5f, y - 0.5f, z + 0.5f),
+                        });
+                        for (int j = 0; j < 4; j++)
+                            normals.Add(new Vector3(0, -1, 0));
+                        uvs.AddRange(new[]
+                        {
+                            uv00, uv01, uv10, uv11
+                        });
+                        for (int j = 0; j < 4; j++)
+                            faceIds.Add(3);
+                        triangles.AddRange(new[]
+                        {
+                            0 + triangleIndex, 1 + triangleIndex, 2 + triangleIndex,
+                            2 + triangleIndex, 1 + triangleIndex, 3 + triangleIndex,
+                        });
+                        triangleIndex += 4;
+                    }
+                    if (IsAir(voxelPosition.X + 1, voxelPosition.Y, voxelPosition.Z, voxels, chunks,
+                            (Vector3Int)(chunkPosition / ChunkSize)))
                     {
-                        new(x - 0.5f, y - 0.5f, z + 0.5f),
-                        new(x - 0.5f, y + 0.5f, z + 0.5f),
-                        new(x + 0.5f, y - 0.5f, z + 0.5f),
-                        new(x + 0.5f, y + 0.5f, z + 0.5f),
-                    });
-                    for (int j = 0; j < 4; j++)
-                        normals.Add(new Vector3(0, 0, 1));
-                    uvs.AddRange(new[]
+                        // Right face
+                        vertices.AddRange(new Vector3[]
+                        {
+                            new(x + 0.5f, y - 0.5f, z - 0.5f),
+                            new(x + 0.5f, y + 0.5f, z - 0.5f),
+                            new(x + 0.5f, y - 0.5f, z + 0.5f),
+                            new(x + 0.5f, y + 0.5f, z + 0.5f),
+                        });
+                        for (int j = 0; j < 4; j++)
+                            normals.Add(new Vector3(1, 0, 0));
+                        uvs.AddRange(new[]
+                        {
+                            uv00, uv01, uv10, uv11
+                        });
+                        for (int j = 0; j < 4; j++)
+                            faceIds.Add(4);
+                        triangles.AddRange(new[]
+                        {
+                            0 + triangleIndex, 1 + triangleIndex, 2 + triangleIndex,
+                            2 + triangleIndex, 1 + triangleIndex, 3 + triangleIndex,
+                        });
+                        triangleIndex += 4;
+                    }
+                    if (IsAir(voxelPosition.X - 1, voxelPosition.Y, voxelPosition.Z, voxels, chunks,
+                            (Vector3Int)(chunkPosition / ChunkSize)))
                     {
-                        uv00, uv01, uv10, uv11
-                    });
-                    for (int j = 0; j < 4; j++)
-                        faceIds.Add(1);
-                    triangles.AddRange(new[]
-                    {
-                        0 + triangleIndex, 2 + triangleIndex, 1 + triangleIndex,
-                        2 + triangleIndex, 3 + triangleIndex, 1 + triangleIndex,
-                    });
-                    triangleIndex += 4;
-                }
-                if (IsAir(voxelPosition.X, voxelPosition.Y + 1, voxelPosition.Z, voxels, chunks,
-                        (Vector3Int)(chunkPosition / ChunkSize)))
-                {
-                    // Top face
-                    vertices.AddRange(new Vector3[]
-                    {
-                        new(x - 0.5f, y + 0.5f, z - 0.5f),
-                        new(x + 0.5f, y + 0.5f, z - 0.5f),
-                        new(x - 0.5f, y + 0.5f, z + 0.5f),
-                        new(x + 0.5f, y + 0.5f, z + 0.5f),
-                    });
-                    for (int j = 0; j < 4; j++)
-                        normals.Add(new Vector3(0, 1, 0));
-                    uvs.AddRange(new[]
-                    {
-                        uv00, uv01, uv10, uv11
-                    });
-                    for (int j = 0; j < 4; j++)
-                        faceIds.Add(2);
-                    triangles.AddRange(new[]
-                    {
-                        0 + triangleIndex, 2 + triangleIndex, 1 + triangleIndex,
-                        2 + triangleIndex, 3 + triangleIndex, 1 + triangleIndex,
-                    });
-                    triangleIndex += 4;
-                }
-                if (IsAir(voxelPosition.X, voxelPosition.Y - 1, voxelPosition.Z, voxels, chunks,
-                        (Vector3Int)(chunkPosition / ChunkSize)))
-                {
-                    // Bottom face
-                    vertices.AddRange(new Vector3[]
-                    {
-                        new(x - 0.5f, y - 0.5f, z - 0.5f),
-                        new(x + 0.5f, y - 0.5f, z - 0.5f),
-                        new(x - 0.5f, y - 0.5f, z + 0.5f),
-                        new(x + 0.5f, y - 0.5f, z + 0.5f),
-                    });
-                    for (int j = 0; j < 4; j++)
-                        normals.Add(new Vector3(0, -1, 0));
-                    uvs.AddRange(new[]
-                    {
-                        uv00, uv01, uv10, uv11
-                    });
-                    for (int j = 0; j < 4; j++)
-                        faceIds.Add(3);
-                    triangles.AddRange(new[]
-                    {
-                        0 + triangleIndex, 1 + triangleIndex, 2 + triangleIndex,
-                        2 + triangleIndex, 1 + triangleIndex, 3 + triangleIndex,
-                    });
-                    triangleIndex += 4;
-                }
-                if (IsAir(voxelPosition.X + 1, voxelPosition.Y, voxelPosition.Z, voxels, chunks,
-                        (Vector3Int)(chunkPosition / ChunkSize)))
-                {
-                    // Right face
-                    vertices.AddRange(new Vector3[]
-                    {
-                        new(x + 0.5f, y - 0.5f, z - 0.5f),
-                        new(x + 0.5f, y + 0.5f, z - 0.5f),
-                        new(x + 0.5f, y - 0.5f, z + 0.5f),
-                        new(x + 0.5f, y + 0.5f, z + 0.5f),
-                    });
-                    for (int j = 0; j < 4; j++)
-                        normals.Add(new Vector3(1, 0, 0));
-                    uvs.AddRange(new[]
-                    {
-                        uv00, uv01, uv10, uv11
-                    });
-                    for (int j = 0; j < 4; j++)
-                        faceIds.Add(4);
-                    triangles.AddRange(new[]
-                    {
-                        0 + triangleIndex, 1 + triangleIndex, 2 + triangleIndex,
-                        2 + triangleIndex, 1 + triangleIndex, 3 + triangleIndex,
-                    });
-                    triangleIndex += 4;
-                }
-                if (IsAir(voxelPosition.X - 1, voxelPosition.Y, voxelPosition.Z, voxels, chunks,
-                        (Vector3Int)(chunkPosition / ChunkSize)))
-                {
-                    // Left face
-                    vertices.AddRange(new Vector3[]
-                    {
-                        new(x - 0.5f, y - 0.5f, z - 0.5f),
-                        new(x - 0.5f, y + 0.5f, z - 0.5f),
-                        new(x - 0.5f, y - 0.5f, z + 0.5f),
-                        new(x - 0.5f, y + 0.5f, z + 0.5f),
-                    });
-                    for (int j = 0; j < 4; j++)
-                        normals.Add(new Vector3(-1, 0, 1));
-                    uvs.AddRange(new[]
-                    {
-                        uv00, uv01, uv10, uv11
-                    });
-                    for (int j = 0; j < 4; j++)
-                        faceIds.Add(5);
-                    triangles.AddRange(new[]
-                    {
-                        0 + triangleIndex, 2 + triangleIndex, 1 + triangleIndex,
-                        2 + triangleIndex, 3 + triangleIndex, 1 + triangleIndex,
-                    });
-                    triangleIndex += 4;
+                        // Left face
+                        vertices.AddRange(new Vector3[]
+                        {
+                            new(x - 0.5f, y - 0.5f, z - 0.5f),
+                            new(x - 0.5f, y + 0.5f, z - 0.5f),
+                            new(x - 0.5f, y - 0.5f, z + 0.5f),
+                            new(x - 0.5f, y + 0.5f, z + 0.5f),
+                        });
+                        for (int j = 0; j < 4; j++)
+                            normals.Add(new Vector3(-1, 0, 1));
+                        uvs.AddRange(new[]
+                        {
+                            uv00, uv01, uv10, uv11
+                        });
+                        for (int j = 0; j < 4; j++)
+                            faceIds.Add(5);
+                        triangles.AddRange(new[]
+                        {
+                            0 + triangleIndex, 2 + triangleIndex, 1 + triangleIndex,
+                            2 + triangleIndex, 3 + triangleIndex, 1 + triangleIndex,
+                        });
+                        triangleIndex += 4;
+                    }
                 }
             }
+
+            _triangleCount = triangles.Count;
+            _vertexCount = vertices.Count;
+
+            const int stride = 9; // each vertex has 3 position floats, 3 normal floats, 2 UV floats, and 1 faceid integer
+            float[] data = new float[vertices.Count * stride];
+            
+            for (int i = 0; i < vertices.Count; i++)
+            {
+                data[i * stride + 0] = vertices[i].X;
+                data[i * stride + 1] = vertices[i].Y;
+                data[i * stride + 2] = vertices[i].Z;
+                
+                data[i * stride + 3] = normals[i].X;
+                data[i * stride + 4] = normals[i].Y;
+                data[i * stride + 5] = normals[i].Z;
+                
+                data[i * stride + 6] = uvs[i].X;
+                data[i * stride + 7] = uvs[i].Y;
+                
+                data[i * stride + 8] = faceIds[i];
+            }
+
+            GL.BindVertexArray(_vao);
+            GL.BindBuffer(BufferTarget.ArrayBuffer, _vbo);
+            GL.BufferData(BufferTarget.ArrayBuffer, data.Length * sizeof(float), data, BufferUsageHint.StaticDraw);
+
+            GL.BindBuffer(BufferTarget.ElementArrayBuffer, _ebo);
+            GL.BufferData(BufferTarget.ElementArrayBuffer, triangles.Count * sizeof(int), triangles.ToArray(), BufferUsageHint.StaticDraw);
+
+            GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, stride * sizeof(float), 0 * sizeof(float));
+            GL.VertexAttribPointer(1, 3, VertexAttribPointerType.Float, false, stride * sizeof(float), 3 * sizeof(float));
+            GL.VertexAttribPointer(2, 2, VertexAttribPointerType.Float, false, stride * sizeof(float), 6 * sizeof(float));
+            GL.VertexAttribPointer(3, 1, VertexAttribPointerType.Float, false, stride * sizeof(float), 8 * sizeof(float));
+            GL.EnableVertexAttribArray(0);
+            GL.EnableVertexAttribArray(1);
+            GL.EnableVertexAttribArray(2);
+            GL.EnableVertexAttribArray(3);
+
+            GL.BindVertexArray(0);
         }
-
-        _triangleCount = triangles.Count;
-        _vertexCount = vertices.Count;
-
-        const int stride = 9; // each vertex has 3 position floats, 3 normal floats, 2 UV floats, and 1 faceid integer
-        float[] data = new float[vertices.Count * stride];
-        
-        for (int i = 0; i < vertices.Count; i++)
-        {
-            data[i * stride + 0] = vertices[i].X;
-            data[i * stride + 1] = vertices[i].Y;
-            data[i * stride + 2] = vertices[i].Z;
-            
-            data[i * stride + 3] = normals[i].X;
-            data[i * stride + 4] = normals[i].Y;
-            data[i * stride + 5] = normals[i].Z;
-            
-            data[i * stride + 6] = uvs[i].X;
-            data[i * stride + 7] = uvs[i].Y;
-            
-            data[i * stride + 8] = faceIds[i];
-        }
-
-        GL.BindVertexArray(_vao);
-        GL.BindBuffer(BufferTarget.ArrayBuffer, _vbo);
-        GL.BufferData(BufferTarget.ArrayBuffer, data.Length * sizeof(float), data, BufferUsageHint.StaticDraw);
-
-        GL.BindBuffer(BufferTarget.ElementArrayBuffer, _ebo);
-        GL.BufferData(BufferTarget.ElementArrayBuffer, triangles.Count * sizeof(int), triangles.ToArray(), BufferUsageHint.StaticDraw);
-
-        GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, stride * sizeof(float), 0 * sizeof(float));
-        GL.VertexAttribPointer(1, 3, VertexAttribPointerType.Float, false, stride * sizeof(float), 3 * sizeof(float));
-        GL.VertexAttribPointer(2, 2, VertexAttribPointerType.Float, false, stride * sizeof(float), 6 * sizeof(float));
-        GL.VertexAttribPointer(3, 1, VertexAttribPointerType.Float, false, stride * sizeof(float), 8 * sizeof(float));
-        GL.EnableVertexAttribArray(0);
-        GL.EnableVertexAttribArray(1);
-        GL.EnableVertexAttribArray(2);
-        GL.EnableVertexAttribArray(3);
-
-        GL.BindVertexArray(0);
     }
     
     internal void RebuildChunk(Dictionary<Vector3Int, Chunk> chunks, bool recursive = false)
@@ -519,12 +532,30 @@ public sealed class Chunk : IRenderable
 
     public (int vertexCount, int triangleCount) Render(Player player)
     {
-        _shader.SetUniform("m_proj", ref player.ProjectionMatrix);
-        _shader.SetUniform("m_view", ref player.ViewMatrix);
-        _shader.SetUniform("m_model", ref m_model);
+        return Render(player.ProjectionMatrix, player.ViewMatrix, Shader.None, false);
+    }
+    public (int vertexCount, int triangleCount) Render(Matrix4 m_proj, Matrix4 m_view, Shader shaderOverride,
+        bool overrideShader = false)
+    {
+        if (IsEmpty)
+            return (0, 0);
+        
+        if (!overrideShader)
+        {
+            _shader.Use();
+            _shader.SetUniform("m_proj", ref m_proj, autoUse: false);
+            _shader.SetUniform("m_view", ref m_view, autoUse: false);
+            _shader.SetUniform("m_model", ref m_model, autoUse: false);
+        }
+        else
+        {
+            shaderOverride.Use();
+            shaderOverride.SetUniform("m_proj", ref m_proj, autoUse: false);
+            shaderOverride.SetUniform("m_view", ref m_view, autoUse: false);
+            shaderOverride.SetUniform("m_model", ref m_model, autoUse: false);
+        }
         
         GL.BindVertexArray(_vao);
-        _shader.Use();
         TextureAtlas.AlbedoTexture.Use(TextureUnit.Texture0);
         TextureAtlas.SpecularTexture.Use(TextureUnit.Texture1);
         GL.DrawElements(PrimitiveType.Triangles, _triangleCount, DrawElementsType.UnsignedInt, 0);
