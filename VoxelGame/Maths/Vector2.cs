@@ -149,6 +149,11 @@ public struct Vector2
         return new OpenTK.Mathematics.Vector2(v.X, v.Y);
     }
     
+    public static implicit operator System.Numerics.Vector2(Vector2 v)
+    {
+        return new(v.X, v.Y);
+    }
+    
     #endregion
 
     #region Utility Methods

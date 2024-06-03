@@ -1,20 +1,12 @@
-﻿// 3,925 lines of code :D
+﻿// 4,165 lines of code :D
 
-using System.Diagnostics;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Runtime.Serialization.Formatters.Binary;
-using System.Text.Json;
-using OpenTK.Mathematics;
+using ImGuiNET;
 using OpenTK.Windowing.Common;
 using OpenTK.Windowing.Desktop;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using VoxelGame.Maths;
 using VoxelGame.Rendering;
-using VoxelGame.Rendering.Font;
-using ErrorCode = OpenTK.Graphics.OpenGL4.ErrorCode;
-using Random = VoxelGame.Maths.Random;
-using Vector2 = VoxelGame.Maths.Vector2;
 using Vector3 = VoxelGame.Maths.Vector3;
 
 namespace VoxelGame;
@@ -23,8 +15,11 @@ public sealed class Engine : GameWindow
 {
     public static readonly string DataPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VoxelGame");
     
-    public new bool IsFullscreen { get; set; }
-    public bool IsWireframe { get; set; }
+    public bool ShowGui { get; set; }
+
+    public bool IsFullscreen;
+    public bool IsWireframe;
+    public bool Shadows = true;
 
     public const bool EnableFrustumCulling = false;
 
@@ -36,6 +31,8 @@ public sealed class Engine : GameWindow
     internal static int VertexCount;
     internal static int LoadedChunks;
     internal static int VisibleChunks;
+
+    internal ImGuiController _imGuiController;
 
     internal readonly ShadowMapper ShadowMapper;
     private Shader _depthShader;
@@ -57,7 +54,16 @@ public sealed class Engine : GameWindow
 
     private int _lightBuffer;
 
-    private Vector3 _lightDir = new Vector3(-2, -1, -0.5f);
+    // private Vector3 _lightDir = new Vector3(-2, -1, -0.5f);
+    private Vector3 _lightDir = new Vector3(-0.5f, -1, -0.5f);
+
+    private string[] _imGuiChunkBuilderDropdown =
+    [
+        "Not Blocking",
+        "Fully blocking"
+    ];
+
+    public static int ChunkBuilderMode = 0;
 
     public Engine(GameWindowSettings gws, NativeWindowSettings nws) : base(gws, nws)
     {
@@ -65,7 +71,6 @@ public sealed class Engine : GameWindow
         CenterWindow();
 
         Player = new Player(Size);
-        CursorState = CursorState.Grabbed;
     }
 
     protected override void OnLoad()
@@ -77,11 +82,15 @@ public sealed class Engine : GameWindow
         GL.Enable(EnableCap.CullFace);
         GL.Enable(EnableCap.DepthTest);
 
-        GL.CullFace(CullFaceMode.Front);
+        GL.CullFace(CullFaceMode.Back);
         GL.FrontFace(FrontFaceDirection.Cw);
 
         GL.ClearColor(0.6f, 0.75f, 1f, 1f);
         // GL.ClearColor(Colour.Black);
+        
+        // Initialise ImGUI
+        _imGuiController = new ImGuiController(Size.X, Size.Y);
+        // load any imgui fonts here
 
         TextureAtlas.Init();
         // Physics.Init();
@@ -158,11 +167,12 @@ public sealed class Engine : GameWindow
             _chunks.Remove(chunkPos);
         }
         
+        CursorState = ShowGui ? CursorState.Normal : CursorState.Grabbed;
+        
         // Physics.Update();
         
         Player.Update(Size);
         
-        // Close game window
         if (Input.GetKeyDown(Keys.Escape))
             Close();
 
@@ -251,7 +261,9 @@ public sealed class Engine : GameWindow
     {
         base.OnRenderFrame(args);
         
+        _imGuiController.Update(this, (float)args.Time);
         GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+        
         TriangleCount = 0;
         VertexCount = 0;
         LoadedChunks = 0;
@@ -268,11 +280,24 @@ public sealed class Engine : GameWindow
         ShadowMapper.Unuse(Size);
         Render(mode: 1);
         
-        GL.Disable(EnableCap.DepthTest);
-        UIRenderer.Render(Player);
-        GL.Enable(EnableCap.DepthTest);
+        if (ShowGui)
+        {
+            GL.Clear(ClearBufferMask.StencilBufferBit);
+            GL.Disable(EnableCap.DepthTest); // disable depth testing for rendering ImGUI
+        
+            ImGui.DockSpaceOverViewport();
+            
+            ImGui.ShowDemoWindow();
+            //OnImGuiRender();
+        
+            _imGuiController.Render();
+        
+            ImGuiController.CheckGLError("End of frame");
+        
+            GL.Enable(EnableCap.DepthTest);
+        }
 
-        Title = $"Vertices: {VertexCount:N0} Triangles: {TriangleCount:N0} | Loaded Chunks: {LoadedChunks} Visible Chunks: {VisibleChunks} | FPS: {Time.Fps}";
+        Title = $"Position: {Vector3.Round(Player.Position, 2)} | Vertices: {VertexCount:N0} Triangles: {TriangleCount:N0} | Loaded Chunks: {LoadedChunks} Visible Chunks: {VisibleChunks} | FPS: {Time.Fps}";
         
         SwapBuffers();
     }
@@ -338,13 +363,57 @@ public sealed class Engine : GameWindow
         
         GL.Viewport(0, 0, e.Width, e.Height);
         Player.UpdateProjection(Size);
+        
+        _imGuiController.WindowResized(e.Width, e.Height);
+    }
+
+    protected override void OnTextInput(TextInputEventArgs e)
+    {
+        base.OnTextInput(e);
+        
+        _imGuiController.PressChar((char)e.Unicode);
     }
 
     protected override void OnMouseMove(MouseMoveEventArgs e)
     {
         base.OnMouseMove(e);
         
-        Player.Rotate(e.DeltaX, e.DeltaY);
+        if (!ShowGui)
+            Player.Rotate(e.DeltaX, e.DeltaY);
+    }
+
+    protected override void OnMouseWheel(MouseWheelEventArgs e)
+    {
+        base.OnMouseWheel(e);
+        
+        _imGuiController.MouseScroll(e.Offset);
+    }
+    
+    private void OnImGuiRender()
+    {
+        ImGuiWindowFlags settingsFlags = 0;
+        settingsFlags |= ImGuiWindowFlags.NoDocking;
+        ImGui.SetNextWindowSize(new Vector2(1280/2f, 720/2f), ImGuiCond.FirstUseEver); 
+
+        ImGui.GetStyle().Alpha = 0.7f;
+
+        if (ImGui.Begin("Settings", settingsFlags))
+        {
+            ImGui.Checkbox("Fullscreen", ref IsFullscreen);
+            ImGui.Checkbox("Wireframe Rendering", ref IsWireframe);
+
+            ImGui.Checkbox("Shadows", ref Shadows);
+            
+            ImGui.SliderInt("Render distance", ref Player.ChunkRenderDistance, 1, 32);
+
+            ImGui.Combo("Chunk Builder Mode", ref ChunkBuilderMode, _imGuiChunkBuilderDropdown,
+                _imGuiChunkBuilderDropdown.Length);
+            
+            if (ImGui.Button("Quit"))
+                Close();
+        }
+
+        ImGui.End();
     }
 
     protected override void OnUnload()

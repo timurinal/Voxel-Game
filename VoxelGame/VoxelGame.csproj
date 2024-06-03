@@ -10,6 +10,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <PackageReference Include="ImGui.NET" Version="1.90.6.1" />
       <PackageReference Include="OpenTK" Version="4.8.2" />
       <PackageReference Include="PhysX.Net" Version="5.0.1-alpha1" />
       <PackageReference Include="SimplexNoise" Version="2.0.0" />

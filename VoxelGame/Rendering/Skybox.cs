@@ -1,6 +1,4 @@
-﻿using OpenTK.Mathematics;
-using StbImageSharp;
-using Vector3 = VoxelGame.Maths.Vector3;
+﻿using Vector3 = VoxelGame.Maths.Vector3;
 
 namespace VoxelGame.Rendering;
 

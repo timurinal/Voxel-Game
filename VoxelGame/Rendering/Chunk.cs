@@ -1,8 +1,6 @@
-﻿using System.Runtime.CompilerServices;
-using OpenTK.Mathematics;
-using SimplexNoise;
+﻿using OpenTK.Mathematics;
 using VoxelGame.Maths;
-using Random = VoxelGame.Maths.Random;
+using VoxelGame.TerrainGeneration;
 using Vector2 = VoxelGame.Maths.Vector2;
 using Vector3 = VoxelGame.Maths.Vector3;
 
@@ -134,8 +132,8 @@ public sealed class Chunk
                             faceIds.Add(0);
                         triangles.AddRange(new[]
                         {
-                            0 + triangleIndex, 1 + triangleIndex, 2 + triangleIndex,
-                            2 + triangleIndex, 1 + triangleIndex, 3 + triangleIndex,
+                            0 + triangleIndex, 2 + triangleIndex, 1 + triangleIndex,
+                            2 + triangleIndex, 3 + triangleIndex, 1 + triangleIndex,
                         });
                         triangleIndex += 4;
                     }
@@ -165,8 +163,8 @@ public sealed class Chunk
                             faceIds.Add(1);
                         triangles.AddRange(new[]
                         {
-                            0 + triangleIndex, 2 + triangleIndex, 1 + triangleIndex,
-                            2 + triangleIndex, 3 + triangleIndex, 1 + triangleIndex,
+                            0 + triangleIndex, 1 + triangleIndex, 2 + triangleIndex,
+                            2 + triangleIndex, 1 + triangleIndex, 3 + triangleIndex,
                         });
                         triangleIndex += 4;
                     }
@@ -196,8 +194,8 @@ public sealed class Chunk
                             faceIds.Add(2);
                         triangles.AddRange(new[]
                         {
-                            0 + triangleIndex, 2 + triangleIndex, 1 + triangleIndex,
-                            2 + triangleIndex, 3 + triangleIndex, 1 + triangleIndex,
+                            0 + triangleIndex, 1 + triangleIndex, 2 + triangleIndex,
+                            2 + triangleIndex, 1 + triangleIndex, 3 + triangleIndex,
                         });
                         triangleIndex += 4;
                     }
@@ -227,8 +225,8 @@ public sealed class Chunk
                             faceIds.Add(3);
                         triangles.AddRange(new[]
                         {
-                            0 + triangleIndex, 1 + triangleIndex, 2 + triangleIndex,
-                            2 + triangleIndex, 1 + triangleIndex, 3 + triangleIndex,
+                            0 + triangleIndex, 2 + triangleIndex, 1 + triangleIndex,
+                            2 + triangleIndex, 3 + triangleIndex, 1 + triangleIndex,
                         });
                         triangleIndex += 4;
                     }
@@ -258,8 +256,8 @@ public sealed class Chunk
                             faceIds.Add(4);
                         triangles.AddRange(new[]
                         {
-                            0 + triangleIndex, 1 + triangleIndex, 2 + triangleIndex,
-                            2 + triangleIndex, 1 + triangleIndex, 3 + triangleIndex,
+                            0 + triangleIndex, 2 + triangleIndex, 1 + triangleIndex,
+                            2 + triangleIndex, 3 + triangleIndex, 1 + triangleIndex,
                         });
                         triangleIndex += 4;
                     }
@@ -289,8 +287,8 @@ public sealed class Chunk
                             faceIds.Add(5);
                         triangles.AddRange(new[]
                         {
-                            0 + triangleIndex, 2 + triangleIndex, 1 + triangleIndex,
-                            2 + triangleIndex, 3 + triangleIndex, 1 + triangleIndex,
+                            0 + triangleIndex, 1 + triangleIndex, 2 + triangleIndex,
+                            2 + triangleIndex, 1 + triangleIndex, 3 + triangleIndex,
                         });
                         triangleIndex += 4;
                     }

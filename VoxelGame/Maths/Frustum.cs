@@ -1,6 +1,4 @@
 ﻿using VoxelGame.Rendering;
-using VoxelGame.Maths;
-using OpenTK.Mathematics;
 using Vector3 = VoxelGame.Maths.Vector3;
 
 public class Frustum

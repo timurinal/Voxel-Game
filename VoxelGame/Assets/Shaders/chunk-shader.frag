@@ -1,5 +1,7 @@
 ﻿#version 450 core
 
+const float MIN_SHADOW_INTENSITY = 0.5;
+
 struct Material {
     sampler2D diffuse;
     sampler2D specular;
@@ -61,9 +63,9 @@ void main() {
     vec3 viewDir = normalize(viewPos - fragPos);
     
     float shadow = calcShadow(fragPosLightSpace);
-    vec3 result = calcDirLight(dirLight, norm, viewDir, shadow);    
-    //result *= 1.0 - shadow;
-
+    vec3 result = calcDirLight(dirLight, norm, viewDir, shadow);
+    //result *= 1 - (shadow);
+    
     if (NumPointLights > 0)
         for (int i = 0; i < NumPointLights; i++)
                 result += calcPointLight(LightData[i], norm, fragPos, viewDir);
@@ -142,11 +144,11 @@ float calcShadow(vec4 lightSpaceFragPos) {
     // transform to [0-1] range
     projCoords = projCoords * 0.5 + 0.5;
 
-    // float closestDepth = texture(shadowMap, projCoords.xy).r;
+    //float closestDepth = texture(shadowMap, projCoords.xy).r;
     float currentDepth = projCoords.z;
 
     float bias = max(0.05 * (1.0 - dot(normal, -dirLight.direction)), 0.00025);
-    // float shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
+    //float shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
     float shadow = 0.0;
     vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
     for (int x = -4; x <= 4; x++) {
@@ -161,5 +163,6 @@ float calcShadow(vec4 lightSpaceFragPos) {
     if (projCoords.z > 1.0)
         shadow = 0.0;
 
-    return shadow;
+    return clamp(shadow - MIN_SHADOW_INTENSITY, 0.0, 1.0);
 }
+

@@ -73,6 +73,8 @@ public static class Mathf
     /// <returns>The rounded integer value.</returns>
     public static int RoundToInt(float v) => (int)Math.Round(v);
 
+    public static float Round(float v, int decimals) => (float)Math.Round(v, decimals);
+
     /// <summary>
     /// Calculates the sine of a specified angle.
     /// </summary>

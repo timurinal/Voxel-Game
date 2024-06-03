@@ -241,6 +241,9 @@ public struct Vector3
 
     public static Vector3Int Round(Vector3 v) =>
         new(Mathf.RoundToInt(v.X), Mathf.RoundToInt(v.Y), Mathf.RoundToInt(v.Z));
+    
+    public static Vector3 Round(Vector3 v, int decimals) =>
+        new(Mathf.Round(v.X, decimals), Mathf.Round(v.Y, decimals), Mathf.Round(v.Z, decimals));
 
     public static Vector3 RotateX(Vector3 vector, float angle)
     {

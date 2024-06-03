@@ -9,7 +9,7 @@ namespace VoxelGame.Rendering;
 
 public sealed class Player
 {
-    public const int ChunkRenderDistance = 8;
+    public static int ChunkRenderDistance = 8;
 
     public readonly Frustum Frustum;
     

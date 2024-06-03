@@ -63,6 +63,7 @@ public static class TextureAtlas
     {
         return name switch
         {
+            "air" => 0,
             "grass_block" => 1,
             "dirt" => 2,
             "stone" => 3,
