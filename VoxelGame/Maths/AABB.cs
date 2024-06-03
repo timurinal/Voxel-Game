@@ -1,31 +1,54 @@
 ﻿namespace VoxelGame.Maths;
 
-public struct AABB
+public struct AABB : IEquatable<AABB>
 {
     public Vector3 Min;
     public Vector3 Max;
 
+    public Vector3 Center => (Min + Max) / 2;
+
+    public AABB()
+    {
+        this = new AABB(Vector3.Zero);
+    }
     public AABB(Vector3 min, Vector3 max)
     {
+        if (min.X > max.X || min.Y > max.Y || min.Z > max.Z)
+        {
+            throw new ArgumentException("Min should be less than or equal to Max in all dimensions.");
+        }
+        
         Min = min;
         Max = max;
     }
-
-    public AABB(Vector3 centre, float halfWidth, float halfHeight, float halfDepth)
+    public AABB(Vector3 center, Vector3 min, Vector3 max)
     {
-        Min = centre - new Vector3(halfWidth, halfHeight, halfDepth);
-        Max = centre + new Vector3(halfWidth, halfHeight, halfDepth);
+        if (min.X > max.X || min.Y > max.Y || min.Z > max.Z)
+        {
+            throw new ArgumentException("Min should be less than or equal to Max in all dimensions.");
+        }
+        
+        Min = center - (max - min) / 2;
+        Max = center + (max - min) / 2;
     }
 
-    public static AABB CreateVoxelAABB(Vector3 voxelPosition)
+    public AABB(Vector3 center)
     {
-        return new AABB(voxelPosition, 0.5f, 0.5f, 0.5f);
+        Min = center - Vector3.One / 2;
+        Max = center + Vector3.One / 2;
+    }
+
+    public void Move(Vector3 dir)
+    {
+        Min += dir;
+        Max += dir;
     }
     
-    public static AABB PlayerAABB(Vector3 position)
+    public bool Contains(Vector3 point)
     {
-        // create a player aabb with a width and depth of 0.6 and a height of 1.85
-        return new AABB(position - new Vector3(0.3f, 0, 0.3f), position + new Vector3(0.3f, 1.85f, 0.3f));
+        return (point.X >= Min.X && point.X <= Max.X) &&
+               (point.Y >= Min.Y && point.Y <= Max.Y) &&
+               (point.Z >= Min.Z && point.Z <= Max.Z);
     }
 
     public bool Intersects(AABB other)
@@ -34,19 +57,25 @@ public struct AABB
                (Min.Y <= other.Max.Y && Max.Y >= other.Min.Y) &&
                (Min.Z <= other.Max.Z && Max.Z >= other.Min.Z);
     }
-    
-    public Vector3 GetPenetrationDepth(AABB other)
-    {
-        float xDepth = Math.Min(Max.X - other.Min.X, other.Max.X - Min.X);
-        float yDepth = Math.Min(Max.Y - other.Min.Y, other.Max.Y - Min.Y);
-        float zDepth = Math.Min(Max.Z - other.Min.Z, other.Max.Z - Min.Z);
 
-        return new Vector3(xDepth, yDepth, zDepth);
+    public void Expand(Vector3 amount)
+    {
+        Min -= amount / 2;
+        Max += amount / 2;
     }
 
-    public bool PointInAABB(Vector3 point)
+    public bool Equals(AABB other)
     {
-        return (point.X >= Min.X && point.X <= Max.X) && (point.Y >= Min.Y && point.Y <= Max.Y) &&
-               (point.Z >= Min.Z && point.Z <= Max.Z);
+        return Min.Equals(other.Min) && Max.Equals(other.Max);
+    }
+
+    public override bool Equals(object? obj)
+    {
+        return obj is AABB other && Equals(other);
+    }
+
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(Min, Max);
     }
 }

@@ -38,7 +38,7 @@ public sealed class Engine : GameWindow
     private Shader _depthShader;
     
     private Shader _chunkShader;
-    private Dictionary<Vector3Int, Chunk> _chunks;
+    internal static Dictionary<Vector3Int, Chunk> Chunks;
     private Queue<Vector3Int> _chunksToBuild;
     private const int MaxChunksToBuildPerFrame = 32;
 
@@ -47,6 +47,10 @@ public sealed class Engine : GameWindow
     private Skybox _skybox;
     private Shader _skyboxSkyShader;
     private Shader _skyboxVoidShader;
+
+    private List<AABB> collisions = new();
+
+    private Mesh _test;
     
     private readonly Vector3 _lightColour = new Vector3(1.0f, 0.898f, 0.7f);
 
@@ -64,6 +68,10 @@ public sealed class Engine : GameWindow
     ];
 
     public static int ChunkBuilderMode = 0;
+
+    private const float FpsUpdateRate = 3f;
+    private float _nextFpsUpdateTime = 0;
+    private float _fps;
 
     public Engine(GameWindowSettings gws, NativeWindowSettings nws) : base(gws, nws)
     {
@@ -124,11 +132,14 @@ public sealed class Engine : GameWindow
         // _skyboxShader = Shader.StandardShader;
         _skybox = new Skybox(_skyboxSkyShader, _skyboxVoidShader);
         
-        _chunks = new Dictionary<Vector3Int, Chunk>();
+        Chunks = new Dictionary<Vector3Int, Chunk>();
         _chunksToBuild = new Queue<Vector3Int>();
 
         _lightBuffer = GL.GenBuffer();
-        
+
+        _test = MeshUtility.GenerateCube(Shader.StandardShader);
+        _test.Transform.Scale = Vector3.One * 1.01f;
+
         // Lights.Add(new PointLight(Player.Position, 50f, ambientLighting, new(1.0f, 1.0f, 1.0f), new Vector3(1.0f, 1.0f, 1.0f)));
         // RecalculateLightBuffer(1);
         // _shader.SetUniform("NumPointLights", 1);
@@ -148,7 +159,7 @@ public sealed class Engine : GameWindow
 
         List<Vector3Int> chunksToRemove = new List<Vector3Int>();
 
-        foreach (var chunk in _chunks)
+        foreach (var chunk in Chunks)
         {
             var chunkPos = chunk.Key;
             int dx = chunkPos.X - playerPosition.X;
@@ -164,14 +175,17 @@ public sealed class Engine : GameWindow
 
         foreach (var chunkPos in chunksToRemove)
         {
-            _chunks.Remove(chunkPos);
+            Chunks.Remove(chunkPos);
         }
         
         CursorState = ShowGui ? CursorState.Normal : CursorState.Grabbed;
-        
-        // Physics.Update();
-        
+
+        // foreach (var chunk in Chunks.Values)
+        // {
+        //     collisions.AddRange(chunk.GenerateCollisions());
+        // }
         Player.Update(Size);
+        // Physics.ResolveCollisions(Player, collisions.ToArray());
         
         if (Input.GetKeyDown(Keys.Escape))
             Close();
@@ -192,12 +206,12 @@ public sealed class Engine : GameWindow
 
         if (Input.GetKeyDown(Keys.Space))
         {
-            var chunk = _chunks[Vector3Int.Zero];
+            var chunk = Chunks[Vector3Int.Zero];
             for (int i = 0; i < chunk.voxels.Length; i++)
             {
                 chunk.voxels[i] = chunk.voxels[i] == 4u ? 4u : 0u;
             }
-            chunk.RebuildChunk(_chunks, recursive: true);
+            chunk.RebuildChunk(Chunks, recursive: true);
         }
 
         if (Input.GetKeyDown(Keys.Enter))
@@ -215,12 +229,12 @@ public sealed class Engine : GameWindow
                     Vector3Int chunkPosition = new Vector3Int(x, y, z) + playerPosition;
                     Vector3Int chunkWorldPosition = chunkPosition * Chunk.ChunkSize;
 
-                    if (!_chunks.ContainsKey(chunkPosition) && chunkWorldPosition.Y >= 0)
+                    if (!Chunks.ContainsKey(chunkPosition) && chunkWorldPosition.Y >= 0)
                     {
                         // TODO: Load chunks from disk
                         var newChunk = new Chunk(chunkWorldPosition, _chunkShader);
                         _chunksToBuild.Enqueue(chunkPosition); // Queue the chunk for building
-                        _chunks[chunkPosition] = newChunk; // Add the chunk to the dictionary
+                        Chunks[chunkPosition] = newChunk; // Add the chunk to the dictionary
                     }
                 }
             }
@@ -232,7 +246,27 @@ public sealed class Engine : GameWindow
             try
             {
                 var chunkPosition = _chunksToBuild.Dequeue();
-                _chunks[chunkPosition].BuildChunk(_chunks);
+                var chunk = Chunks[chunkPosition];
+                chunk.RebuildChunk(Chunks, recursive: true);
+
+                // Force neighbouring chunks to rebuild
+                Vector3Int[] neighbourChunkOffsets =
+                {
+                    new Vector3Int(0, 0, 1),
+                    new Vector3Int(0, 0, -1),
+                    new Vector3Int(0, 1, 0),
+                    new Vector3Int(0, -1, 0),
+                    new Vector3Int(1, 0, 0),
+                    new Vector3Int(-1, 0, 0),
+                };
+
+                foreach (var offset in neighbourChunkOffsets)
+                {
+                    if (Chunks.TryGetValue(chunkPosition + offset, out var neighbour))
+                    {
+                        neighbour.RebuildChunk(Chunks);
+                    }
+                }
             }
             catch
             {
@@ -247,6 +281,11 @@ public sealed class Engine : GameWindow
         //_lightDir = Vector3.RotateX(_lightDir, sunSpeed * Time.DeltaTime);
         
         _chunkShader.SetUniform("viewPos", Player.Position);
+
+        // Player.Yaw = 0;
+        // Player.Pitch = 0;
+
+        _test.Transform.Position = Player.Traverse() ?? Vector3.Zero;
         
         //_shader.SetUniform("dirLight.direction", _lightDir);
         
@@ -297,7 +336,13 @@ public sealed class Engine : GameWindow
             GL.Enable(EnableCap.DepthTest);
         }
 
-        Title = $"Position: {Vector3.Round(Player.Position, 2)} | Vertices: {VertexCount:N0} Triangles: {TriangleCount:N0} | Loaded Chunks: {LoadedChunks} Visible Chunks: {VisibleChunks} | FPS: {Time.Fps}";
+        if (Time.ElapsedTime >= _nextFpsUpdateTime)
+        {
+            _fps = Time.Fps;
+            _nextFpsUpdateTime = (1f / FpsUpdateRate) + Time.ElapsedTime;
+        }
+        
+        Title = $"Position: {Vector3.Round(Player.Position, 2)} | Vertices: {VertexCount:N0} Triangles: {TriangleCount:N0} | Loaded Chunks: {LoadedChunks} Visible Chunks: {VisibleChunks} | FPS: {_fps}";
         
         SwapBuffers();
     }
@@ -306,10 +351,12 @@ public sealed class Engine : GameWindow
     {
         if (mode == 0) // 0 = shadow render pass
         {
+            //_test.Render(Player);
+            
             GL.BindBuffer(BufferTarget.ShaderStorageBuffer, _lightBuffer);
             try
             {
-                foreach (var chunk in _chunks)
+                foreach (var chunk in Chunks)
                 {
                     LoadedChunks++;
                     VisibleChunks++;
@@ -328,10 +375,12 @@ public sealed class Engine : GameWindow
         }
         else
         {
+            //_test.Render(Player);
+            
             GL.BindBuffer(BufferTarget.ShaderStorageBuffer, _lightBuffer);
             try
             {
-                foreach (var chunk in _chunks)
+                foreach (var chunk in Chunks)
                 {
                     LoadedChunks++;
 
@@ -486,5 +535,38 @@ public sealed class Engine : GameWindow
             _padding4 = 4;
             _padding5 = 4;
         }
+    }
+
+    public static uint? GetVoxelAtPosition(Vector3Int position)
+    {
+        // Determine the chunk position by dividing the voxel position by the chunk size
+        Vector3Int chunkPosition = new Vector3Int(
+            Mathf.FloorToInt((float)position.X / Chunk.ChunkSize),
+            Mathf.FloorToInt((float)position.Y / Chunk.ChunkSize),
+            Mathf.FloorToInt((float)position.Z / Chunk.ChunkSize)
+        );
+
+        // Check if the chunk exists in the dictionary
+        if (Chunks.TryGetValue(chunkPosition, out Chunk chunk))
+        {
+            // Calculate the local voxel position within the chunk
+            Vector3Int localPosition = new Vector3Int(
+                position.X % Chunk.ChunkSize,
+                position.Y % Chunk.ChunkSize,
+                position.Z % Chunk.ChunkSize
+            );
+
+            // Ensure positive local positions by adjusting with Chunk.ChunkSize
+            localPosition = (localPosition + Chunk.ChunkSize) % Chunk.ChunkSize;
+
+            // Flatten the local position to get the voxel index in the chunk's voxel array
+            int index = Chunk.FlattenIndex3D(localPosition.X, localPosition.Y, localPosition.Z, Chunk.ChunkSize, Chunk.ChunkSize);
+
+            // Return the voxel value at the calculated index
+            return chunk.voxels[index];
+        }
+
+        // Return null if the chunk does not exist
+        return null;
     }
 }

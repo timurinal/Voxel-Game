@@ -152,6 +152,11 @@ public struct Vector3Int : IEquatable<Vector3Int>
         return new Vector3(a.X / (float)b.X, a.Y / (float)b.Y, a.Z / (float)b.Z);
     }
 
+    public static Vector3Int operator %(Vector3Int a, int k)
+    {
+        return new Vector3Int(a.X % k, a.Y % k, a.Z % k);
+    }
+
     public static bool operator ==(Vector3Int a, Vector3Int b)
     {
         return a.X == b.X && a.Y == b.Y && a.Z == b.Z;

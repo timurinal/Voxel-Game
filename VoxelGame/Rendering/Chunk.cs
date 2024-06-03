@@ -8,7 +8,7 @@ namespace VoxelGame.Rendering;
 
 public sealed class Chunk
 {
-    public const int ChunkSize = 16;
+    public const int ChunkSize = 8;
     public const int HChunkSize = ChunkSize / 2;
     public const int ChunkArea = ChunkSize * ChunkSize;
     public const int ChunkVolume = ChunkArea * ChunkSize;
@@ -21,10 +21,8 @@ public sealed class Chunk
             chunkPosition.Z + ChunkSize / 2f);
 
     public bool IsEmpty { get; private set; }
-    
-    public AABB Bounds { get; private set; }
 
-    // if this is true, it means the chunk has been modified since generation
+    // if this is true, it means the chunk has been modified since generation (or since it was last loaded from the disk)
     public bool IsDirty { get; private set; } = false;
     
     public uint solidVoxelCount { get; private set; }
@@ -69,9 +67,6 @@ public sealed class Chunk
         m_model = Matrix4.CreateTranslation(chunkPosition);
         
         Vector3 chunkCentre = chunkPosition + new Vector3(ChunkSize / 2f, ChunkSize / 2f, ChunkSize / 2f);
-
-        // Create the AABB using the centre and half dimensions
-        Bounds = new AABB(chunkCentre, ChunkSize / 2f, ChunkSize / 2f, ChunkSize / 2f);
     }
 
     internal void BuildChunk(Dictionary<Vector3Int, Chunk> chunks)
@@ -338,32 +333,33 @@ public sealed class Chunk
     }
     
     internal void RebuildChunk(Dictionary<Vector3Int, Chunk> chunks, bool recursive = false)
+{
+    BuildChunk(chunks);
+
+    Vector3Int[] neighbourChunkOffsets =
+    [
+        new Vector3Int(0, 0, 1),
+        new Vector3Int(0, 0, -1),
+        new Vector3Int(0, 1, 0),
+        new Vector3Int(0, -1, 0),
+        new Vector3Int(1, 0, 0),
+        new Vector3Int(-1, 0, 0)
+    ];
+
+    if (recursive)
     {
-        BuildChunk(chunks);
-
-        Vector3Int[] neighbourChunkOffsets =
-        [
-            new Vector3Int(0, 0, 1),
-            new Vector3Int(0, 0, -1),
-            new Vector3Int(0, 1, 0),
-            new Vector3Int(0, -1, 0),
-            new Vector3Int(1, 0, 0),
-            new Vector3Int(-1, 0, 0),
-        ];
-
-        if (recursive)
+        foreach (var offset in neighbourChunkOffsets)
         {
-            foreach (var offset in neighbourChunkOffsets)
+            if (chunks.TryGetValue(chunkPosition + offset, out var neighbour))
             {
-                if (chunks.TryGetValue(chunkPosition + offset, out var neighbour))
-                {
-                    neighbour.RebuildChunk(chunks);
-                }
+                neighbour.RebuildChunk(chunks);
             }
         }
-        
-        IsDirty = true;
     }
+    
+    IsDirty = true;
+}
+
 
     public static bool IsAir(int x, int y, int z, uint[] voxels, Dictionary<Vector3Int, Chunk> chunks, Vector3Int currentChunkPosition)
     {
@@ -469,4 +465,30 @@ public sealed class Chunk
     }
 
     internal void OnSaved() => IsDirty = false;
+
+    internal List<AABB> GenerateCollisions()
+    {
+        List<AABB> collisions = new();
+        int index = 0;
+        for (int x = 0; x < ChunkSize; x++)
+        {
+            for (int y = 0; y < ChunkSize; y++)
+            {
+                for (int z = 0; z < ChunkSize; z++)
+                {
+                    int voxelIndex = FlattenIndex3D(x, y, z, ChunkSize, ChunkSize);
+                    uint voxel = voxels[voxelIndex];
+                    if (voxel != 0)
+                    {
+                        Vector3 min = new Vector3(chunkPosition.X + x, chunkPosition.Y + y, chunkPosition.Z + z);
+                        Vector3 max = min + Vector3.One / 2f;
+                        collisions.Add(new AABB(min, max));
+                        index++;
+                    }
+                }
+            }
+        }
+
+        return collisions;
+    }
 }

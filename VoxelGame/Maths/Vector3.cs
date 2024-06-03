@@ -3,7 +3,7 @@
 /// <summary>
 /// Represents a 3D vector with floating point values.
 /// </summary>
-public struct Vector3
+public struct Vector3 : IEquatable<Vector3>
 {
     /// <summary>
     /// X component of the vector
@@ -196,17 +196,6 @@ public struct Vector3
         return a.X * b.X + a.Y * b.Y + a.Z * b.Z;
     }
 
-    /// <summary>
-    /// Converts the vector to a new vector with the Z component negated. This is done so that as Z increases,
-    /// the object moves 'into' the scene and not 'out'
-    /// </summary>
-    /// <returns>A new Vector3 with the Z component negated.</returns>
-    /// <remarks>Internal as the rendering engine automatically converts positions using this function so the user will never have to convert their vectors</remarks>
-    internal Vector3 ToBackZ()
-    {
-        return new Vector3(X, Y, -Z);
-    }
-
     public static Vector3 Normalize(Vector3 v)
     {
         return v.Normalized;
@@ -256,6 +245,32 @@ public struct Vector3
         return new Vector3(vector.X * Mathf.Cos(angle) + vector.Z * Mathf.Sin(angle), vector.Y,
             -vector.X * Mathf.Sin(angle) + vector.Z * Mathf.Cos(angle));
     }
+
+    public static float SqrDistance(Vector3 a, Vector3 b)
+    {
+        return (a - b).SqrMagnitude;
+    }
+
+    public static float Distance(Vector3 a, Vector3 b)
+    {
+        return (a - b).Magnitude;
+    }
     
     #endregion
+
+    public bool Equals(Vector3 other)
+    {
+        return Mathf.Abs(X - other.X) < 0.0000001f && Mathf.Abs(Y - other.Y) < 0.0000001f &&
+               Mathf.Abs(Z - other.Z) < 0.0000001f;
+    }
+
+    public override bool Equals(object? obj)
+    {
+        return obj is Vector3 other && Equals(other);
+    }
+
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(X, Y, Z);
+    }
 }

@@ -1,16 +1,25 @@
 ﻿using SimplexNoise;
+using VoxelGame.Maths;
+using Random = VoxelGame.Maths.Random;
 
 namespace VoxelGame.TerrainGeneration;
 
 public static class TerrainGenerator
 {
-    public static float Sample(int x, int z)
+    private static SimplexNoise _noise;
+
+    static TerrainGenerator()
     {
-        return Noise.CalcPixel2D(x, z, 0.01f) / 255f;
+        _noise = new SimplexNoise(0);
     }
-    public static float Sample(int x, int y, int z)
+    
+    public static float Sample(int x, int z, float scale = 0.01f)
     {
-        return Noise.CalcPixel3D(x, y, z, 0.10f) / 255f;
+        return Noise.CalcPixel2D(x, z, scale) / 255f;
+    }
+    public static float Sample(int x, int y, int z, float scale = 0.01f)
+    {
+        return Noise.CalcPixel3D(x, y, z, scale) / 255f;
     }
 
     public static float FractalNoise(int x, int z, int octaves = 6, float frequencyBase = 2, float persistence = 0.5f)
@@ -35,6 +44,15 @@ public static class TerrainGenerator
 
     public static uint SampleTerrain(int x, int y, int z)
     {
+        // return y switch
+        // {
+        //     <= 0  => TextureAtlas.NameToVoxelId("bedrock"),
+        //     <= 6  => TextureAtlas.NameToVoxelId("stone"),
+        //     <= 9  => TextureAtlas.NameToVoxelId("dirt"),
+        //     <= 10 => TextureAtlas.NameToVoxelId("grass_block"),
+        //     _     => TextureAtlas.NameToVoxelId("air")
+        // };
+        
         // Generate height value based on noise
         float noise = FractalNoise(x, z);
         int height = (int)(noise * 15); // Scale noise to a suitable height range
@@ -54,6 +72,26 @@ public static class TerrainGenerator
         else if (y < height)
         {
             return TextureAtlas.NameToVoxelId("grass_block");
+        }
+        else if (y == height)
+        {
+            return Random.Hash((uint)(new Vector3Int(x, y, z).GetHashCode())) > 0.99f
+                ? TextureAtlas.NameToVoxelId("oak_log") : 0u;
+        }
+        else if (y == height + 1)
+        {
+            return Random.Hash((uint)(new Vector3Int(x, y - 1, z).GetHashCode())) > 0.99f
+                ? TextureAtlas.NameToVoxelId("oak_log") : 0u;
+        }
+        else if (y == height + 2)
+        {
+            return Random.Hash((uint)(new Vector3Int(x, y - 2, z).GetHashCode())) > 0.99f
+                ? TextureAtlas.NameToVoxelId("oak_log") : 0u;
+        }
+        else if (y == height + 3)
+        {
+            return Random.Hash((uint)(new Vector3Int(x, y - 3, z).GetHashCode())) > 0.99f
+                ? TextureAtlas.NameToVoxelId("oak_log") : 0u;
         }
         else
         {

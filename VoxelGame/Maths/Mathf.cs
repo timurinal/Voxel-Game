@@ -148,4 +148,6 @@ public static class Mathf
     }
 
     public static int FloorToInt(float v) => (int)Math.Floor(v);
+
+    public static int Floor(float v) => (int)Math.Floor(v);
 }
