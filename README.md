@@ -23,7 +23,7 @@ There is a shortcut in the root of the folder that runs the correct executable. 
 Start by cloning the repository.<br>
 The project was made in JetBrains Rider and the project-specific IDE files are included so formatting may differ between IDEs<br>
 Any required packages should automatically be installed by your IDE's package manager.
-<br>
+<br><br>
 **If you want to contribute, please ensure all code follows the [naming guidelines](https://github.com/timurinal/Voxel-Game/blob/main/VoxelGame/README.md)**
 
 Planned for the future
