@@ -14,6 +14,44 @@ public static class VoxelData
         var serializer = new JsonSerializer();
         Voxels = (Voxel[])serializer.Deserialize(fileReader, typeof(Voxel[]));
     }
+
+    internal static int GetTextureFace(uint voxelId, VoxelFace face) => Voxels[voxelId].textureFaces[(int)face];
+    
+    /// <summary>
+    /// Converts a voxel name to its corresponding voxel ID.
+    /// </summary>
+    /// <param name="name">The name of the voxel.</param>
+    /// <returns>The voxel ID.</returns>
+    /// <remarks>Returns 0 if the name is not found</remarks>
+    public static uint NameToVoxelId(string name)
+    {
+        if (name == "air") return 0;
+        
+        foreach (var voxel in Voxels)
+        {
+            if (voxel.name == name) return voxel.id;
+        }
+
+        return 0;
+    }
+
+    /// <summary>
+    /// Converts a voxel ID to its corresponding voxel name.
+    /// </summary>
+    /// <param name="id">The ID of the voxel.</param>
+    /// <returns>The voxel name.</returns>
+    /// <remarks>Returns 'air' if the voxel id is not found</remarks>
+    public static string VoxelIdToName(uint id)
+    {
+        if (id == 0) return "air";
+        
+        foreach (var voxel in Voxels)
+        {
+            if (voxel.id == id) return voxel.name;
+        }
+
+        return "air";
+    }
     
     public struct Voxel
     {

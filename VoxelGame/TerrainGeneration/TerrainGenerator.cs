@@ -54,43 +54,43 @@ public static class TerrainGenerator
 
         if (y <= 0)
         {
-            return TextureAtlas.NameToVoxelId("bedrock");
+            return VoxelData.NameToVoxelId("bedrock");
         }
         else if (y < height - 3)
         {
-            return TextureAtlas.NameToVoxelId("stone");
+            return Sample(x, y, z, scale: 7f) >= 0.5f ? VoxelData.NameToVoxelId("stone") : VoxelData.NameToVoxelId("cobblestone");
         }
         else if (y < height - 1)
         {
-            return TextureAtlas.NameToVoxelId("dirt");
+            return VoxelData.NameToVoxelId("dirt");
         }
         else if (y < height)
         {
-            return TextureAtlas.NameToVoxelId("grass_block");
+            return VoxelData.NameToVoxelId("grass_block");
         }
         else if (y == height)
         {
             return Random.Hash((uint)(new Vector3Int(x, y, z).GetHashCode())) > 0.99f
-                ? TextureAtlas.NameToVoxelId("oak_log") : 0u;
+                ? VoxelData.NameToVoxelId("oak_log") : 0u;
         }
         else if (y == height + 1)
         {
             return Random.Hash((uint)(new Vector3Int(x, y - 1, z).GetHashCode())) > 0.99f
-                ? TextureAtlas.NameToVoxelId("oak_log") : 0u;
+                ? VoxelData.NameToVoxelId("oak_log") : 0u;
         }
         else if (y == height + 2)
         {
             return Random.Hash((uint)(new Vector3Int(x, y - 2, z).GetHashCode())) > 0.99f
-                ? TextureAtlas.NameToVoxelId("oak_log") : 0u;
+                ? VoxelData.NameToVoxelId("oak_log") : 0u;
         }
         else if (y == height + 3)
         {
             return Random.Hash((uint)(new Vector3Int(x, y - 3, z).GetHashCode())) > 0.99f
-                ? TextureAtlas.NameToVoxelId("oak_log") : 0u;
+                ? VoxelData.NameToVoxelId("oak_log") : 0u;
         }
         else
         {
-            return TextureAtlas.NameToVoxelId("air");
+            return VoxelData.NameToVoxelId("air");
         }
     }
 }

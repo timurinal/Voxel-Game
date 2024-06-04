@@ -52,7 +52,8 @@ public sealed class Engine : GameWindow
 
     private Mesh _test;
     
-    private readonly Vector3 _lightColour = new Vector3(1.0f, 0.898f, 0.7f);
+    // private readonly Vector3 _lightColour = new Vector3(1.0f, 0.898f, 0.7f);
+    private readonly Vector3 _lightColour = new Vector3(1.0f, 1.0f, 1.0f);
 
     private bool _newLightThisFrame = true; // this is true when a (or multiple) new light is added to the scene. The light buffer is recalculated when this is true
 
@@ -291,6 +292,7 @@ public sealed class Engine : GameWindow
 
         _test.Transform.Position = -_lightDir;
         _test.Transform.Position += Player.Position;
+        // _test.Transform.LookAt(Player.Position);
         
         //_shader.SetUniform("dirLight.direction", _lightDir);
         

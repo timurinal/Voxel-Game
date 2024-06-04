@@ -24,6 +24,13 @@ public class Transform
         Scale = scale;
     }
 
+    public void LookAt(Vector3 position)
+    {
+        Vector3 forward = Vector3.Normalize(position - Position);
+        Rotation = new Vector3(Mathf.Atan2(forward.Y, forward.Z) * Mathf.Rad2Deg,
+            Mathf.Atan2(-forward.X, Mathf.Sqrt(forward.Y * forward.Y + forward.Z * forward.Z)) * Mathf.Rad2Deg, 0);
+    }
+
     internal Matrix4 GetModelMatrix()
     {
         Matrix4 scale = Matrix4.CreateScale(Scale);
