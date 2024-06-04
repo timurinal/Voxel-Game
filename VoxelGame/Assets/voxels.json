@@ -1,0 +1,14 @@
+﻿[
+  {
+    "id": 1,
+    "displayName": "Grass Block",
+    "name": "grass_block",
+    "textureFaces": [ 1, 1, 0, 2, 1, 1 ]
+  },
+  {
+    "id": 2,
+    "displayName": "Dirt Block",
+    "name": "dirt",
+    "textureFaces": [ 2, 2, 2, 2, 2, 2 ]
+  }
+]

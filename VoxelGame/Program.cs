@@ -6,6 +6,17 @@ class Program
 {
     static void Main(string[] args)
     {
+        int[] arr = 
+        {
+            0, 1, 2
+        };
+        
+        foreach (var voxel in VoxelData.Voxels)
+        {
+            Console.WriteLine(voxel.ToString());
+        }
+        return;
+        
         // FontReader.ParseFont("Assets/Fonts/JetBrainsMono-bold.ttf");
         // return;
         

@@ -6,13 +6,6 @@ namespace VoxelGame.TerrainGeneration;
 
 public static class TerrainGenerator
 {
-    private static SimplexNoise _noise;
-
-    static TerrainGenerator()
-    {
-        _noise = new SimplexNoise(0);
-    }
-    
     public static float Sample(int x, int z, float scale = 0.01f)
     {
         return Noise.CalcPixel2D(x, z, scale) / 255f;
@@ -52,6 +45,8 @@ public static class TerrainGenerator
         //     <= 10 => TextureAtlas.NameToVoxelId("grass_block"),
         //     _     => TextureAtlas.NameToVoxelId("air")
         // };
+
+        if (y >= 15) return 0u;
         
         // Generate height value based on noise
         float noise = FractalNoise(x, z);

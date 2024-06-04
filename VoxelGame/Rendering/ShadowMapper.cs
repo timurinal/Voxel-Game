@@ -19,7 +19,7 @@ internal class ShadowMapper
 
     public const int ShadowMapWidth = 8192, ShadowMapHeight = 8192;
 
-    public const float OrthographicSize = 25f;
+    public const float OrthographicSize = 35f;
 
     private int _depthMapFbo, _depthMap;
 

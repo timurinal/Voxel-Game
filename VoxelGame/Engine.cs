@@ -59,7 +59,7 @@ public sealed class Engine : GameWindow
     private int _lightBuffer;
 
     // private Vector3 _lightDir = new Vector3(-2, -1, -0.5f);
-    private Vector3 _lightDir = new Vector3(-0.5f, -1, -0.5f);
+    private Vector3 _lightDir = new Vector3(-0.5f, -1f, -0.5f);
 
     private string[] _imGuiChunkBuilderDropdown =
     [
@@ -138,7 +138,11 @@ public sealed class Engine : GameWindow
         _lightBuffer = GL.GenBuffer();
 
         _test = MeshUtility.GenerateCube(Shader.StandardShader);
-        _test.Transform.Scale = Vector3.One * 1.01f;
+        _test.Transform.Scale = Vector3.One * 0.05f;
+        for (int i = 0; i < _test.Colours.Length; i++)
+        {
+            _test.Colours[i] = Colour.Yellow;
+        }
 
         // Lights.Add(new PointLight(Player.Position, 50f, ambientLighting, new(1.0f, 1.0f, 1.0f), new Vector3(1.0f, 1.0f, 1.0f)));
         // RecalculateLightBuffer(1);
@@ -285,7 +289,8 @@ public sealed class Engine : GameWindow
         // Player.Yaw = 0;
         // Player.Pitch = 0;
 
-        _test.Transform.Position = Player.Traverse() ?? Vector3.Zero;
+        _test.Transform.Position = -_lightDir;
+        _test.Transform.Position += Player.Position;
         
         //_shader.SetUniform("dirLight.direction", _lightDir);
         
@@ -310,6 +315,7 @@ public sealed class Engine : GameWindow
         
         // Render skybox with depth write disabled
         GL.DepthMask(false);
+        _test.Render(Player);
         //_skyboxShader.Use();
         // _skybox.Render(Player);
         GL.DepthMask(true);
@@ -366,7 +372,10 @@ public sealed class Engine : GameWindow
                     TriangleCount += c.triangleCount;
                 }
             }
-            catch (GLException e) // for some reason, I get an opengl invalid value error when rendering the chunks but my error handler throws an exception when a gl exception is caught. this 'fixes' the issue, it only stops the window closing but chunks all render correctly even after the error is thrown
+            catch (GLException e) // for some reason, I get an opengl invalid value error when rendering the chunks but
+                                  // my error handler throws an exception when a gl exception is caught. this 'fixes'
+                                  // the issue, it only stops the window closing but chunks all render correctly even
+                                  // after the error is thrown
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
                 Console.WriteLine(e.Message);

@@ -11,7 +11,7 @@ public sealed class Player
 {
     private const float MaxRayDistance = 8f;
     
-    public static int ChunkRenderDistance = 2;
+    public static int ChunkRenderDistance = 4;
 
     public readonly Frustum Frustum;
 
