@@ -15,11 +15,11 @@ internal class ShadowMapper
 
     public const float SunViewDistance = 50f;
 
-    public const float NearPlane = 1.0f, FarPlane = 1000f;
+    public const float NearPlane = 1.0f, FarPlane = 500f;
 
     public const int ShadowMapWidth = 8192, ShadowMapHeight = 8192;
 
-    public const float OrthographicSize = 100f;
+    public const float OrthographicSize = 25f;
 
     private int _depthMapFbo, _depthMap;
 
@@ -45,7 +45,7 @@ internal class ShadowMapper
     {
         GL.BindFramebuffer(FramebufferTarget.Framebuffer, _depthMapFbo);
         GL.Viewport(0, 0, ShadowMapWidth, ShadowMapHeight);
-        //GL.CullFace(CullFaceMode.Front);
+        GL.CullFace(CullFaceMode.Front);
         GL.Clear(ClearBufferMask.DepthBufferBit);
     }
 
@@ -53,7 +53,7 @@ internal class ShadowMapper
     {
         GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
         GL.Viewport(0, 0, size.X, size.Y);
-        //GL.CullFace(CullFaceMode.Back);
+        GL.CullFace(CullFaceMode.Back);
     }
 
     internal void UpdateMatrix(Player player, Vector3 lightDir)
