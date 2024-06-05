@@ -47,3 +47,16 @@ SomeFunction(() => { // Same line opening bracket
     // Code
 });
 ```
+<br>
+GLSL functions use same-line opening curly brackets. GLSL functions are named using standard camel case. Declare function prototypes at the top of the file but implement them under the main function
+```glsl
+void someFuntion(); // function prototype
+
+void main() {
+    // Main code
+}
+
+void someFuntion() {
+    // Code
+}
+```
