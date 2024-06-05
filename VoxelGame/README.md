@@ -48,7 +48,8 @@ SomeFunction(() => { // Same line opening bracket
 });
 ```
 <br>
-GLSL functions use same-line opening curly brackets. GLSL functions are named using standard camel case. Declare function prototypes at the top of the file but implement them under the main function
+GLSL functions use same-line opening curly brackets. GLSL functions are named using standard camel case. Declare function prototypes at the top of the file but implement them under the main function<br>
+
 ```glsl
 void someFuntion(); // function prototype
 
