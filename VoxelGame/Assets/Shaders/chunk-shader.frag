@@ -87,7 +87,7 @@ void main() {
     
     // finalCol = mix(vec4(result, 1.0), vec4(fogColour, 1.0), fogAmount);
     vec4 lit = vec4(result, 1.0);
-    lit = clamp(lit, 0.0, 1.0);
+    //lit = clamp(lit, 0.0, 1.0);
     
     // TODO: dithering
     

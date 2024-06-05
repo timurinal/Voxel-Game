@@ -69,6 +69,12 @@
       <None Update="Assets\voxels.json">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
+      <None Update="Assets\Shaders\tonemapper.frag">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+      <None Update="Assets\Shaders\tonemapper.vert">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
     </ItemGroup>
 
 </Project>

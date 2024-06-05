@@ -1,4 +1,4 @@
-﻿// 4,165 lines of code :D
+﻿// 5,924 lines of code :D
 
 using System.Runtime.InteropServices;
 using ImGuiNET;
@@ -74,6 +74,9 @@ public sealed class Engine : GameWindow
     private float _nextFpsUpdateTime = 0;
     private float _fps;
 
+    private SSEffect _tonemapper;
+    private Shader _tonemapperShader;
+
     public Engine(GameWindowSettings gws, NativeWindowSettings nws) : base(gws, nws)
     {
         ShadowMapper = new();
@@ -96,7 +99,8 @@ public sealed class Engine : GameWindow
         
         GL.DepthFunc(DepthFunction.Less);
 
-        GL.ClearColor(0.6f, 0.75f, 1f, 1f);
+        GL.ClearColor(0.7f, 0.9f, 1.0f, 1f);
+        //GL.ClearColor(r, g, b, 1f);
         // GL.ClearColor(Colour.Black);
         
         // Initialise ImGUI
@@ -134,6 +138,9 @@ public sealed class Engine : GameWindow
         _skyboxVoidShader.SetUniform("fogDensity", 0.03f);
         // _skyboxShader = Shader.StandardShader;
         _skybox = new Skybox(_skyboxSkyShader, _skyboxVoidShader);
+        
+        _tonemapperShader = Shader.Load("Assets/Shaders/tonemapper.vert", "Assets/Shaders/tonemapper.frag");
+        _tonemapper = new SSEffect(_tonemapperShader, Size, true);
         
         Chunks = new Dictionary<Vector3Int, Chunk>();
         _chunksToBuild = new Queue<Vector3Int>();
@@ -205,11 +212,7 @@ public sealed class Engine : GameWindow
         }
         
         // Toggle wireframe
-        if (Input.GetKeyDown(Keys.F1))
-        {
-            IsWireframe = !IsWireframe;
-            GL.PolygonMode(MaterialFace.FrontAndBack, IsWireframe ? PolygonMode.Line : PolygonMode.Fill);
-        }
+        if (Input.GetKeyDown(Keys.F1)) IsWireframe = !IsWireframe;
 
         if (Input.GetKeyDown(Keys.Space))
         {
@@ -327,7 +330,16 @@ public sealed class Engine : GameWindow
         ShadowMapper.Use();
         Render(mode: 0);
         ShadowMapper.Unuse(Size);
+        _tonemapper.Use();
+        GL.PolygonMode(MaterialFace.FrontAndBack, IsWireframe ? PolygonMode.Line : PolygonMode.Fill);
         Render(mode: 1);
+        _tonemapper.Unuse();
+        
+        GL.Disable(EnableCap.DepthTest);
+        
+        _tonemapper.Render(Player);
+        
+        GL.Enable(EnableCap.DepthTest);
         
         if (ShowGui)
         {
@@ -336,8 +348,8 @@ public sealed class Engine : GameWindow
         
             ImGui.DockSpaceOverViewport();
             
-            ImGui.ShowDemoWindow();
-            //OnImGuiRender();
+            //ImGui.ShowDemoWindow();
+            OnImGuiRender();
         
             _imGuiController.Render();
         
@@ -423,6 +435,8 @@ public sealed class Engine : GameWindow
         Player.UpdateProjection(Size);
         
         _imGuiController.WindowResized(e.Width, e.Height);
+        
+        _tonemapper.UpdateSize(e.Size);
     }
 
     protected override void OnTextInput(TextInputEventArgs e)
