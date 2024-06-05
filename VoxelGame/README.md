@@ -21,7 +21,7 @@ Formatting
 
 Formatting follows a normal C# formatting system:
 - 4 space indent
-- When initialising an array, use collection initialisers and not array initialisers. Leave a space before the first array element, and after the last array element as it makes large arrays slightly more readable. When using multiline collection initialisers, leave a trailing comma
+- When initialising an array, use collection initialisers and not array initialisers. Leave a space before the first array element, and after the last array element as it makes large arrays slightly more readable. When using multiline collection initialisers, leave a trailing comma. Also ensure that all commas are aligned with the longest array element
 ```csharp
 int[] myArr = { 0, 1, 2 }; // Don't use this
 int[] myArr = [ 0, 1, 2 ]; // Use this
@@ -29,9 +29,9 @@ int[] myArr = [ 0, 1, 2 ]; // Use this
 ```csharp
 string[] names = 
 [
-    "First Name",
+    "First Name" , // <--- comma has whitespace before to be aligned with element 2
     "Second Name",
-    "Third Name", // <--- Trailing comma
+    "Third Name" , // <--- Trailing comma
 ];
 ```
 - Curly brackets go on their own line, unless writing a function as part of a function parameter
