@@ -23,15 +23,6 @@ public static class TextureAtlas
     public static Texture2D AlbedoTexture { get; private set; }
     public static Texture2D SpecularTexture { get; private set; }
 
-    // private static int[][] Voxels =
-    // [ // Format: front face id, back id, top id, bottom id, right id, left id
-    //     [ 1, 1, 0, 2, 1, 1 ], // Grass block
-    //     [ 2, 2, 2, 2, 2, 2 ], // Dirt block
-    //     [ 3, 3, 3, 3, 3, 3 ], // Stone block
-    //     [ 4, 4, 4, 4, 4, 4 ], // Bedrock block
-    //     [ 5, 5, 6, 6, 5, 5 ], // Oak log
-    // ];
-
     internal static void Init()
     {
         AlbedoTexture = new(AlbedoAtlasPath, false, true, true);

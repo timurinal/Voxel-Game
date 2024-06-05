@@ -93,6 +93,8 @@ public sealed class Engine : GameWindow
 
         GL.CullFace(CullFaceMode.Back);
         GL.FrontFace(FrontFaceDirection.Cw);
+        
+        GL.DepthFunc(DepthFunction.Less);
 
         GL.ClearColor(0.6f, 0.75f, 1f, 1f);
         // GL.ClearColor(Colour.Black);
@@ -366,12 +368,8 @@ public sealed class Engine : GameWindow
             {
                 foreach (var chunk in Chunks)
                 {
-                    LoadedChunks++;
-                    VisibleChunks++;
                     
                     var c = chunk.Value.Render(ShadowMapper.OrthographicMatrix, ShadowMapper.ViewMatrix, overrideShader: true, shaderOverride: _depthShader);
-                    VertexCount   += c.vertexCount;
-                    TriangleCount += c.triangleCount;
                 }
             }
             catch (GLException e) // for some reason, I get an opengl invalid value error when rendering the chunks but
@@ -399,7 +397,7 @@ public sealed class Engine : GameWindow
                     {
                         if (Player.Frustum.IsInFrustum(chunk.Value) || !EnableFrustumCulling)
                         {
-                            VisibleChunks++;
+                            VisibleChunks += !chunk.Value.IsEmpty ? 1 : 0;
                     
                             var c = chunk.Value.Render(Player, ShadowMapper);
                             VertexCount   += c.vertexCount;

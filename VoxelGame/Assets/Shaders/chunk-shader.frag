@@ -59,6 +59,10 @@ vec3 calcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir);
 float calcShadow(vec4 lightSpaceFragPos);
 
 void main() {
+    
+//    finalCol = vec4(texture(material.specular, texcoord).rgb, 1.0);
+//    return;
+    
     vec3 norm = normalize(normal);
     vec3 viewDir = normalize(viewPos - fragPos);
     
@@ -103,7 +107,7 @@ vec3 calcDirLight(DirLight light, vec3 normal, vec3 viewDir, float shadow) {
     // combine
     vec3 ambient  = light.ambient  * vec3(texture(material.diffuse, texcoord));
     vec3 diffuse  = light.diffuse  * diff * vec3(texture(material.diffuse, texcoord));
-    vec3 specular = light.specular * spec * vec3(texture(material.specular, texcoord));
+    vec3 specular = light.specular * spec * vec3(texture(material.specular, texcoord).rgb);
     return (ambient + (1.0 - shadow) * (diffuse + specular));
 }
 
@@ -124,7 +128,7 @@ vec3 calcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir) {
     // combine
     vec3 ambient  = light.ambient  * vec3(texture(material.diffuse, texcoord));
     vec3 diffuse  = light.diffuse  * diff * vec3(texture(material.diffuse, texcoord));
-    vec3 specular = light.specular * spec + vec3(texture(material.specular, texcoord));
+    vec3 specular = light.specular * spec * vec3(texture(material.specular, texcoord));
     ambient  *= attenuation;
     diffuse  *= attenuation;
     specular *= attenuation;
