@@ -86,15 +86,18 @@ public sealed class Player
 
     internal void Update(Vector2Int screenSize)
     {
-        if (Input.GetKey(Keys.W)) cameraPosition += MoveSpeed * cameraFront * Time.DeltaTime;
-        if (Input.GetKey(Keys.S)) cameraPosition -= MoveSpeed * cameraFront * Time.DeltaTime;
+        float speed = MoveSpeed;
+        if (Input.GetKey(Keys.LeftShift)) speed *= 2;
+        
+        if (Input.GetKey(Keys.W)) cameraPosition += speed * cameraFront * Time.DeltaTime;
+        if (Input.GetKey(Keys.S)) cameraPosition -= speed * cameraFront * Time.DeltaTime;
         if (Input.GetKey(Keys.A))
-            cameraPosition -= Vector3.Normalize(Vector3.Cross(cameraFront, cameraUp)) * MoveSpeed * Time.DeltaTime;
+            cameraPosition -= Vector3.Normalize(Vector3.Cross(cameraFront, cameraUp)) * speed * Time.DeltaTime;
         if (Input.GetKey(Keys.D))
-            cameraPosition += Vector3.Normalize(Vector3.Cross(cameraFront, cameraUp)) * MoveSpeed * Time.DeltaTime;
+            cameraPosition += Vector3.Normalize(Vector3.Cross(cameraFront, cameraUp)) * speed * Time.DeltaTime;
 
-        if (Input.GetKey(Keys.E)) cameraPosition.Y += MoveSpeed * Time.DeltaTime;
-        if (Input.GetKey(Keys.Q)) cameraPosition.Y -= MoveSpeed * Time.DeltaTime;
+        if (Input.GetKey(Keys.E)) cameraPosition.Y += speed * Time.DeltaTime;
+        if (Input.GetKey(Keys.Q)) cameraPosition.Y -= speed * Time.DeltaTime;
 
         Collider = new AABB(Position);
 

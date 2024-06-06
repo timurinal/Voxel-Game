@@ -69,9 +69,8 @@ void main() {
     vec3 viewDir = normalize(viewPos - fragPos);
     
     float shadow = calcShadow(fragPosLightSpace);
-    // vec3 result = calcDirLight(dirLight, norm, viewDir, shadow);
-    // result *= 1 - (shadow);
-    vec3 result = vec3(0.0);
+    vec3 result = calcDirLight(dirLight, norm, viewDir, shadow);
+    // vec3 result = vec3(0.0);
     
     if (NumPointLights > 0)
         for (int i = 0; i < NumPointLights; i++)

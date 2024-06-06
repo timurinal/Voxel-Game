@@ -37,6 +37,9 @@ public static class TerrainGenerator
 
     public static uint SampleTerrain(int x, int y, int z)
     {
+        if (y <= 0) return VoxelData.NameToVoxelId("bedrock");
+        if (y >= 140) return VoxelData.NameToVoxelId("air");
+        
         return y switch
         {
             <= 0   => VoxelData.NameToVoxelId("bedrock"),
@@ -45,30 +48,5 @@ public static class TerrainGenerator
             <= 132 => VoxelData.NameToVoxelId("grass_block"),
             _      => VoxelData.NameToVoxelId("air")
         };
-        
-        // Generate height value based on noise
-        // float noise = FractalNoise(x, z);
-        // int height = (int)(noise * 64); // Scale noise to a suitable height range
-        //
-        // if (y <= 0)
-        // {
-        //     return VoxelData.NameToVoxelId("bedrock");
-        // }
-        // else if (y < height - 3)
-        // {
-        //     return Sample(x + 50, y + 50, z + 50, 0.05f) >= 0.65f ? VoxelData.NameToVoxelId("air") : VoxelData.NameToVoxelId("stone");
-        // }
-        // else if (y < height - 1)
-        // {
-        //     return VoxelData.NameToVoxelId("dirt");
-        // }
-        // else if (y < height)
-        // {
-        //     return VoxelData.NameToVoxelId("grass_block");
-        // }
-        // else
-        // {
-        //     return VoxelData.NameToVoxelId("air");
-        // }
     }
 }
