@@ -15,6 +15,7 @@ public sealed class Chunk
     public static readonly float ChunkSphereRadius = ChunkSize * Mathf.Sqrt(3) / 2f;
     
     public Vector3Int chunkPosition;
+    public Vector3 chunkCentre;
 
     public Vector3 Center =>
         new(chunkPosition.X + ChunkSize / 2f, chunkPosition.Y + ChunkSize / 2f,
@@ -66,7 +67,7 @@ public sealed class Chunk
         
         m_model = Matrix4.CreateTranslation(chunkPosition);
         
-        Vector3 chunkCentre = chunkPosition + new Vector3(ChunkSize / 2f, ChunkSize / 2f, ChunkSize / 2f);
+        chunkCentre = chunkPosition + new Vector3(ChunkSize / 2f, ChunkSize / 2f, ChunkSize / 2f);
     }
 
     internal void BuildChunk(Dictionary<Vector3Int, Chunk> chunks)
@@ -294,7 +295,7 @@ public sealed class Chunk
             _vertexCount = vertices.Count;
 
             const int stride = 9; // each vertex has 3 position floats, 3 normal floats, 2 UV floats, and 1 faceid integer
-            float[] data = new float[vertices.Count * stride];
+            Span<float> data = stackalloc float[vertices.Count * stride];
             
             for (int i = 0; i < vertices.Count; i++)
             {
@@ -314,7 +315,7 @@ public sealed class Chunk
 
             GL.BindVertexArray(_vao);
             GL.BindBuffer(BufferTarget.ArrayBuffer, _vbo);
-            GL.BufferData(BufferTarget.ArrayBuffer, data.Length * sizeof(float), data, BufferUsageHint.StaticDraw);
+            GL.BufferData(BufferTarget.ArrayBuffer, data.Length * sizeof(float), data.ToArray(), BufferUsageHint.StaticDraw);
 
             GL.BindBuffer(BufferTarget.ElementArrayBuffer, _ebo);
             GL.BufferData(BufferTarget.ElementArrayBuffer, triangles.Count * sizeof(int), triangles.ToArray(), BufferUsageHint.StaticDraw);
@@ -333,33 +334,32 @@ public sealed class Chunk
     }
     
     internal void RebuildChunk(Dictionary<Vector3Int, Chunk> chunks, bool recursive = false)
-{
-    BuildChunk(chunks);
-
-    Vector3Int[] neighbourChunkOffsets =
-    [
-        new Vector3Int(0, 0, 1),
-        new Vector3Int(0, 0, -1),
-        new Vector3Int(0, 1, 0),
-        new Vector3Int(0, -1, 0),
-        new Vector3Int(1, 0, 0),
-        new Vector3Int(-1, 0, 0)
-    ];
-
-    if (recursive)
     {
-        foreach (var offset in neighbourChunkOffsets)
+        BuildChunk(chunks);
+
+        Vector3Int[] neighbourChunkOffsets =
+        [
+            new Vector3Int(0, 0, 1),
+            new Vector3Int(0, 0, -1),
+            new Vector3Int(0, 1, 0),
+            new Vector3Int(0, -1, 0),
+            new Vector3Int(1, 0, 0),
+            new Vector3Int(-1, 0, 0)
+        ];
+
+        if (recursive)
         {
-            if (chunks.TryGetValue(chunkPosition + offset, out var neighbour))
+            foreach (var offset in neighbourChunkOffsets)
             {
-                neighbour.RebuildChunk(chunks);
+                if (chunks.TryGetValue(chunkPosition + offset, out var neighbour))
+                {
+                    neighbour.RebuildChunk(chunks);
+                }
             }
         }
+        
+        IsDirty = true;
     }
-    
-    IsDirty = true;
-}
-
 
     public static bool IsAir(int x, int y, int z, uint[] voxels, Dictionary<Vector3Int, Chunk> chunks, Vector3Int currentChunkPosition)
     {

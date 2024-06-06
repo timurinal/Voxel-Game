@@ -21,7 +21,7 @@ public sealed class Engine : GameWindow
     public bool IsWireframe;
     public bool Shadows = true;
 
-    public const bool EnableFrustumCulling = false;
+    public const bool EnableFrustumCulling = true;
 
     public readonly Player Player;
 
@@ -31,6 +31,8 @@ public sealed class Engine : GameWindow
     internal static int VertexCount;
     internal static int LoadedChunks;
     internal static int VisibleChunks;
+
+    public static int MaxFPS;
 
     internal ImGuiController _imGuiController;
 
@@ -52,15 +54,15 @@ public sealed class Engine : GameWindow
 
     private Mesh _test;
     
-    // private readonly Vector3 _lightColour = new Vector3(1.0f, 0.898f, 0.7f);
-    private readonly Vector3 _lightColour = new Vector3(1.0f, 1.0f, 1.0f);
+    private readonly Vector3 _lightColour = new Vector3(1.0f, 0.898f, 0.7f);
+    // private readonly Vector3 _lightColour = new Vector3(1.0f, 1.0f, 1.0f);
 
     private bool _newLightThisFrame = true; // this is true when a (or multiple) new light is added to the scene. The light buffer is recalculated when this is true
 
     private int _lightBuffer;
 
-    // private Vector3 _lightDir = new Vector3(-2, -1, -0.5f);
-    private Vector3 _lightDir = new Vector3(-0.5f, -1f, -0.5f);
+    private Vector3 _lightDir = new Vector3(-2, -1, -0.5f);
+    // private Vector3 _lightDir = new Vector3(-0.5f, -1f, -0.5f);
 
     private string[] _imGuiChunkBuilderDropdown =
     [
@@ -72,13 +74,20 @@ public sealed class Engine : GameWindow
 
     private const float FpsUpdateRate = 3f;
     private float _nextFpsUpdateTime = 0;
-    private float _fps;
+    private float _deltaTime;
 
     private SSEffect _tonemapper;
     private Shader _tonemapperShader;
 
     public Engine(GameWindowSettings gws, NativeWindowSettings nws) : base(gws, nws)
     {
+        if (nws.NumberOfSamples != 0)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("MSAA is not supported and will not be applied.");
+            Console.ResetColor();
+        }
+        
         ShadowMapper = new();
         CenterWindow();
 
@@ -90,7 +99,6 @@ public sealed class Engine : GameWindow
         base.OnLoad();
 
         // GL setup
-        GL.Enable(EnableCap.Multisample);
         GL.Enable(EnableCap.CullFace);
         GL.Enable(EnableCap.DepthTest);
 
@@ -165,6 +173,8 @@ public sealed class Engine : GameWindow
     {
         base.OnUpdateFrame(args);
 
+        UpdateFrequency = MaxFPS;
+
         Input._keyboardState = KeyboardState;
         Time.DeltaTime = (float)args.Time;
         
@@ -213,6 +223,7 @@ public sealed class Engine : GameWindow
         
         // Toggle wireframe
         if (Input.GetKeyDown(Keys.F1)) IsWireframe = !IsWireframe;
+        if (Input.GetKeyDown(Keys.F2)) ShowGui = !ShowGui;
 
         if (Input.GetKeyDown(Keys.Space))
         {
@@ -226,7 +237,7 @@ public sealed class Engine : GameWindow
 
         if (Input.GetKeyDown(Keys.Enter))
         {
-            Lights.Add(new PointLight(Player.Position, 50f, Vector3.Zero, _lightColour, _lightColour));
+            Lights.Add(new PointLight(Player.Position, 50f, 1.5f, Vector3.Zero, _lightColour, _lightColour));
             RecalculateLightBuffer(Lights.Count);
         }
 
@@ -360,11 +371,15 @@ public sealed class Engine : GameWindow
 
         if (Time.ElapsedTime >= _nextFpsUpdateTime)
         {
-            _fps = Time.Fps;
+            _deltaTime = Time.DeltaTime;
             _nextFpsUpdateTime = (1f / FpsUpdateRate) + Time.ElapsedTime;
         }
         
-        Title = $"Position: {Vector3.Round(Player.Position, 2)} | Vertices: {VertexCount:N0} Triangles: {TriangleCount:N0} | Loaded Chunks: {LoadedChunks} Visible Chunks: {VisibleChunks} | FPS: {_fps}";
+        Vector3 pos = Vector3.Round(Player.Position, 2);
+        string posX = pos.X.ToString("F2").PadRight(2);
+        string posY = pos.Y.ToString("F2").PadRight(2);
+        string posZ = pos.Z.ToString("F2").PadRight(2);
+        Title = $"Voxel Game 0.0.0 (OpenGL4 - Forward) - Chunk builder mode: Fully Blocking | Position: ({posX}, {posY}, {posZ}) | Vertices: {VertexCount:N0} Triangles: {TriangleCount:N0} | Frame Time: {Mathf.Round(_deltaTime * 1000f, 2)}ms ({Mathf.RoundToInt(1f / _deltaTime)} FPS)";
         
         SwapBuffers();
     }
@@ -407,14 +422,11 @@ public sealed class Engine : GameWindow
 
                     if (!chunk.Value.IsEmpty)
                     {
-                        if (Player.Frustum.IsInFrustum(chunk.Value) || !EnableFrustumCulling)
-                        {
-                            VisibleChunks += !chunk.Value.IsEmpty ? 1 : 0;
+                        VisibleChunks += !chunk.Value.IsEmpty ? 1 : 0;
                     
-                            var c = chunk.Value.Render(Player, ShadowMapper);
-                            VertexCount   += c.vertexCount;
-                            TriangleCount += c.triangleCount;
-                        }
+                        var c = chunk.Value.Render(Player, ShadowMapper);
+                        VertexCount   += c.vertexCount;
+                        TriangleCount += c.triangleCount;
                     }
                 }
             }
@@ -477,6 +489,7 @@ public sealed class Engine : GameWindow
             ImGui.Checkbox("Shadows", ref Shadows);
             
             ImGui.SliderInt("Render distance", ref Player.ChunkRenderDistance, 1, 32);
+            ImGui.SliderInt("Max FPS", ref MaxFPS, 20, 480);
 
             ImGui.Combo("Chunk Builder Mode", ref ChunkBuilderMode, _imGuiChunkBuilderDropdown,
                 _imGuiChunkBuilderDropdown.Length);
@@ -538,23 +551,23 @@ public sealed class Engine : GameWindow
         public Vector3 specular;
         public float _padding5;
 
-        public PointLight(Vector3 position, float range, Vector3 ambient, Vector3 diffuse, Vector3 specular)
+        public PointLight(Vector3 position, float range, float intensity, Vector3 ambient, Vector3 diffuse,
+            Vector3 specular)
         {
             this.position = position;
-            this.ambient = ambient;
-            this.diffuse = diffuse;
-            this.specular = specular;
-            
+            this.ambient = ambient * intensity;
+            this.diffuse = diffuse * intensity;
+            this.specular = specular * intensity;
+
             constant = 1.0f;
             linear = 4.5f / range;
             quadratic = 75.0f / (range * range);
-            
+
             Lights.Add(this);
 
             _padding1 = 1;
-            _padding1 = 2;
-            _padding2 = 3;
-            _padding3 = 4;
+            _padding2 = 2;
+            _padding3 = 3;
             _padding4 = 4;
             _padding5 = 4;
         }

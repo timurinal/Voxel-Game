@@ -68,7 +68,7 @@ public sealed class Player
     {
         Collider = new AABB();
         
-        Frustum = new(this);
+        // Frustum = new(this);
         MoveSpeed = moveSpeed;
         RotateSpeed = rotateSpeed;
 
@@ -112,6 +112,8 @@ public sealed class Player
         cameraRight = Vector3.Normalize(Vector3.Cross(Vector3.Up, cameraDirection));
         cameraUp = Vector3.Cross(cameraDirection, cameraRight);
 
+        // Frustum.RecalculateFrustum(fov, _aspect);
+        
         ViewMatrix = Matrix4.LookAt(cameraPosition, cameraPosition + cameraFront, cameraUp);
         ProjectionMatrix = Matrix4.CreatePerspectiveFieldOfView(fov * Mathf.Deg2Rad, (float)screenSize.X / screenSize.Y, 
             NearClipPlane, FarClipPlane);

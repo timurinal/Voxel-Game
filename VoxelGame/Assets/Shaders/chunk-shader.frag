@@ -33,6 +33,8 @@ layout (std430, binding = 0) buffer PointLights {
 };
 uniform int NumPointLights;
 
+layout (location = 0) out vec4 gPosition;
+layout (location = 1) out vec4 gNormal;
 out vec4 finalCol;
 
 in vec2 texcoord;
@@ -67,8 +69,9 @@ void main() {
     vec3 viewDir = normalize(viewPos - fragPos);
     
     float shadow = calcShadow(fragPosLightSpace);
-    vec3 result = calcDirLight(dirLight, norm, viewDir, shadow);
-    //result *= 1 - (shadow);
+    // vec3 result = calcDirLight(dirLight, norm, viewDir, shadow);
+    // result *= 1 - (shadow);
+    vec3 result = vec3(0.0);
     
     if (NumPointLights > 0)
         for (int i = 0; i < NumPointLights; i++)
@@ -87,7 +90,7 @@ void main() {
     
     // finalCol = mix(vec4(result, 1.0), vec4(fogColour, 1.0), fogAmount);
     vec4 lit = vec4(result, 1.0);
-    //lit = clamp(lit, 0.0, 1.0);
+    // lit = clamp(lit, 0.0, 1.0);
     
     // TODO: dithering
     

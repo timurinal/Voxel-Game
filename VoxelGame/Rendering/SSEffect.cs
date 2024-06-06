@@ -42,7 +42,7 @@ public class SSEffect
 {
     private Shader _shader;
     private bool _floating;
-    private int _vao, _vbo, _ebo, _fbo, _texture, _depth;
+    private int _vao, _vbo, _ebo, _fbo, _texture, _depth, _normal;
 
     public SSEffect(Shader shader, Vector2Int screenSize, bool floating = false)
     {
@@ -106,6 +106,18 @@ public class SSEffect
         GL.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthAttachment,
             TextureTarget.Texture2D, _depth, 0);
         
+        // Generate normal texture
+        // _normal = GL.GenTexture();
+        // GL.BindTexture(TextureTarget.Texture2D, _normal);
+        // GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba16f, screenSize.X, screenSize.Y, 0, PixelFormat.Rgba, PixelType.Float, IntPtr.Zero);
+        // GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Nearest);
+        // GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Nearest);
+        // GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToBorder);
+        // GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToBorder);
+        // GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureBorderColor, borderCol);
+        // GL.BindFramebuffer(FramebufferTarget.Framebuffer, _fbo);
+        // GL.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment1, TextureTarget.Texture2D, _normal, 0);
+        
         // Generate colour texture
         if (!floating)
         {
@@ -147,9 +159,13 @@ public class SSEffect
         GL.FramebufferTexture(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthAttachment,
             _depth, 0);
         
-        // Attach the color texture to the framebuffer's color attachment point
+        // Attach the colour texture to the framebuffer's color attachment point
         GL.FramebufferTexture(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0, 
             _texture, 0);
+        
+        // Attach the normal texture to the framebuffer
+        // GL.FramebufferTexture(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment1, 
+        //     _normal, 0);
     
         GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
     }
@@ -158,6 +174,7 @@ public class SSEffect
     {
         GL.DeleteFramebuffer(_fbo);
         GL.DeleteTexture(_depth);
+        // GL.DeleteTexture(_normal);
         GL.DeleteTexture(_texture);
         _fbo = GL.GenFramebuffer();
         
@@ -175,6 +192,18 @@ public class SSEffect
         GL.BindFramebuffer(FramebufferTarget.Framebuffer, _fbo);
         GL.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthAttachment,
             TextureTarget.Texture2D, _depth, 0);
+        
+        // Generate normal texture
+        // _normal = GL.GenTexture();
+        // GL.BindTexture(TextureTarget.Texture2D, _normal);
+        // GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba16f, screenSize.X, screenSize.Y, 0, PixelFormat.Rgba, PixelType.Float, IntPtr.Zero);
+        // GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Nearest);
+        // GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Nearest);
+        // GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToBorder);
+        // GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToBorder);
+        // GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureBorderColor, borderCol);
+        // GL.BindFramebuffer(FramebufferTarget.Framebuffer, _fbo);
+        // GL.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment1, TextureTarget.Texture2D, _normal, 0);
         
         // Generate colour texture
         if (!_floating)
@@ -227,7 +256,6 @@ public class SSEffect
     public void Use()
     {
         GL.BindFramebuffer(FramebufferTarget.Framebuffer, _fbo);
-        //GL.BindRenderbuffer(RenderbufferTarget.Renderbuffer, _depth);
         
         GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
         
@@ -240,7 +268,6 @@ public class SSEffect
     public void Unuse()
     {
         GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
-        //GL.BindRenderbuffer(RenderbufferTarget.Renderbuffer, 0);
     }
 
     public void Render(Player player)

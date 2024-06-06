@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json;
+using VoxelGame.Maths;
 
 namespace VoxelGame;
 
@@ -59,15 +60,27 @@ public static class VoxelData
         public string displayName;
         public string name;
         public int[] textureFaces;
-
-        public Voxel(uint id, string displayName, string name, int[] textureFaces)
+        
+        public Vector3 lightColour;
+        public float lightRange;
+        
+        [JsonConstructor]
+        public Voxel(uint id, string displayName, string name, int[] textureFaces, float[] lightColour, float lightRange)
         {
             if (textureFaces.Length > 6) throw new ArgumentException("A voxel can't have more than 6 textures!");
+            if (lightColour != null && lightColour.Length != 3) throw new ArgumentException("Light colour needs 3 colour properties!");
             
             this.id = id;
             this.displayName = displayName;
             this.name = name;
             this.textureFaces = textureFaces;
+
+            if (lightColour != null)
+                this.lightColour = new Vector3(lightColour[0], lightColour[1], lightColour[2]);
+            else
+                this.lightColour = Vector3.Zero;
+            
+            this.lightRange = lightRange != null ? lightRange : 0f;
         }
 
         public override string ToString()
@@ -76,9 +89,11 @@ public static class VoxelData
             var displayNameString = $"Display Name: \"{displayName}\"";
             var nameString = $"Name: \"{name}\"";
             var textureFacesString = $"Texture Faces: [ {string.Join(", ", textureFaces)} ]";
+            var lightColourString = $"Light Colour: {lightColour}";
+            var lightRangeString = $"Light Range: {lightRange}";
 
             var voxelDataString =
-                $"Voxel Data: {{\n\t{idString}\n\t{displayNameString}\n\t{nameString}\n\t{textureFacesString}\n}}";
+                $"\"{displayName}\" Voxel Data: {{\n\t{idString}\n\t{displayNameString}\n\t{nameString}\n\t{textureFacesString}\n\t{lightColourString}\n\t{lightRangeString}\n}}";
 
             return voxelDataString;
         }

@@ -34,5 +34,13 @@
     "displayName": "Cobblestone",
     "name": "cobblestone",
     "textureFaces": [ 8, 8, 8, 8, 8, 8 ]
+  },
+  {
+    "id": 7,
+    "displayName": "Light",
+    "name": "light",
+    "textureFaces": [ 9, 9, 9, 9, 9, 9 ],
+    "lightColour": [ 1.0, 0.898, 0.7 ],
+    "lightRange": 50
   }
 ]

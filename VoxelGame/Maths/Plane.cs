@@ -2,27 +2,17 @@
 
 public struct Plane
 {
-    public float A, B, C, D;
+    public Vector3 normal;
+    public float distance;
 
-    public Plane(float a, float b, float c, float d)
+    public Plane(Vector3 normal, Vector3 point)
     {
-        A = a;
-        B = b;
-        C = c;
-        D = d;
+        this.normal = Vector3.Normalize(normal);
+        this.distance = -Vector3.Dot(this.normal, point);
     }
 
-    public void Normalize()
+    public float GetDistanceToPoint(Vector3 point)
     {
-        float length = (float)Math.Sqrt(A * A + B * B + C * C);
-        A /= length;
-        B /= length;
-        C /= length;
-        D /= length;
-    }
-
-    public float DistanceToPoint(Vector3 point)
-    {
-        return A * point.X + B * point.Y + C * point.Z + D;
+        return Vector3.Dot(normal, point) + distance;
     }
 }
