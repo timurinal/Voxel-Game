@@ -77,7 +77,9 @@ public sealed class Engine : GameWindow
     private float _deltaTime;
 
     private SSEffect _tonemapper;
+    private SSEffect _bloom;
     private Shader _tonemapperShader;
+    private Shader _bloomShader;
 
     public Engine(GameWindowSettings gws, NativeWindowSettings nws) : base(gws, nws)
     {
@@ -147,8 +149,11 @@ public sealed class Engine : GameWindow
         // _skyboxShader = Shader.StandardShader;
         _skybox = new Skybox(_skyboxSkyShader, _skyboxVoidShader);
         
-        _tonemapperShader = Shader.Load("Assets/Shaders/tonemapper.vert", "Assets/Shaders/tonemapper.frag");
+        _tonemapperShader = Shader.Load("BUILTIN/image-effect.vert", "Assets/Shaders/tonemapper.frag");
         _tonemapper = new SSEffect(_tonemapperShader, Size, true);
+        
+        _bloomShader = Shader.Load("BUILTIN/image-effect.vert", "Assets/Shaders/bloom.frag");
+        _bloom = new SSEffect(_bloomShader, Size, true);
         
         Chunks = new Dictionary<Vector3Int, Chunk>();
         _chunksToBuild = new Queue<Vector3Int>();
@@ -341,13 +346,16 @@ public sealed class Engine : GameWindow
         ShadowMapper.Use();
         Render(mode: 0);
         ShadowMapper.Unuse(Size);
-        _tonemapper.Use();
+        _bloom.Use();
         GL.PolygonMode(MaterialFace.FrontAndBack, IsWireframe ? PolygonMode.Line : PolygonMode.Fill);
         Render(mode: 1);
-        _tonemapper.Unuse();
+        _bloom.Unuse();
         
         GL.Disable(EnableCap.DepthTest);
         
+        _tonemapper.Use();
+        _bloom.Render(Player);
+        _tonemapper.Unuse();
         _tonemapper.Render(Player);
         
         GL.Enable(EnableCap.DepthTest);
@@ -448,6 +456,7 @@ public sealed class Engine : GameWindow
         
         _imGuiController.WindowResized(e.Width, e.Height);
         
+        _bloom.UpdateSize(e.Size);
         _tonemapper.UpdateSize(e.Size);
     }
 

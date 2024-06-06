@@ -395,6 +395,45 @@ public sealed class Chunk
             return voxels[index] == 0;
         }
     }
+
+    private static bool CanVoxelSeeSky(int x, int y, int z, uint[] voxels, Dictionary<Vector3Int, Chunk> chunks,
+        Vector3Int currentChunkPosition)
+    {
+        // Assuming that y is the vertical axis.
+        // Find the highest chunk.
+        int highestChunkY = chunks.Values.Max(chunk => chunk.chunkPosition.Y);
+
+        // Check each voxel directly above the current one, up to slightly above the highest chunk.
+        for (int yCheck = y + 1; yCheck <= highestChunkY + 1; yCheck++)
+        {
+            // If the checked location is outside the bounds of the current chunk, find the relevant chunk.
+            if (yCheck >= ChunkSize)
+            {
+                var chunkPosAbove =
+                    currentChunkPosition + new Vector3Int(0, 1, 0); // Assuming chunks are stacked vertically.
+                if (chunks.TryGetValue(chunkPosAbove, out var chunkAbove))
+                {
+                    if (!IsAir(x, yCheck - ChunkSize, z, chunkAbove.voxels, chunks,
+                            chunkPosAbove)) // Translate Y check position to relevant chunk.
+                    {
+                        return false;
+                    }
+                }
+                // If chunk above does not exist, then it is all air.
+            }
+            else
+            {
+                // If any voxel in the current chunk is not air, this voxel cannot see the sky.
+                if (!IsAir(x, yCheck, z, voxels, chunks, currentChunkPosition))
+                {
+                    return false;
+                }
+            }
+        }
+
+        // All voxels above are air, this voxel can see the sky.
+        return true;
+    }
     
     public static int FlattenIndex3D(int x, int y, int z, int width, int height)
     {

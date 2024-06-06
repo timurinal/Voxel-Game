@@ -44,6 +44,20 @@ public class SSEffect
     private bool _floating;
     private int _vao, _vbo, _ebo, _fbo, _texture, _depth, _normal;
 
+    public static readonly string DefaultVertexShader = @"
+#version 450 core
+
+layout (location = 0) in vec3 vPosition;
+layout (location = 1) in vec2 vUv;
+
+out vec2 texcoord;
+
+void main() {
+    gl_Position = vec4(vPosition, 1.0);
+    
+    texcoord = vUv;
+}";
+    
     public SSEffect(Shader shader, Vector2Int screenSize, bool floating = false)
     {
         _shader = shader;

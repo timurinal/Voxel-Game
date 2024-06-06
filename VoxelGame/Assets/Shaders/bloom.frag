@@ -15,16 +15,10 @@ vec3 sampleMainTexture(vec2 uv);
 float linearizeDepth(float nonLinearDepth, float near, float far);
 
 void main() {
-    const float gamma = 0.8;
-    const float exposure = 2.2;
-    vec3 hdrColour = sampleMainTexture(texcoord);
-
-    // exposure tonemapping
-    vec3 mapped = vec3(1.0) - exp(-hdrColour * exposure);
-    // gamma correction
-    mapped = pow(mapped, vec3(1.0 / gamma));
-
-    finalColour = vec4(mapped, 1.0);
+    float sceneDepthNonLinear = sampleDepthTexture(texcoord);
+    float sceneDepth = linearizeDepth(sceneDepthNonLinear, NearPlane, FarPlane);
+    
+    finalColour = vec4(sampleMainTexture(texcoord), 0.0);
 }
 
 float sampleDepthTexture(vec2 uv) {

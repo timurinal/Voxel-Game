@@ -119,8 +119,14 @@ public struct Shader : IEquatable<Shader>
     public static Shader Load(string vertexShaderPath, string fragmentShaderPath)
     {
         int id = GL.CreateProgram();
+
+        SubShader vertexShader;
         
-        SubShader vertexShader = SubShader.Load(vertexShaderPath, ShaderType.VertexShader);
+        if (vertexShaderPath == "BUILTIN/image-effect.vert")
+            vertexShader = SubShader.CreateFromSource(SSEffect.DefaultVertexShader, ShaderType.VertexShader);
+        else
+            vertexShader = SubShader.Load(vertexShaderPath, ShaderType.VertexShader);
+        
         SubShader fragmentShader = SubShader.Load(fragmentShaderPath, ShaderType.FragmentShader);
         
         GL.AttachShader(id, vertexShader._id);
@@ -222,6 +228,20 @@ public struct Shader : IEquatable<Shader>
             string log = GL.GetShaderInfoLog(id);
             if (!string.IsNullOrEmpty(log))
                 throw new ShaderErrorException(path, log);
+
+            return new SubShader { _id = id };
+        }
+        
+        public static SubShader CreateFromSource(string source, ShaderType type)
+        {
+            int id = GL.CreateShader(type);
+            
+            GL.ShaderSource(id, source);
+            GL.CompileShader(id);
+
+            string log = GL.GetShaderInfoLog(id);
+            if (!string.IsNullOrEmpty(log))
+                throw new ShaderErrorException(log);
 
             return new SubShader { _id = id };
         }

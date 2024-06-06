@@ -75,7 +75,10 @@
       <None Update="Assets\Shaders\tonemapper.frag">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
-      <None Update="Assets\Shaders\tonemapper.vert">
+      <None Update="Assets\Shaders\bloom.frag">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+      <None Update="Assets\Shaders\fxaa.frag">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
     </ItemGroup>
