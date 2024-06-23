@@ -29,6 +29,7 @@ public sealed class Engine : GameWindow
 
     internal static int TriangleCount;
     internal static int VertexCount;
+    internal static int BatchCount;
     internal static int LoadedChunks;
     internal static int VisibleChunks;
 
@@ -333,6 +334,7 @@ public sealed class Engine : GameWindow
         
         TriangleCount = 0;
         VertexCount = 0;
+        BatchCount = 0;
         LoadedChunks = 0;
         VisibleChunks = 0;
         
@@ -387,7 +389,7 @@ public sealed class Engine : GameWindow
         string posX = pos.X.ToString("F2").PadRight(2);
         string posY = pos.Y.ToString("F2").PadRight(2);
         string posZ = pos.Z.ToString("F2").PadRight(2);
-        Title = $"Voxel Game 0.0.0 (OpenGL4 - Forward) - Chunk builder mode: Fully Blocking | Position: ({posX}, {posY}, {posZ}) | Vertices: {VertexCount:N0} Triangles: {TriangleCount:N0} | Frame Time: {Mathf.Round(_deltaTime * 1000f, 2)}ms ({Mathf.RoundToInt(1f / _deltaTime)} FPS)";
+        Title = $"Voxel Game 0.0.0 (OpenGL 4 - Forward Rendering) - Chunk builder mode: Fully Blocking | Position: ({posX}, {posY}, {posZ}) | Vertices: {VertexCount:N0} Triangles: {TriangleCount:N0} Batches: {BatchCount:N0} | Frame Time: {Mathf.Round(_deltaTime * 1000f, 2)}ms ({Mathf.RoundToInt(1f / _deltaTime)} FPS)";
         
         SwapBuffers();
     }

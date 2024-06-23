@@ -473,6 +473,8 @@ public sealed class Chunk
     {
         if (IsEmpty)
             return (0, 0);
+
+        Engine.BatchCount++;
         
         if (!overrideShader)
         {
