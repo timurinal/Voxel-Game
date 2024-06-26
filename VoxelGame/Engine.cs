@@ -47,12 +47,6 @@ public sealed class Engine : GameWindow
 
     private Shader _meshShader;
 
-    private Skybox _skybox;
-    private Shader _skyboxSkyShader;
-    private Shader _skyboxVoidShader;
-
-    private List<AABB> collisions = new();
-
     private Mesh _test;
     
     private readonly Vector3 _lightColour = new Vector3(1.0f, 0.898f, 0.7f);
@@ -81,6 +75,10 @@ public sealed class Engine : GameWindow
     private SSEffect _raytracing;
     private Shader _tonemapperShader;
     private Shader _raytracingShader;
+
+    private Texture2D _testTexture;
+
+    private ShaderStorageBuffer _rtVoxelStorageBuffer;
 
     public Engine(GameWindowSettings gws, NativeWindowSettings nws) : base(gws, nws)
     {
@@ -111,15 +109,12 @@ public sealed class Engine : GameWindow
         GL.DepthFunc(DepthFunction.Less);
 
         GL.ClearColor(0.7f, 0.9f, 1.0f, 1f);
-        //GL.ClearColor(r, g, b, 1f);
-        // GL.ClearColor(Colour.Black);
         
         // Initialise ImGUI
         _imGuiController = new ImGuiController(Size.X, Size.Y);
         // load any imgui fonts here
 
         TextureAtlas.Init();
-        // Physics.Init();
 
         // Make the window visible after setting up so it appears in place and not in a random location
         IsVisible = true;
@@ -140,20 +135,11 @@ public sealed class Engine : GameWindow
         
         _chunkShader.SetUniform("fogColour", new Vector3(0.6f, 0.75f, 1f));
         _chunkShader.SetUniform("fogDensity", 0.03f);
-
-        _skyboxSkyShader = Shader.Load("Assets/Shaders/skybox.vert", "Assets/Shaders/skybox.frag");
-        _skyboxSkyShader.SetUniform("fogColour", new Vector3(0.6f, 0.75f, 1f));
-        _skyboxSkyShader.SetUniform("fogDensity", 0.07f);
-        _skyboxVoidShader = Shader.Load("Assets/Shaders/skybox.vert", "Assets/Shaders/skybox.frag");
-        _skyboxVoidShader.SetUniform("fogColour", new Vector3(0.6f, 0.75f, 1f));
-        _skyboxVoidShader.SetUniform("fogDensity", 0.03f);
-        // _skyboxShader = Shader.StandardShader;
-        _skybox = new Skybox(_skyboxSkyShader, _skyboxVoidShader);
         
         _tonemapperShader = Shader.Load("BUILTIN/image-effect.vert", "Assets/Shaders/tonemapper.frag");
         _tonemapper = new SSEffect(_tonemapperShader, Size, true);
         
-        _raytracingShader = Shader.Load("Assets/Shaders/raytracing.vert", "Assets/Shaders/raytracing.frag");
+        _raytracingShader = Shader.Load("Assets/Shaders/pathtracer.vert", "Assets/Shaders/pathtracer.frag");
         _raytracing = new SSEffect(_raytracingShader, Size, true);
         
         Chunks = new Dictionary<Vector3Int, Chunk>();
@@ -168,11 +154,20 @@ public sealed class Engine : GameWindow
             _test.Colours[i] = Colour.Yellow;
         }
 
-        // Lights.Add(new PointLight(Player.Position, 50f, ambientLighting, new(1.0f, 1.0f, 1.0f), new Vector3(1.0f, 1.0f, 1.0f)));
-        // RecalculateLightBuffer(1);
-        // _shader.SetUniform("NumPointLights", 1);
+        _testTexture = new Texture2D("Assets/Textures/uv-checker.png", useLinearSampling: true, generateMipmaps: true);
 
-        // UIRenderer.CreateQuad(Vector2.Zero, Vector3.One);
+        _rtVoxelStorageBuffer = new ShaderStorageBuffer(0);
+
+        Cube[] cubes =
+        [
+            new Cube(new Vector3(0, 0, 0), new RTMaterial(new Vector3(0, 0, 0))),
+            new Cube(new Vector3(0, 1.5f, 0), new RTMaterial(new Vector3(1, 0, 0))),
+            new Cube(new Vector3(0, -1.5f, 0), new RTMaterial(new Vector3(0, 0, 1))),
+        ];
+        
+        _rtVoxelStorageBuffer.SetData(Marshal.SizeOf<Cube>(), cubes);
+        
+        _raytracingShader.SetUniform("NumCubes", cubes.Length);
     }
 
     protected override void OnUpdateFrame(FrameEventArgs args)
@@ -210,12 +205,7 @@ public sealed class Engine : GameWindow
         
         CursorState = ShowGui ? CursorState.Normal : CursorState.Grabbed;
 
-        // foreach (var chunk in Chunks.Values)
-        // {
-        //     collisions.AddRange(chunk.GenerateCollisions());
-        // }
         Player.Update(Size);
-        // Physics.ResolveCollisions(Player, collisions.ToArray());
         
         if (Input.GetKeyDown(Keys.Escape))
             Close();
@@ -299,26 +289,11 @@ public sealed class Engine : GameWindow
             {
             }
         }
-
-        // _skybox.Transform.Position = Player.Position;
-        // _skybox.Transform.Rotation += Vector3.Forward * (2f * Time.DeltaTime);
-
-        const float sunSpeed = 1f;
-        // update light direction to rotate in a circle
-        //_lightDir = Vector3.RotateX(_lightDir, sunSpeed * Time.DeltaTime);
         
         _chunkShader.SetUniform("viewPos", Player.Position);
 
-        // Player.Yaw = 0;
-        // Player.Pitch = 0;
-
         _test.Transform.Position = -_lightDir;
         _test.Transform.Position += Player.Position;
-        // _test.Transform.LookAt(Player.Position);
-        
-        //_shader.SetUniform("dirLight.direction", _lightDir);
-        
-        _skyboxSkyShader.SetUniform("viewPos", Player.Position);
         
         ShadowMapper.UpdateMatrix(Player, _lightDir);
 
@@ -332,41 +307,14 @@ public sealed class Engine : GameWindow
         _imGuiController.Update(this, (float)args.Time);
         GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
         
-        TriangleCount = 0;
-        VertexCount = 0;
-        BatchCount = 0;
-        LoadedChunks = 0;
-        VisibleChunks = 0;
+        _testTexture.Use(TextureUnit.Texture5);
         
-        // Render skybox with depth write disabled
-        GL.DepthMask(false);
-        _test.Render(Player);
-        //_skyboxShader.Use();
-        // _skybox.Render(Player);
-        GL.DepthMask(true);
-        
-        ShadowMapper.Use();
-        Render(mode: 0);
-        ShadowMapper.Unuse(Size);
-        _raytracing.Use();
-        GL.PolygonMode(MaterialFace.FrontAndBack, IsWireframe ? PolygonMode.Line : PolygonMode.Fill);
-        Render(mode: 1);
-        _raytracing.Unuse();
-        
-        GL.Disable(EnableCap.DepthTest);
-        
-        _tonemapper.Use();
         _raytracingShader.Use();
-        _raytracingShader.SetUniform("lightDir", _lightDir);
-        _raytracingShader.SetUniform("lightColour", _lightColour);
-        _raytracingShader.SetUniform("lightIntensity", 1.0f);
-        _raytracingShader.SetUniform("scatterFactor", 0.1f);
+        _raytracingShader.SetUniform("_TestTexture", 5);
+        
+        _rtVoxelStorageBuffer.Use();
+        
         _raytracing.Render(Player, ShadowMapper);
-        _tonemapper.Unuse();
-        
-        _tonemapper.Render(Player, ShadowMapper);
-        
-        GL.Enable(EnableCap.DepthTest);
         
         if (ShowGui)
         {
@@ -395,7 +343,7 @@ public sealed class Engine : GameWindow
         string posX = pos.X.ToString("F2").PadRight(2);
         string posY = pos.Y.ToString("F2").PadRight(2);
         string posZ = pos.Z.ToString("F2").PadRight(2);
-        Title = $"Voxel Game 0.0.0 (OpenGL 4 - Forward Rendering) - Chunk builder mode: Fully Blocking | Position: ({posX}, {posY}, {posZ}) | Vertices: {VertexCount:N0} Triangles: {TriangleCount:N0} Batches: {BatchCount:N0} | Frame Time: {Mathf.Round(_deltaTime * 1000f, 2)}ms ({Mathf.RoundToInt(1f / _deltaTime)} FPS)";
+        Title = $"Voxel Game 0.0.0 (OpenGL 4 - Ray Traced Rendering) - Chunk builder mode: Fully Blocking | Position: ({posX}, {posY}, {posZ}) | Frame Time: {Mathf.Round(_deltaTime * 1000f, 2)}ms ({Mathf.RoundToInt(1f / _deltaTime)} FPS)";
         
         SwapBuffers();
     }
@@ -592,6 +540,53 @@ public sealed class Engine : GameWindow
             _padding3 = 3;
             _padding4 = 4;
             _padding5 = 4;
+        }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct RTMaterial
+    {
+        public Vector3 colour;
+
+        private float _padding;
+
+        public RTMaterial(Vector3 colour)
+        {
+            this.colour = colour;
+
+            _padding = 0;
+        }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct Cube
+    {
+        public Vector3 min;
+        private float _padding0;
+        
+        public Vector3 max;
+        private float _padding1;
+        
+        public RTMaterial material;
+
+        public Cube(Vector3 min, Vector3 max, RTMaterial material)
+        {
+            this.min = min;
+            this.max = max;
+            this.material = material;
+
+            _padding0 = 0;
+            _padding1 = 0;
+        }
+        
+        public Cube(Vector3 offset, RTMaterial material)
+        {
+            min = new Vector3(-0.5f, -0.5f, -0.5f) + offset;
+            max = new Vector3(0.5f, 0.5f, 0.5f) + offset;
+            this.material = material;
+
+            _padding0 = 0;
+            _padding1 = 0;
         }
     }
 

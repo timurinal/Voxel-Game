@@ -81,10 +81,10 @@
       <None Update="Assets\Shaders\fxaa.frag">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
-      <None Update="Assets\Shaders\raytracing.frag">
+      <None Update="Assets\Shaders\pathtracer.frag">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
-      <None Update="Assets\Shaders\raytracing.vert">
+      <None Update="Assets\Shaders\pathtracer.vert">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
     </ItemGroup>

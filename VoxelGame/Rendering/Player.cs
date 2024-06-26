@@ -48,7 +48,7 @@ public sealed class Player
     public Plane[] Planes { get; private set; } = new Plane[6];
 
     private Vector3 cameraTarget = Vector3.Zero;
-    private Vector3 cameraPosition = new(0, 13, 0);
+    private Vector3 cameraPosition = new(0, 0, -5);
     private Vector3 cameraDirection = Vector3.Zero;
     private Vector3 cameraUp = Vector3.Up;
     private Vector3 cameraRight = Vector3.Right;
