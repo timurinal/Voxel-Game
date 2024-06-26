@@ -64,7 +64,7 @@ public sealed class Player
 
     private float fov;
 
-    public Player(Vector2Int screenSize, float moveSpeed = 5f, float rotateSpeed = 0.5f, float fov = 65f, float near = 0.1f, float far = 7500f)
+    public Player(Vector2Int screenSize, float moveSpeed = 5f, float rotateSpeed = 0.3f, float fov = 65f, float near = 0.1f, float far = 7500f)
     {
         Collider = new AABB();
         

@@ -273,4 +273,9 @@ public struct Vector3 : IEquatable<Vector3>
     {
         return HashCode.Combine(X, Y, Z);
     }
+
+    public static float Angle(Vector3 a, Vector3 b)
+    {
+        return Mathf.Acos(Mathf.Clamp(Dot(a.Normalized, b.Normalized), -1f, 1f)) * Mathf.Rad2Deg;
+    }
 }

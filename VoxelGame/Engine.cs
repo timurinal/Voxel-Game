@@ -78,9 +78,9 @@ public sealed class Engine : GameWindow
     private float _deltaTime;
 
     private SSEffect _tonemapper;
-    private SSEffect _bloom;
+    private SSEffect _raytracing;
     private Shader _tonemapperShader;
-    private Shader _bloomShader;
+    private Shader _raytracingShader;
 
     public Engine(GameWindowSettings gws, NativeWindowSettings nws) : base(gws, nws)
     {
@@ -153,8 +153,8 @@ public sealed class Engine : GameWindow
         _tonemapperShader = Shader.Load("BUILTIN/image-effect.vert", "Assets/Shaders/tonemapper.frag");
         _tonemapper = new SSEffect(_tonemapperShader, Size, true);
         
-        _bloomShader = Shader.Load("BUILTIN/image-effect.vert", "Assets/Shaders/bloom.frag");
-        _bloom = new SSEffect(_bloomShader, Size, true);
+        _raytracingShader = Shader.Load("Assets/Shaders/raytracing.vert", "Assets/Shaders/raytracing.frag");
+        _raytracing = new SSEffect(_raytracingShader, Size, true);
         
         Chunks = new Dictionary<Vector3Int, Chunk>();
         _chunksToBuild = new Queue<Vector3Int>();
@@ -348,17 +348,23 @@ public sealed class Engine : GameWindow
         ShadowMapper.Use();
         Render(mode: 0);
         ShadowMapper.Unuse(Size);
-        _bloom.Use();
+        _raytracing.Use();
         GL.PolygonMode(MaterialFace.FrontAndBack, IsWireframe ? PolygonMode.Line : PolygonMode.Fill);
         Render(mode: 1);
-        _bloom.Unuse();
+        _raytracing.Unuse();
         
         GL.Disable(EnableCap.DepthTest);
         
         _tonemapper.Use();
-        _bloom.Render(Player);
+        _raytracingShader.Use();
+        _raytracingShader.SetUniform("lightDir", _lightDir);
+        _raytracingShader.SetUniform("lightColour", _lightColour);
+        _raytracingShader.SetUniform("lightIntensity", 1.0f);
+        _raytracingShader.SetUniform("scatterFactor", 0.1f);
+        _raytracing.Render(Player, ShadowMapper);
         _tonemapper.Unuse();
-        _tonemapper.Render(Player);
+        
+        _tonemapper.Render(Player, ShadowMapper);
         
         GL.Enable(EnableCap.DepthTest);
         
@@ -432,11 +438,16 @@ public sealed class Engine : GameWindow
 
                     if (!chunk.Value.IsEmpty)
                     {
-                        VisibleChunks += !chunk.Value.IsEmpty ? 1 : 0;
+                        Vector3 dirToChunk = Player.Position - chunk.Value.chunkCentre;
+                        dirToChunk.Normalize();
+                        if (Vector3.Angle(Player.Forward, dirToChunk) > 45f)
+                        {
+                            VisibleChunks += !chunk.Value.IsEmpty ? 1 : 0;
                     
-                        var c = chunk.Value.Render(Player, ShadowMapper);
-                        VertexCount   += c.vertexCount;
-                        TriangleCount += c.triangleCount;
+                            var c = chunk.Value.Render(Player, ShadowMapper);
+                            VertexCount   += c.vertexCount;
+                            TriangleCount += c.triangleCount;
+                        }
                     }
                 }
             }
@@ -458,7 +469,7 @@ public sealed class Engine : GameWindow
         
         _imGuiController.WindowResized(e.Width, e.Height);
         
-        _bloom.UpdateSize(e.Size);
+        _raytracing.UpdateSize(e.Size);
         _tonemapper.UpdateSize(e.Size);
     }
 

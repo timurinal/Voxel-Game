@@ -1,4 +1,5 @@
-﻿using VoxelGame.Maths;
+﻿using OpenTK.Mathematics;
+using VoxelGame.Maths;
 
 namespace VoxelGame.Rendering;
 
@@ -284,11 +285,25 @@ void main() {
         GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
     }
 
-    public void Render(Player player)
+    internal void Render(Player player, ShadowMapper shadowMapper)
     {
         _shader.Use();
         _shader.SetUniform("_MainTex", 0, false);
         _shader.SetUniform("_DepthTexture", 1, false);
+        _shader.SetUniform("_ShadowMap", 2, false);
+        
+        _shader.SetUniform("m_lightOrtho", ref shadowMapper.OrthographicMatrix, autoUse: false);
+        _shader.SetUniform("m_lightView", ref shadowMapper.ViewMatrix, autoUse: false);
+        
+        _shader.SetUniform("m_proj", ref player.ProjectionMatrix, autoUse: false);
+        _shader.SetUniform("m_view", ref player.ViewMatrix, autoUse: false);
+        
+        Matrix4 m_invProj = Matrix4.Invert(player.ProjectionMatrix);
+        Matrix4 m_invView = Matrix4.Invert(player.ViewMatrix);
+        _shader.SetUniform("m_invProj", ref m_invProj, autoUse: false);
+        _shader.SetUniform("m_invView", ref m_invView, autoUse: false);
+        
+        _shader.SetUniform("_CamPos", player.Position, false);
         
         _shader.SetUniform("NearPlane", player.NearClipPlane, false);
         _shader.SetUniform("FarPlane", player.FarClipPlane, false);
@@ -299,6 +314,9 @@ void main() {
         
         GL.ActiveTexture(TextureUnit.Texture1);
         GL.BindTexture(TextureTarget.Texture2D, _depth);
+        
+        GL.ActiveTexture(TextureUnit.Texture2);
+        GL.BindTexture(TextureTarget.Texture2D, shadowMapper.DepthMap);
         
         GL.PolygonMode(MaterialFace.FrontAndBack, PolygonMode.Fill); // Don't allow the quad to be rendered as wireframe
         
