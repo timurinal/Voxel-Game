@@ -8,7 +8,7 @@ namespace VoxelGame.Rendering;
 
 public sealed class Chunk
 {
-    public const int ChunkSize = 16;
+    public const int ChunkSize = 8;
     public const int HChunkSize = ChunkSize / 2;
     public const int ChunkArea = ChunkSize * ChunkSize;
     public const int ChunkVolume = ChunkArea * ChunkSize;
@@ -45,19 +45,21 @@ public sealed class Chunk
 
         voxels = new uint[ChunkVolume];
 
+        //Array.Fill<uint>(voxels, 1);
+        
         for (int i = 0; i < ChunkVolume; i++)
         {
             int x = i % ChunkSize;
             int y = (i / ChunkSize) % ChunkSize;
             int z = i / ChunkArea;
-
+        
             // Calculate the global y position
             int globalX = x + this.chunkPosition.X;
             int globalY = y + this.chunkPosition.Y;
             int globalZ = z + this.chunkPosition.Z;
-
+        
             // voxels[i] = TerrainGenerator.Sample(globalX, globalY, globalZ) > 0.5f ? 2u : 0u;
-
+        
             voxels[i] = TerrainGenerator.SampleTerrain(globalX, globalY, globalZ);
         }
 
