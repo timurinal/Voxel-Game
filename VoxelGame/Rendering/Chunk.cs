@@ -45,7 +45,7 @@ public sealed class Chunk
 
         voxels = new uint[ChunkVolume];
 
-        //Array.Fill<uint>(voxels, 1);
+        // Array.Fill<uint>(voxels, 1);
         
         for (int i = 0; i < ChunkVolume; i++)
         {

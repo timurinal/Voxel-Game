@@ -2,6 +2,9 @@
 
 #define INFINITY 3.402823466e+38
 
+#define AtlasWidth 256
+#define VoxelTextureSize 16
+
 struct Ray {
     vec3 origin;
     vec3 dir;
@@ -54,12 +57,21 @@ Cube createCube(vec3 offset, RTMaterial material) {
     return cube;
 }
 
+struct VoxelData {
+    uint id;
+    int texFaces[6];
+};
+
 out vec4 finalColour;
 
 in vec2 texcoord;
 in vec3 pos;
 
-layout (std430, binding = 0) buffer CubeBuffer {
+layout (std430, binding = 0) buffer VoxelDataBuffer {
+    VoxelData voxels[];
+};
+
+layout (std430, binding = 1) buffer CubeBuffer {
     Cube cubes[];
 };
 
@@ -109,6 +121,15 @@ bool rayAabb(Ray ray, vec3 aabbMin, vec3 aabbMax);
 HitInfo raySphere(Ray ray, vec3 sphereCentre, float sphereRadius);
 HitInfo rayCube(Ray ray, vec3 cubeMin, vec3 cubeMax);
 
+vec2 getVoxelUv(int voxelID, float u, float v);
+
+const float faceShading[6] = float[6](
+    0.6, 0.8,  // front back
+    1.0, 0.4,  // top bottom
+    0.5, 0.7   // right left
+);
+
+
 void main() {    
     vec4 clipPos = vec4(pos.xy, 1.0, 1.0);
     vec4 viewPos = m_invProj * clipPos;
@@ -121,9 +142,19 @@ void main() {
     Ray ray = createRay(_CamPos, rayDir);
     
     HitInfo worldHit = calcRayCollision(ray);
-    
+
     if (worldHit.didHit) {
-        finalColour = vec4(texture(_TestTexture, worldHit.uv).rgb, 1.0); 
+        int faceId = 0;
+        
+        if (worldHit.normal == vec3(0, 0, 1)) { faceId = 0; }
+        else if (worldHit.normal == vec3(0, 0, -1)) { faceId = 1; }
+        else if (worldHit.normal == vec3(0, 1, 0)) { faceId = 2; }
+        else if (worldHit.normal == vec3(0, -1, 0)) { faceId = 3; }
+        else if (worldHit.normal == vec3(1, 0, 0)) { faceId = 4; }
+        else if (worldHit.normal == vec3(-1, 0, 0)) { faceId = 5; }
+        
+        vec3 colour = texture(_TestTexture, getVoxelUv(8, worldHit.uv.x, 1 - worldHit.uv.y)).rgb;
+        finalColour = vec4(colour * faceShading[faceId], 1.0f);
     } else {
         finalColour = vec4(getEnvironmentLight(ray), 1.0);
     }
@@ -200,6 +231,24 @@ uint hashVec2(vec2 v) {
     result ^= (result >> 16);
 
     return result;
+}
+
+vec3 trace(Ray ray, inout uint rngState) {
+    
+    vec3 incomingLight = vec3(0);
+    vec3 rayColour = vec3(0);
+    
+    for (int i = 0; i <= MaxLightBounces; i++) {
+        HitInfo hitInfo = calcRayCollision(ray);
+        
+        if (hitInfo.didHit) {
+            rayColour += hitInfo.material.colour;
+        } else {
+            break;
+        }
+    }
+    
+    return rayColour;
 }
 
 HitInfo calcRayCollision(Ray ray) {
@@ -355,4 +404,19 @@ HitInfo rayCube(Ray ray, vec3 cubeMin, vec3 cubeMax) {
     }
 
     return hitInfo;
+}
+
+vec2 getVoxelUv(int voxelID, float u, float v) {
+    int textureID = voxelID;
+    int texturePerRow = AtlasWidth / VoxelTextureSize;
+    float unit = 1.0f / texturePerRow;
+
+    // Padding to avoid bleeding
+    const float padding = 0.0001f;
+
+    float x = (textureID % texturePerRow) * unit + padding;
+    float y = (textureID / texturePerRow) * unit + padding;
+    float adjustedUnit = unit - 2 * padding;
+
+    return vec2(x + u * adjustedUnit, y + v * adjustedUnit);
 }

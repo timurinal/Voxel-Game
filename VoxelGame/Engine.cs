@@ -79,6 +79,7 @@ public sealed class Engine : GameWindow
 
     private Texture2D _testTexture;
 
+    private ShaderStorageBuffer _rtVoxelDataStorageBuffer;
     private ShaderStorageBuffer _rtVoxelStorageBuffer;
 
     public Engine(GameWindowSettings gws, NativeWindowSettings nws) : base(gws, nws)
@@ -170,7 +171,18 @@ public sealed class Engine : GameWindow
 
         _testTexture = new Texture2D("Assets/Textures/uv-checker.png", useLinearSampling: true, generateMipmaps: true);
 
-        _rtVoxelStorageBuffer = new ShaderStorageBuffer(0);
+        _rtVoxelDataStorageBuffer = new ShaderStorageBuffer(0);
+        _rtVoxelStorageBuffer = new ShaderStorageBuffer(1);
+
+        ShaderVoxelData[] svd = new ShaderVoxelData[VoxelData.Voxels.Length];
+
+        for (int i = 0; i < svd.Length; i++)
+        {
+            VoxelData.Voxel voxelData = VoxelData.Voxels[i];
+            svd[i] = new ShaderVoxelData(voxelData.id, voxelData.textureFaces);
+        }
+        
+        _rtVoxelDataStorageBuffer.SetData(Marshal.SizeOf<ShaderVoxelData>(), svd);
 
         // Cube[] cubes =
         // [
@@ -254,21 +266,24 @@ public sealed class Engine : GameWindow
             RecalculateLightBuffer(Lights.Count);
         }
 
-        for (int x = -Player.ChunkRenderDistance; x < Player.ChunkRenderDistance; x++)
+        for (int x = -Player.ChunkRenderDistance; x <= Player.ChunkRenderDistance; x++)
         {
-            for (int y = -Player.ChunkRenderDistance; y < Player.ChunkRenderDistance; y++)
+            for (int y = -Player.ChunkRenderDistance; y <= Player.ChunkRenderDistance; y++)
             {
-                for (int z = -Player.ChunkRenderDistance; z < Player.ChunkRenderDistance; z++)
+                for (int z = -Player.ChunkRenderDistance; z <= Player.ChunkRenderDistance; z++)
                 {
-                    Vector3Int chunkPosition = new Vector3Int(x, y, z) + playerPosition;
-                    Vector3Int chunkWorldPosition = chunkPosition * Chunk.ChunkSize;
-
-                    if (!Chunks.ContainsKey(chunkPosition) && chunkWorldPosition.Y >= 0)
+                    if (x * x + y * y + z * z <= Player.SqrChunkRenderDistance)
                     {
-                        // TODO: Load chunks from disk
-                        var newChunk = new Chunk(chunkWorldPosition, _chunkShader);
-                        _chunksToBuild.Enqueue(chunkPosition); // Queue the chunk for building
-                        Chunks[chunkPosition] = newChunk; // Add the chunk to the dictionary
+                        Vector3Int chunkPosition = new Vector3Int(x, y, z) + playerPosition;
+                        Vector3Int chunkWorldPosition = chunkPosition * Chunk.ChunkSize;
+
+                        if (!Chunks.ContainsKey(chunkPosition) && chunkWorldPosition.Y >= 0)
+                        {
+                            // TODO: Load chunks from disk
+                            var newChunk = new Chunk(chunkWorldPosition, _chunkShader);
+                            _chunksToBuild.Enqueue(chunkPosition); // Queue the chunk for building
+                            Chunks[chunkPosition] = newChunk; // Add the chunk to the dictionary
+                        }
                     }
                 }
             }
@@ -345,8 +360,10 @@ public sealed class Engine : GameWindow
         
         _imGuiController.Update(this, (float)args.Time);
         GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+
+        // _testTexture.Use(TextureUnit.Texture5);
         
-        _testTexture.Use(TextureUnit.Texture5);
+        TextureAtlas.AlbedoTexture.Use(TextureUnit.Texture5);
         
         _raytracingShader.Use();
         _raytracingShader.SetUniform("_TestTexture", 5);
@@ -382,7 +399,7 @@ public sealed class Engine : GameWindow
         string posX = pos.X.ToString("F2").PadRight(2);
         string posY = pos.Y.ToString("F2").PadRight(2);
         string posZ = pos.Z.ToString("F2").PadRight(2);
-        Title = $"Voxel Game 0.0.0 (OpenGL 4 - Ray Traced Rendering) - Chunk builder mode: Fully Blocking | Position: ({posX}, {posY}, {posZ}) | Frame Time: {Mathf.Round(_deltaTime * 1000f, 2)}ms ({Mathf.RoundToInt(1f / _deltaTime)} FPS)";
+        Title = $"Voxel Game 0.0.0 (OpenGL 4 - Ray Traced Rendering (1 SPP, {RayTracing.MaxLightBounces} Light Bounce(s))) | Position: ({posX}, {posY}, {posZ}) | Frame Time: {Mathf.Round(_deltaTime * 1000f, 2)}ms ({Mathf.RoundToInt(1f / _deltaTime)} FPS)";
         
         SwapBuffers();
     }
@@ -624,6 +641,19 @@ public sealed class Engine : GameWindow
 
             _padding0 = 0;
             _padding1 = 0;
+        }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct ShaderVoxelData
+    {
+        public uint id;
+        public int[] texFaces;
+
+        public ShaderVoxelData(uint id, int[] texFaces)
+        {
+            this.id = id;
+            this.texFaces = texFaces;
         }
     }
 
