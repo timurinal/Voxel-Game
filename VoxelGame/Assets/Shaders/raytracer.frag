@@ -1,6 +1,7 @@
 ﻿#version 450 core
 
 #define INFINITY 3.402823466e+38
+#define EPSILON 1e-4
 
 #define AtlasWidth 256
 #define VoxelTextureSize 16
@@ -18,6 +19,10 @@ Ray createRay(vec3 origin, vec3 dir) {
 
 struct RTMaterial {
     vec3 colour;
+    float emissionStrength;
+
+    vec3 emissionColour;
+    float _pad0;
 };
 
 struct HitInfo {
@@ -26,6 +31,7 @@ struct HitInfo {
     vec3 point;
     vec3 normal;
     vec2 uv;
+    int id;
     RTMaterial material;
 };
 HitInfo createHitInfo(bool didHit, float dst, vec3 point, vec3 normal, vec2 uv) {
@@ -41,6 +47,8 @@ HitInfo createHitInfo(bool didHit, float dst, vec3 point, vec3 normal, vec2 uv) 
 struct Cube {
     vec3 min;
     vec3 max;
+    
+    int id;
     
     RTMaterial material;
 };
@@ -83,6 +91,11 @@ uniform mat4 m_invProj;
 uniform mat4 m_invView;
 
 uniform int MaxLightBounces;
+uniform int RaysPerPixel;
+
+uniform float SkyboxIntensity;
+
+uniform float Time;
 
 uniform vec3 _CamPos;
 
@@ -129,32 +142,33 @@ const float faceShading[6] = float[6](
     0.5, 0.7   // right left
 );
 
-
-void main() {    
+void main() {
     vec4 clipPos = vec4(pos.xy, 1.0, 1.0);
     vec4 viewPos = m_invProj * clipPos;
     viewPos /= viewPos.w; // Perspective divide
     viewPos = m_invView * viewPos;
-    vec3 rayDir = normalize(viewPos.xyz);
-    
-    uint rngState = hashVec2(texcoord);
-    
+    vec3 rayDir = normalize(viewPos.xyz - _CamPos); // Correct ray direction based on camera position
+
+    uint rngState = hashVec2(texcoord + vec2(Time, -Time));
+
     Ray ray = createRay(_CamPos, rayDir);
+
+    // TODO: denoiser
+    // I want to use the below code but it is too noisy, so when I have a denoiser, this will be used
+//    vec3 totalIncomingLight = vec3(0);
+//
+//    for (int rayIndex = 0; rayIndex < RaysPerPixel; rayIndex++) {
+//        totalIncomingLight += trace(ray, rngState);
+//        rngState += 1;
+//    }
+//
+//    vec3 finalRayColour = totalIncomingLight / RaysPerPixel;
+//    finalColour = vec4(finalRayColour, 1.0);
     
     HitInfo worldHit = calcRayCollision(ray);
-
+    
     if (worldHit.didHit) {
-        int faceId = 0;
-        
-        if (worldHit.normal == vec3(0, 0, 1)) { faceId = 0; }
-        else if (worldHit.normal == vec3(0, 0, -1)) { faceId = 1; }
-        else if (worldHit.normal == vec3(0, 1, 0)) { faceId = 2; }
-        else if (worldHit.normal == vec3(0, -1, 0)) { faceId = 3; }
-        else if (worldHit.normal == vec3(1, 0, 0)) { faceId = 4; }
-        else if (worldHit.normal == vec3(-1, 0, 0)) { faceId = 5; }
-        
-        vec3 colour = texture(_TestTexture, getVoxelUv(8, worldHit.uv.x, 1 - worldHit.uv.y)).rgb;
-        finalColour = vec4(colour * faceShading[faceId], 1.0f);
+        finalColour = vec4(texture(_TestTexture, getVoxelUv(worldHit.id, worldHit.uv.x, 1 - worldHit.uv.y)).rgb, 1.0);
     } else {
         finalColour = vec4(getEnvironmentLight(ray), 1.0);
     }
@@ -195,15 +209,15 @@ float normalDistHash(inout uint state) {
 }
 
 vec3 randDir(inout uint state) {
-    float x = normalDistHash(state);
-    float y = normalDistHash(state);
-    float z = normalDistHash(state);
-    return normalize(vec3(x, y, z));
+    float z = 2.0 * hash(state) - 1.0; // z in range [-1, 1]
+    float r = sqrt(1.0 - z * z);
+    float theta = 2.0 * 3.14159265358979323846 * hash(state);
+    return vec3(r * cos(theta), r * sin(theta), z);
 }
 
 vec3 randHemisphereDir(vec3 normal, inout uint state) {
     vec3 dir = randDir(state);
-    return dir * sign(dot(normal, dir));
+    return dot(dir, normal) > 0.0 ? dir : -dir;
 }
 
 uint hashVec2(vec2 v) {
@@ -233,26 +247,53 @@ uint hashVec2(vec2 v) {
     return result;
 }
 
+bool nearlyEqual(float a, float b, float epsilon) {
+    return abs(a - b) < epsilon;
+}
+
+
 vec3 trace(Ray ray, inout uint rngState) {
     
     vec3 incomingLight = vec3(0);
-    vec3 rayColour = vec3(0);
+    vec3 rayColour = vec3(1);
+    
+    bool hasHit = false;
     
     for (int i = 0; i <= MaxLightBounces; i++) {
         HitInfo hitInfo = calcRayCollision(ray);
         
         if (hitInfo.didHit) {
-            rayColour += hitInfo.material.colour;
+            
+            hasHit = true;
+            
+            ray.origin = hitInfo.point;
+            ray.dir = randHemisphereDir(hitInfo.normal, rngState);
+            
+            RTMaterial material = hitInfo.material;
+            vec3 emittedLight = material.emissionColour * material.emissionStrength;
+            incomingLight += emittedLight * rayColour;
+            rayColour *= texture(_TestTexture, getVoxelUv(hitInfo.id, hitInfo.uv.x, 1 - hitInfo.uv.y)).rgb;
         } else {
+            // We missed every object and this ray 'hit' the sky
+            // but first check if that ray hit an object first to
+            // allow darkening of the natural light given off by
+            // the skybox
+            if (hasHit)
+            {
+                incomingLight += (getEnvironmentLight(ray) * rayColour) * SkyboxIntensity;
+            } else
+            {
+                incomingLight += (getEnvironmentLight(ray) * rayColour);
+            }
             break;
         }
     }
     
-    return rayColour;
+    return incomingLight;
 }
 
 HitInfo calcRayCollision(Ray ray) {
-    HitInfo closestHit = HitInfo(false, 0, vec3(0), vec3(0), vec2(0), RTMaterial(vec3(0)));
+    HitInfo closestHit = HitInfo(false, 0, vec3(0), vec3(0), vec2(0), 0, RTMaterial(vec3(0), 0, vec3(0), 0));
     
     // As we've not hit anything (yet), the 'closest' hit is infinitely far away
     closestHit.dst = INFINITY;
@@ -263,13 +304,22 @@ HitInfo calcRayCollision(Ray ray) {
         
        if (rayAabb(ray, cube.min, cube.max)) {
            HitInfo hitInfo = rayCube(ray, cube.min, cube.max);
+           // HitInfo hitInfo = raySphere(ray, (cube.min + cube.max) * 0.5, 0.5);
 
            if (hitInfo.didHit && hitInfo.dst < closestHit.dst) {
                closestHit = hitInfo;
                closestHit.material = cube.material;
+               closestHit.id = cube.id;
            }
        }
     }
+    
+    // Test sun sphere
+//    HitInfo sphereHit = raySphere(ray, vec3(-50, 100, -50), 25);
+//    if (sphereHit.didHit && sphereHit.dst < closestHit.dst) {
+//        closestHit = sphereHit;
+//        closestHit.material = RTMaterial(vec3(0), 15, vec3(1), 0);
+//    }   
     
     return closestHit;
 }
@@ -294,7 +344,7 @@ bool rayAabb(Ray ray, vec3 aabbMin, vec3 aabbMax) {
 }
 
 HitInfo raySphere(Ray ray, vec3 sphereCentre, float sphereRadius) {
-    HitInfo hitInfo = HitInfo(false, 0, vec3(0), vec3(0), vec2(0), RTMaterial(vec3(0)));
+    HitInfo hitInfo = HitInfo(false, 0, vec3(0), vec3(0), vec2(0), 0, RTMaterial(vec3(0), 0, vec3(0), 0));
     vec3 offsetRayOrigin = ray.origin - sphereCentre;
     
     float a = dot(ray.dir, ray.dir);
@@ -317,7 +367,7 @@ HitInfo raySphere(Ray ray, vec3 sphereCentre, float sphereRadius) {
 }
 
 HitInfo rayCube(Ray ray, vec3 cubeMin, vec3 cubeMax) {
-    HitInfo hitInfo = HitInfo(false, 0, vec3(0), vec3(0), vec2(0), RTMaterial(vec3(0)));
+    HitInfo hitInfo = HitInfo(false, 0, vec3(0), vec3(0), vec2(0), 0, RTMaterial(vec3(0), 0, vec3(0), 0));
     float tMin = (cubeMin.x - ray.origin.x) / ray.dir.x;
     float tMax = (cubeMax.x - ray.origin.x) / ray.dir.x;
 
@@ -374,14 +424,13 @@ HitInfo rayCube(Ray ray, vec3 cubeMin, vec3 cubeMax) {
     hitInfo.point = ray.origin + t * ray.dir;
 
     vec3 hitNormal = vec3(0);
-    float epsilon = 1e-5; // Small epsilon value to handle floating point precision
 
-    if (abs(hitInfo.point.x - cubeMin.x) < epsilon) hitNormal = vec3(-1, 0, 0);
-    else if (abs(hitInfo.point.x - cubeMax.x) < epsilon) hitNormal = vec3(1, 0, 0);
-    else if (abs(hitInfo.point.y - cubeMin.y) < epsilon) hitNormal = vec3(0, -1, 0);
-    else if (abs(hitInfo.point.y - cubeMax.y) < epsilon) hitNormal = vec3(0, 1, 0);
-    else if (abs(hitInfo.point.z - cubeMin.z) < epsilon) hitNormal = vec3(0, 0, -1);
-    else if (abs(hitInfo.point.z - cubeMax.z) < epsilon) hitNormal = vec3(0, 0, 1);
+    if (nearlyEqual(hitInfo.point.x, cubeMin.x, EPSILON)) hitNormal = vec3(-1, 0, 0);
+    else if (nearlyEqual(hitInfo.point.x, cubeMax.x, EPSILON)) hitNormal = vec3(1, 0, 0);
+    else if (nearlyEqual(hitInfo.point.y, cubeMin.y, EPSILON)) hitNormal = vec3(0, -1, 0);
+    else if (nearlyEqual(hitInfo.point.y, cubeMax.y, EPSILON)) hitNormal = vec3(0, 1, 0);
+    else if (nearlyEqual(hitInfo.point.z, cubeMin.z, EPSILON)) hitNormal = vec3(0, 0, -1);
+    else if (nearlyEqual(hitInfo.point.z, cubeMax.z, EPSILON)) hitNormal = vec3(0, 0, 1);
 
     hitInfo.normal = hitNormal;
 
@@ -402,6 +451,9 @@ HitInfo rayCube(Ray ray, vec3 cubeMin, vec3 cubeMax) {
     } else if (hitNormal == vec3(0, 0, 1)) {
         hitInfo.uv = vec2(localPoint.x / cubeSize.x, localPoint.y / cubeSize.y);
     }
+
+    // Apply a small depth bias to avoid z-fighting
+    hitInfo.point += hitNormal * EPSILON;
 
     return hitInfo;
 }

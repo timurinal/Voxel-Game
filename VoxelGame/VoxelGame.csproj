@@ -87,6 +87,9 @@
       <None Update="Assets\Shaders\raytracer.vert">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
+      <None Update="Assets\Shaders\denoiser.frag">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
     </ItemGroup>
 
 </Project>

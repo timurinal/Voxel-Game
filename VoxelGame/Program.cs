@@ -1,4 +1,5 @@
 ﻿using OpenTK.Windowing.Desktop;
+using VoxelGame.Maths;
 
 namespace VoxelGame;
 

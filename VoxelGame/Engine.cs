@@ -1,4 +1,4 @@
-﻿// 5,924 lines of code :D
+﻿// 6,953 lines of code :D
 
 using System.Runtime.InteropServices;
 using ImGuiNET;
@@ -12,6 +12,12 @@ using Vector3 = VoxelGame.Maths.Vector3;
 
 namespace VoxelGame;
 
+public enum RenderMode
+{
+    Polygon = 0,
+    RayTraced = 1
+}
+
 public sealed class Engine : GameWindow
 {
     public static readonly string DataPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VoxelGame");
@@ -21,6 +27,7 @@ public sealed class Engine : GameWindow
     public bool IsFullscreen;
     public bool IsWireframe;
     public bool Shadows = true;
+    public RenderMode RenderMode = RenderMode.RayTraced;
 
     public const bool EnableFrustumCulling = true;
 
@@ -74,8 +81,10 @@ public sealed class Engine : GameWindow
 
     private SSEffect _tonemapper;
     private SSEffect _raytracing;
+    private SSEffect _denoiser;
     private Shader _tonemapperShader;
     private Shader _raytracingShader;
+    private Shader _denoiserShader;
 
     private Texture2D _testTexture;
 
@@ -144,7 +153,9 @@ public sealed class Engine : GameWindow
         _raytracingShader = Shader.Load("Assets/Shaders/raytracer.vert", "Assets/Shaders/raytracer.frag");
         
         _raytracingShader.Use();
-        _raytracingShader.SetUniform("MaxLightBounces", 8, autoUse: false);
+        _raytracingShader.SetUniform("MaxLightBounces", RayTracing.MaxLightBounces, autoUse: false);
+        _raytracingShader.SetUniform("RaysPerPixel", RayTracing.RaysPerPixel, autoUse: false);
+        _raytracingShader.SetUniform("SkyboxIntensity", RayTracing.SkyboxIntensity, autoUse: false);
         
         _raytracingShader.SetUniform("SkyColourZenith", new Vector3(0.5019608f, 0.67058825f, 0.8980393f), autoUse: false);
         _raytracingShader.SetUniform("SkyColourHorizon", new Vector3(1, 1, 1), autoUse: false);
@@ -156,6 +167,9 @@ public sealed class Engine : GameWindow
         _raytracingShader.SetUniform("SunLightDirection", _lightDir);
         
         _raytracing = new SSEffect(_raytracingShader, Size, true);
+
+        _denoiserShader = Shader.Load("BUILTIN/image-effect.vert", "Assets/Shaders/denoiser.frag");
+        _denoiser = new SSEffect(_denoiserShader, Size, true);
         
         Chunks = new Dictionary<Vector3Int, Chunk>();
         _chunksToBuild = new Queue<Vector3Int>();
@@ -272,76 +286,80 @@ public sealed class Engine : GameWindow
             {
                 for (int z = -Player.ChunkRenderDistance; z <= Player.ChunkRenderDistance; z++)
                 {
-                    if (x * x + y * y + z * z <= Player.SqrChunkRenderDistance)
-                    {
-                        Vector3Int chunkPosition = new Vector3Int(x, y, z) + playerPosition;
-                        Vector3Int chunkWorldPosition = chunkPosition * Chunk.ChunkSize;
+                    Vector3Int chunkPosition = new Vector3Int(x, y, z) + playerPosition;
+                    Vector3Int chunkWorldPosition = chunkPosition * Chunk.ChunkSize;
 
-                        if (!Chunks.ContainsKey(chunkPosition) && chunkWorldPosition.Y >= 0)
-                        {
-                            // TODO: Load chunks from disk
-                            var newChunk = new Chunk(chunkWorldPosition, _chunkShader);
-                            _chunksToBuild.Enqueue(chunkPosition); // Queue the chunk for building
-                            Chunks[chunkPosition] = newChunk; // Add the chunk to the dictionary
-                        }
+                    if (!Chunks.ContainsKey(chunkPosition) && chunkWorldPosition.Y >= 0)
+                    {
+                        // TODO: Load chunks from disk
+                        var newChunk = new Chunk(chunkWorldPosition, _chunkShader);
+                        _chunksToBuild.Enqueue(chunkPosition); // Queue the chunk for building
+                        Chunks[chunkPosition] = newChunk; // Add the chunk to the dictionary
                     }
                 }
             }
         }
 
         // Build a limited number of chunks per frame
-        // for (int i = 0; i < MaxChunksToBuildPerFrame && _chunksToBuild.Count > 0; i++)
-        // {
-        //     try
-        //     {
-        //         var chunkPosition = _chunksToBuild.Dequeue();
-        //         var chunk = Chunks[chunkPosition];
-        //         
-        //         chunk.RebuildChunk(Chunks, recursive: true);
-        //
-        //         // Force neighbouring chunks to rebuild
-        //         Vector3Int[] neighbourChunkOffsets =
-        //         {
-        //             new Vector3Int(0, 0, 1),
-        //             new Vector3Int(0, 0, -1),
-        //             new Vector3Int(0, 1, 0),
-        //             new Vector3Int(0, -1, 0),
-        //             new Vector3Int(1, 0, 0),
-        //             new Vector3Int(-1, 0, 0),
-        //         };
-        //
-        //         foreach (var offset in neighbourChunkOffsets)
-        //         {
-        //             if (Chunks.TryGetValue(chunkPosition + offset, out var neighbour))
-        //             {
-        //                 neighbour.RebuildChunk(Chunks);
-        //             }
-        //         }
-        //     }
-        //     catch
-        //     {
-        //     }
-        // }
-        
-        if (!_updated) {
-            Chunk chunk = Chunks[new Vector3Int(0, 0, 0)];
-            List<Cube> cubes = new();
-            for (int i = 0; i < Chunk.ChunkVolume; i++)
-            {
-                if (chunk.voxels[i] == VoxelData.NameToVoxelId("air")) continue;
-                
-                Vector3Int voxelPos = UnflattenIndex(i, Chunk.ChunkSize, Chunk.ChunkSize);
-                
-                RTMaterial material = new RTMaterial(new(Random.Hash((uint)voxelPos.GetHashCode()), Random.Hash((uint)voxelPos.GetHashCode()),
-                    Random.Hash((uint)voxelPos.GetHashCode())));
-                
-                cubes.Add(new Cube(voxelPos, material));
-            }
-            
-            _rtVoxelStorageBuffer.SetData(Marshal.SizeOf<Cube>(), cubes.ToArray());
-            _raytracingShader.SetUniform("NumCubes", cubes.Count);
 
-            _updated = true;
+        if (RenderMode == RenderMode.Polygon)
+        {
+            for (int i = 0; i < MaxChunksToBuildPerFrame && _chunksToBuild.Count > 0; i++)
+            {
+                try
+                {
+                    var chunkPosition = _chunksToBuild.Dequeue();
+                    var chunk = Chunks[chunkPosition];
+                
+                    chunk.RebuildChunk(Chunks, recursive: true);
+        
+                    // Force neighbouring chunks to rebuild
+                    Vector3Int[] neighbourChunkOffsets =
+                    {
+                        new Vector3Int(0, 0, 1),
+                        new Vector3Int(0, 0, -1),
+                        new Vector3Int(0, 1, 0),
+                        new Vector3Int(0, -1, 0),
+                        new Vector3Int(1, 0, 0),
+                        new Vector3Int(-1, 0, 0),
+                    };
+        
+                    foreach (var offset in neighbourChunkOffsets)
+                    {
+                        if (Chunks.TryGetValue(chunkPosition + offset, out var neighbour))
+                        {
+                            neighbour.RebuildChunk(Chunks);
+                        }
+                    }
+                }
+                catch
+                {
+                }
+            }
+        } 
+        else if (RenderMode == RenderMode.RayTraced)
+        {
+            if (!_updated) 
+            {
+                Chunk chunk = Chunks[new Vector3Int(0, 0, 0)];
+                List<Cube> cubes = new();
+                for (int i = 0; i < Chunk.ChunkVolume; i++)
+                {
+                    if (chunk.voxels[i] == VoxelData.NameToVoxelId("air")) continue;
+                
+                    Vector3Int voxelPos = UnflattenIndex(i, Chunk.ChunkSize, Chunk.ChunkSize);
+                
+                    RTMaterial material = new RTMaterial(new(Random.Hash((uint)voxelPos.GetHashCode()), Random.Hash((uint)voxelPos.GetHashCode()),
+                        Random.Hash((uint)voxelPos.GetHashCode())), new Vector3(0, 0, 0), 0f);
+                
+                    cubes.Add(new Cube(voxelPos, (int)chunk.voxels[i], material));
+                }
+            
+                _rtVoxelStorageBuffer.SetData(Marshal.SizeOf<Cube>(), cubes.ToArray());
+                _raytracingShader.SetUniform("NumCubes", cubes.Count);
+
+                _updated = true;
+            }
         }
         
         _chunkShader.SetUniform("viewPos", Player.Position);
@@ -361,16 +379,49 @@ public sealed class Engine : GameWindow
         _imGuiController.Update(this, (float)args.Time);
         GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
+        TriangleCount = 0;
+        VertexCount = 0;
+        BatchCount = 0;
+        LoadedChunks = 0;
+        VisibleChunks = 0;
+        
         // _testTexture.Use(TextureUnit.Texture5);
+
+        if (RenderMode == RenderMode.Polygon)
+        {
+            // Render skybox with depth write disabled
+            GL.DepthMask(false);
+            _test.Render(Player);
+            //_skyboxShader.Use();
+            // _skybox.Render(Player);
+            GL.DepthMask(true);
         
-        TextureAtlas.AlbedoTexture.Use(TextureUnit.Texture5);
+            ShadowMapper.Use();
+            Render(mode: 0);
+            ShadowMapper.Unuse(Size);
+            _tonemapper.Use();
+            GL.PolygonMode(MaterialFace.FrontAndBack, IsWireframe ? PolygonMode.Line : PolygonMode.Fill);
+            Render(mode: 1);
+            _tonemapper.Unuse();
         
-        _raytracingShader.Use();
-        _raytracingShader.SetUniform("_TestTexture", 5);
+            GL.Disable(EnableCap.DepthTest);
         
-        _rtVoxelStorageBuffer.Use();
+            _tonemapper.Render(Player, ShadowMapper);
+        } 
+        else if (RenderMode == RenderMode.RayTraced)
+        {
+            TextureAtlas.AlbedoTexture.Use(TextureUnit.Texture5);
         
-        _raytracing.Render(Player, ShadowMapper);
+            _raytracingShader.Use();
+            _raytracingShader.SetUniform("_TestTexture", 5, autoUse: false);
+            _raytracingShader.SetUniform("Time", Time.ElapsedTime, autoUse: false);
+        
+            _rtVoxelStorageBuffer.Use();
+        
+            _raytracing.Render(Player, ShadowMapper);
+        }
+        
+        GL.Enable(EnableCap.DepthTest);
         
         if (ShowGui)
         {
@@ -399,7 +450,16 @@ public sealed class Engine : GameWindow
         string posX = pos.X.ToString("F2").PadRight(2);
         string posY = pos.Y.ToString("F2").PadRight(2);
         string posZ = pos.Z.ToString("F2").PadRight(2);
-        Title = $"Voxel Game 0.0.0 (OpenGL 4 - Ray Traced Rendering (1 SPP, {RayTracing.MaxLightBounces} Light Bounce(s))) | Position: ({posX}, {posY}, {posZ}) | Frame Time: {Mathf.Round(_deltaTime * 1000f, 2)}ms ({Mathf.RoundToInt(1f / _deltaTime)} FPS)";
+        
+        string rendererString = RenderMode switch
+        {
+            RenderMode.Polygon => $"Standard Rendering",
+            RenderMode.RayTraced =>
+                $"Ray Traced Rendering ({RayTracing.RaysPerPixel} SPP, {RayTracing.MaxLightBounces} Light Bounce(s))",
+            _ => "Unknown Renderer"
+        };
+        
+        Title = $"Voxel Game 0.0.0 (OpenGL 4 - {rendererString}) | Position: ({posX}, {posY}, {posZ}) | Frame Time: {Mathf.Round(_deltaTime * 1000f, 2)}ms ({Mathf.RoundToInt(1f / _deltaTime)} FPS)";
         
         SwapBuffers();
     }
@@ -444,14 +504,11 @@ public sealed class Engine : GameWindow
                     {
                         Vector3 dirToChunk = Player.Position - chunk.Value.chunkCentre;
                         dirToChunk.Normalize();
-                        if (Vector3.Angle(Player.Forward, dirToChunk) > 45f)
-                        {
-                            VisibleChunks += !chunk.Value.IsEmpty ? 1 : 0;
+                        VisibleChunks += !chunk.Value.IsEmpty ? 1 : 0;
                     
-                            var c = chunk.Value.Render(Player, ShadowMapper);
-                            VertexCount   += c.vertexCount;
-                            TriangleCount += c.triangleCount;
-                        }
+                        var c = chunk.Value.Render(Player, ShadowMapper);
+                        VertexCount   += c.vertexCount;
+                        TriangleCount += c.triangleCount;
                     }
                 }
             }
@@ -598,20 +655,7 @@ public sealed class Engine : GameWindow
             _padding5 = 4;
         }
     }
-
-    [StructLayout(LayoutKind.Sequential)]
-    internal struct RTMaterial
-    {
-        public Vector3 colour; private float _padding0;
-
-        public RTMaterial(Vector3 colour)
-        {
-            this.colour = colour;
-
-            _padding0 = 0;
-        }
-    }
-
+    
     [StructLayout(LayoutKind.Sequential)]
     internal struct Cube
     {
@@ -619,28 +663,48 @@ public sealed class Engine : GameWindow
         private float _padding0;
         
         public Vector3 max;
-        private float _padding1;
+        public int id;
         
         public RTMaterial material;
 
-        public Cube(Vector3 min, Vector3 max, RTMaterial material)
+        public Cube(Vector3 min, Vector3 max, int id, RTMaterial material)
         {
             this.min = min;
             this.max = max;
+            this.id = id;
             this.material = material;
 
             _padding0 = 0;
-            _padding1 = 0;
         }
         
-        public Cube(Vector3 offset, RTMaterial material)
+        public Cube(Vector3 offset, int id, RTMaterial material)
         {
             min = new Vector3(-0.5f, -0.5f, -0.5f) + offset;
             max = new Vector3(0.5f, 0.5f, 0.5f) + offset;
+            this.id = id;
             this.material = material;
 
             _padding0 = 0;
-            _padding1 = 0;
+        }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct RTMaterial
+    {
+        public Vector3 colour;
+        public float emissionStrength;
+
+        public Vector3 emissionColour;
+
+        private float _padding0;
+
+        public RTMaterial(Vector3 colour, Vector3 emissionColour, float emissionStrength)
+        {
+            this.colour = colour;
+            this.emissionColour = emissionColour;
+            this.emissionStrength = emissionStrength;
+
+            _padding0 = 0;
         }
     }
 
@@ -654,6 +718,32 @@ public sealed class Engine : GameWindow
         {
             this.id = id;
             this.texFaces = texFaces;
+        }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RTChunk
+    {
+        public Vector3 min; private float _padding0;
+        public Vector3 max; private float _padding1;
+
+        public int voxelStartIndex;
+        public int voxelCount;
+
+        private int _padding2;
+        private int _padding3;
+
+        public RTChunk(Vector3 min, Vector3 max, int voxelStartIndex, int voxelCount)
+        {
+            this.min = min;
+            this.max = max;
+            this.voxelStartIndex = voxelStartIndex;
+            this.voxelCount = voxelCount;
+
+            _padding0 = 0;
+            _padding1 = 0;
+            _padding2 = 0;
+            _padding3 = 0;
         }
     }
 

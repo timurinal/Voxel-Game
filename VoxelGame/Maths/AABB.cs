@@ -5,7 +5,7 @@ public struct AABB : IEquatable<AABB>
     public Vector3 Min;
     public Vector3 Max;
 
-    public Vector3 Center => (Min + Max) / 2;
+    public Vector3 Center => (Min + Max) * 0.5f;
 
     public AABB()
     {
@@ -43,25 +43,34 @@ public struct AABB : IEquatable<AABB>
         Min += dir;
         Max += dir;
     }
-    
+
+    public void SetCenter(Vector3 pos)
+    {
+        Min = pos - (Max - Min) / 2;
+        Max = pos + (Max - Min) / 2;
+    }
+
+    public void Encapsulate(Vector3 point)
+    {
+        Min = Vector3.Min(Min, point);
+        Max = Vector3.Max(Max, point);
+    }
+
+    public void Encapsulate(AABB box)
+    {
+        Min = Vector3.Min(Min, box.Min);
+        Max = Vector3.Max(Max, box.Max);
+    }
+
     public bool Contains(Vector3 point)
     {
-        return (point.X >= Min.X && point.X <= Max.X) &&
-               (point.Y >= Min.Y && point.Y <= Max.Y) &&
-               (point.Z >= Min.Z && point.Z <= Max.Z);
+        return point.X >= Min.X && point.X <= Max.X && point.Y >= Min.Y && point.Y <= Max.Y && point.Z >= Min.Z &&
+               point.Z <= Max.Z;
     }
 
-    public bool Intersects(AABB other)
+    public override int GetHashCode()
     {
-        return (Min.X <= other.Max.X && Max.X >= other.Min.X) &&
-               (Min.Y <= other.Max.Y && Max.Y >= other.Min.Y) &&
-               (Min.Z <= other.Max.Z && Max.Z >= other.Min.Z);
-    }
-
-    public void Expand(Vector3 amount)
-    {
-        Min -= amount / 2;
-        Max += amount / 2;
+        return HashCode.Combine(Min, Max);
     }
 
     public bool Equals(AABB other)
@@ -72,10 +81,5 @@ public struct AABB : IEquatable<AABB>
     public override bool Equals(object? obj)
     {
         return obj is AABB other && Equals(other);
-    }
-
-    public override int GetHashCode()
-    {
-        return HashCode.Combine(Min, Max);
     }
 }

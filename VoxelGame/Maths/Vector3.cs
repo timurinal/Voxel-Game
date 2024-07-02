@@ -278,4 +278,14 @@ public struct Vector3 : IEquatable<Vector3>
     {
         return Mathf.Acos(Mathf.Clamp(Dot(a.Normalized, b.Normalized), -1f, 1f)) * Mathf.Rad2Deg;
     }
+
+    public static Vector3 Min(Vector3 a, Vector3 b)
+    {
+        return new Vector3(Mathf.Min(a.X, b.X), Mathf.Min(a.Y, b.Y), Mathf.Min(a.Z, b.Z));
+    }
+    
+    public static Vector3 Max(Vector3 a, Vector3 b)
+    {
+        return new Vector3(Mathf.Max(a.X, b.X), Mathf.Max(a.Y, b.Y), Mathf.Max(a.Z, b.Z));
+    }
 }
