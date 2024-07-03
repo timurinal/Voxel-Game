@@ -38,7 +38,7 @@ public static class TerrainGenerator
     public static uint SampleTerrain(int x, int y, int z)
     {
         float h = Sample(x, y, z);
-        float height = h * 20;
+        float height = h * 40;
         if (y <= 0) return VoxelData.NameToVoxelId("bedrock");
         if (y <= height - 15) return VoxelData.NameToVoxelId("stone");
         if (y <= height - 12) return VoxelData.NameToVoxelId("dirt");

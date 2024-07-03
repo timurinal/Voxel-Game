@@ -9,9 +9,15 @@ namespace VoxelGame.Rendering;
 
 public sealed class Player
 {
+    public const float Bounciness = 0.01f;
+    public const float Gravity = -9.81f;
+
+    public static Vector3 ColliderSize => new Vector3(0.8f, 1.8f, 0.8f);
+    public static Vector3 ColliderOffset => new Vector3(0f, -0.7f, 0f);
+    
     private const float MaxRayDistance = 8f;
     
-    public static int ChunkRenderDistance = 4;
+    public static int ChunkRenderDistance = 8;
     public static int SqrChunkRenderDistance => ChunkRenderDistance * ChunkRenderDistance;
 
     public readonly Frustum Frustum;
@@ -49,7 +55,7 @@ public sealed class Player
     public Plane[] Planes { get; private set; } = new Plane[6];
 
     private Vector3 cameraTarget = Vector3.Zero;
-    private Vector3 cameraPosition = new(0, 0, -5);
+    private Vector3 cameraPosition = new(0, 50, -0);
     private Vector3 cameraDirection = Vector3.Zero;
     private Vector3 cameraUp = Vector3.Up;
     private Vector3 cameraRight = Vector3.Right;
@@ -65,9 +71,11 @@ public sealed class Player
 
     private float fov;
 
+    private Vector3 _velocity;
+
     public Player(Vector2Int screenSize, float moveSpeed = 5f, float rotateSpeed = 0.3f, float fov = 65f, float near = 0.1f, float far = 7500f)
     {
-        Collider = new AABB();
+        Collider = AABB.CreateFromExtents(Position + ColliderOffset, ColliderSize * 0.5f);
         
         // Frustum = new(this);
         MoveSpeed = moveSpeed;
@@ -85,13 +93,18 @@ public sealed class Player
             NearClipPlane, FarClipPlane);
     }
 
-    internal void Update(Vector2Int screenSize)
+    internal void Update(Vector2Int screenSize, IEnumerable<AABB> chunkCollisions)
     {
         float speed = MoveSpeed;
         if (Input.GetKey(Keys.LeftShift)) speed *= 2;
+
+        _velocity += Vector3.Up * (Gravity * Time.DeltaTime);
         
-        if (Input.GetKey(Keys.W)) cameraPosition += speed * cameraFront * Time.DeltaTime;
-        if (Input.GetKey(Keys.S)) cameraPosition -= speed * cameraFront * Time.DeltaTime;
+        Vector3 cameraFrontXZ = new Vector3(cameraFront.X, 0, cameraFront.Z).Normalized;
+
+        if (Input.GetKey(Keys.W)) cameraPosition += speed * cameraFrontXZ * Time.DeltaTime;
+        if (Input.GetKey(Keys.S)) cameraPosition -= speed * cameraFrontXZ * Time.DeltaTime;
+        
         if (Input.GetKey(Keys.A))
             cameraPosition -= Vector3.Normalize(Vector3.Cross(cameraFront, cameraUp)) * speed * Time.DeltaTime;
         if (Input.GetKey(Keys.D))
@@ -100,7 +113,22 @@ public sealed class Player
         if (Input.GetKey(Keys.E)) cameraPosition.Y += speed * Time.DeltaTime;
         if (Input.GetKey(Keys.Q)) cameraPosition.Y -= speed * Time.DeltaTime;
 
-        Collider = new AABB(Position);
+        Vector3 predictedPosition = Position + (_velocity * Time.DeltaTime);
+        AABB predictedCollider = AABB.CreateFromExtents(predictedPosition + ColliderOffset, ColliderSize * 0.5f);
+
+        foreach (var collision in chunkCollisions)
+        {
+            if (AABB.Intersects(collision, predictedCollider))
+            {
+                _velocity = -_velocity * Bounciness;
+            }
+        }
+
+        if (_velocity.SqrMagnitude <= Mathf.Epsilon) _velocity = Vector3.Zero;
+
+        cameraPosition += _velocity * Time.DeltaTime;
+        
+        Collider = AABB.CreateFromExtents(Position + ColliderOffset, ColliderSize * 0.5f);
 
         pitch = Mathf.Clamp(pitch, -89, 89);
 

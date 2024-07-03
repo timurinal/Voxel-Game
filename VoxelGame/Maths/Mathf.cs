@@ -22,6 +22,8 @@ public static class Mathf
 
     public const float E = 2.7182818285f;
 
+    public const float Epsilon = 1e-05f;
+
     /// <summary>
     /// Clamps a value between a minimum and maximum value.
     /// </summary>

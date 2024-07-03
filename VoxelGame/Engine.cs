@@ -2,12 +2,14 @@
 
 using System.Runtime.InteropServices;
 using ImGuiNET;
+using OpenTK.Mathematics;
 using OpenTK.Windowing.Common;
 using OpenTK.Windowing.Desktop;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using VoxelGame.Maths;
 using VoxelGame.Rendering;
 using Random = VoxelGame.Maths.Random;
+using Vector2 = VoxelGame.Maths.Vector2;
 using Vector3 = VoxelGame.Maths.Vector3;
 
 namespace VoxelGame;
@@ -27,7 +29,7 @@ public sealed class Engine : GameWindow
     public bool IsFullscreen;
     public bool IsWireframe;
     public bool Shadows = true;
-    public RenderMode RenderMode = RenderMode.RayTraced;
+    public RenderMode RenderMode = RenderMode.Polygon;
 
     public const bool EnableFrustumCulling = true;
 
@@ -51,7 +53,7 @@ public sealed class Engine : GameWindow
     private Shader _chunkShader;
     internal static Dictionary<Vector3Int, Chunk> Chunks;
     private Queue<Vector3Int> _chunksToBuild;
-    private const int MaxChunksToBuildPerFrame = 32;
+    private const int MaxChunksToBuildPerFrame = 8;
 
     private Shader _meshShader;
 
@@ -222,17 +224,14 @@ public sealed class Engine : GameWindow
         
         Vector3Int playerPosition = Vector3.Round(Player.Position / Chunk.ChunkSize);
         int renderDistance = Player.ChunkRenderDistance;
+        int sqrRenderDistance = Player.SqrChunkRenderDistance;
 
         List<Vector3Int> chunksToRemove = new List<Vector3Int>();
 
         foreach (var chunk in Chunks)
         {
             var chunkPos = chunk.Key;
-            int dx = chunkPos.X - playerPosition.X;
-            int dy = chunkPos.Y - playerPosition.Y;
-            int dz = chunkPos.Z - playerPosition.Z;
-
-            if (Math.Abs(dx) > renderDistance || Math.Abs(dy) > renderDistance || Math.Abs(dz) > renderDistance)
+            if (Vector3Int.SqrDistance(chunkPos, playerPosition) > sqrRenderDistance)
             {
                 // TODO: Save dirty chunks to the disk
                 chunksToRemove.Add(chunkPos);
@@ -246,7 +245,16 @@ public sealed class Engine : GameWindow
         
         CursorState = ShowGui ? CursorState.Normal : CursorState.Grabbed;
 
-        Player.Update(Size);
+        Vector3Int playerChunkPosition = Vector3Int.FloorToInt(Player.Position / Chunk.ChunkSize);
+
+        AABB[] collisions = [];
+        
+        if (Chunks.TryGetValue(playerChunkPosition, out var currentChunk))
+            collisions = currentChunk.GenerateCollisions(Chunks);
+        else
+            Console.WriteLine("Couldn't get chunk");
+        
+        Player.Update(Size, collisions);
         
         if (Input.GetKeyDown(Keys.Escape))
             Close();
@@ -287,6 +295,10 @@ public sealed class Engine : GameWindow
                 for (int z = -Player.ChunkRenderDistance; z <= Player.ChunkRenderDistance; z++)
                 {
                     Vector3Int chunkPosition = new Vector3Int(x, y, z) + playerPosition;
+
+                    // Check if the chunk is within the spherical render distance
+                    if (Vector3Int.SqrDistance(chunkPosition, playerPosition) > sqrRenderDistance) continue;
+                    
                     Vector3Int chunkWorldPosition = chunkPosition * Chunk.ChunkSize;
 
                     if (!Chunks.ContainsKey(chunkPosition) && chunkWorldPosition.Y >= 0)
@@ -301,7 +313,6 @@ public sealed class Engine : GameWindow
         }
 
         // Build a limited number of chunks per frame
-
         if (RenderMode == RenderMode.Polygon)
         {
             for (int i = 0; i < MaxChunksToBuildPerFrame && _chunksToBuild.Count > 0; i++)
@@ -362,7 +373,9 @@ public sealed class Engine : GameWindow
             }
         }
         
-        _chunkShader.SetUniform("viewPos", Player.Position);
+        _chunkShader.Use();
+        _chunkShader.SetUniform("viewPos", Player.Position, autoUse: false);
+        _chunkShader.SetUniform("shadowsEnabled", Shadows ? 1 : 0, autoUse: false);
 
         _test.Transform.Position = -_lightDir;
         _test.Transform.Position += Player.Position;
@@ -395,10 +408,13 @@ public sealed class Engine : GameWindow
             //_skyboxShader.Use();
             // _skybox.Render(Player);
             GL.DepthMask(true);
-        
-            ShadowMapper.Use();
-            Render(mode: 0);
-            ShadowMapper.Unuse(Size);
+
+            if (Shadows)
+            {
+                ShadowMapper.Use();
+                Render(mode: 0);
+                ShadowMapper.Unuse(Size);
+            }
             _tonemapper.Use();
             GL.PolygonMode(MaterialFace.FrontAndBack, IsWireframe ? PolygonMode.Line : PolygonMode.Fill);
             Render(mode: 1);
@@ -453,7 +469,7 @@ public sealed class Engine : GameWindow
         
         string rendererString = RenderMode switch
         {
-            RenderMode.Polygon => $"Standard Rendering",
+            RenderMode.Polygon => $"Standard Rendering (Vertices: {VertexCount:N0} | Triangles: {TriangleCount:N0})",
             RenderMode.RayTraced =>
                 $"Ray Traced Rendering ({RayTracing.RaysPerPixel} SPP, {RayTracing.MaxLightBounces} Light Bounce(s))",
             _ => "Unknown Renderer"

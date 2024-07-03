@@ -48,6 +48,8 @@ uniform vec3 viewPos;
 uniform vec3 fogColour;
 uniform float fogDensity;
 
+uniform int shadowsEnabled;
+
 uniform Material material;
 uniform DirLight dirLight;
 
@@ -88,6 +90,7 @@ void main() {
     vec2 noise = hash2(uv);
     
     // finalCol = mix(vec4(result, 1.0), vec4(fogColour, 1.0), fogAmount);
+    vec3 fogResult = mix(result, fogColour, fogAmount);
     vec4 lit = vec4(result, 1.0);
     // lit = clamp(lit, 0.0, 1.0);
     
@@ -146,24 +149,28 @@ vec2 hash2(vec2 p) {
 }
 
 float calcShadow(vec4 lightSpaceFragPos) {
+    
+    if (shadowsEnabled == 0)
+            return 0.0;
+    
     vec3 projCoords = lightSpaceFragPos.xyz / lightSpaceFragPos.w;
     // transform to [0-1] range
     projCoords = projCoords * 0.5 + 0.5;
 
-    float closestDepth = texture(shadowMap, projCoords.xy).r;
+//    float closestDepth = texture(shadowMap, projCoords.xy).r;
     float currentDepth = projCoords.z;
 
     float bias = max(0.05 * (1.0 - dot(normal, -dirLight.direction)), 0.000000001);
-    float shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
-//    float shadow = 0.0;
-//    vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
-//    for (int x = -4; x <= 4; x++) {
-//        for (int y = -4; y <= 4; y++) {
-//            float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r;
-//            shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
-//        }
-//    }
-//    shadow /= 64.0;
+//    float shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
+    float shadow = 0.0;
+    vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+    for (int x = -1; x <= 1; x++) {
+        for (int y = -1; y <= 1; y++) {
+            float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r;
+            shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
+        }
+    }
+    shadow /= 9.0;
 
     // keep shadow at 0 ouside far plane
     if (projCoords.z > 1.0)

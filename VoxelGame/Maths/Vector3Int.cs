@@ -199,6 +199,19 @@ public struct Vector3Int : IEquatable<Vector3Int>
     {
         return a.X * b.X + a.Y * b.Y + a.Z * b.Z;
     }
+    
+    public static int SqrDistance(Vector3Int a, Vector3Int b)
+    {
+        int dx = a.X - b.X;
+        int dy = a.Y - b.Y;
+        int dz = a.Z - b.Z;
+        return dx * dx + dy * dy + dz * dz;
+    }
+
+    public static Vector3Int FloorToInt(Vector3 v)
+    {
+        return new Vector3Int((int)Math.Floor(v.X), (int)Math.Floor(v.Y), (int)Math.Floor(v.Z));
+    }
 
     #endregion
 

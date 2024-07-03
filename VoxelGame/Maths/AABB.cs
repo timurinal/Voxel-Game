@@ -2,42 +2,27 @@
 
 public struct AABB : IEquatable<AABB>
 {
-    public Vector3 Min;
-    public Vector3 Max;
+    public Vector3 Min, Max;
 
     public Vector3 Center => (Min + Max) * 0.5f;
 
-    public AABB()
-    {
-        this = new AABB(Vector3.Zero);
-    }
     public AABB(Vector3 min, Vector3 max)
     {
-        if (min.X > max.X || min.Y > max.Y || min.Z > max.Z)
-        {
-            throw new ArgumentException("Min should be less than or equal to Max in all dimensions.");
-        }
-        
         Min = min;
         Max = max;
     }
-    public AABB(Vector3 center, Vector3 min, Vector3 max)
-    {
-        if (min.X > max.X || min.Y > max.Y || min.Z > max.Z)
-        {
-            throw new ArgumentException("Min should be less than or equal to Max in all dimensions.");
-        }
-        
-        Min = center - (max - min) / 2;
-        Max = center + (max - min) / 2;
-    }
 
-    public AABB(Vector3 center)
+    public AABB(Vector3 offset)
     {
-        Min = center - Vector3.One / 2;
-        Max = center + Vector3.One / 2;
+        Min = new Vector3(-0.5f, -0.5f, -0.5f) + offset;
+        Max = new Vector3( 0.5f,  0.5f,  0.5f) + offset;
     }
-
+    
+    public static AABB CreateFromExtents(Vector3 center, Vector3 extents)
+    {
+        return new AABB(center - extents, center + extents);
+    }
+    
     public void Move(Vector3 dir)
     {
         Min += dir;
@@ -66,6 +51,12 @@ public struct AABB : IEquatable<AABB>
     {
         return point.X >= Min.X && point.X <= Max.X && point.Y >= Min.Y && point.Y <= Max.Y && point.Z >= Min.Z &&
                point.Z <= Max.Z;
+    }
+
+    public static bool Intersects(AABB a, AABB b)
+    {
+        return !(a.Max.X < b.Min.X || a.Min.X > b.Max.X || a.Max.Y < b.Min.Y || a.Min.Y > b.Max.Y ||
+                 a.Max.Z < b.Min.Z || a.Min.Z > b.Max.Z);
     }
 
     public override int GetHashCode()

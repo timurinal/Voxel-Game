@@ -398,6 +398,19 @@ public sealed class Chunk
         }
     }
 
+    public static bool IsVoxelVisible(int x, int y, int z, uint[] voxels, Dictionary<Vector3Int, Chunk> chunks,
+        Vector3Int currentChunkPosition)
+    {
+        bool up    = IsAir(  x,   y + 1, z, voxels, chunks, currentChunkPosition);
+        bool down  = IsAir(  x,   y - 1, z, voxels, chunks, currentChunkPosition);
+        bool front = IsAir(  x,     y,   z + 1, voxels, chunks, currentChunkPosition);
+        bool back  = IsAir(  x,     y,   z - 1, voxels, chunks, currentChunkPosition);
+        bool right = IsAir(x + 1, y,     z, voxels, chunks, currentChunkPosition);
+        bool left  = IsAir(x - 1, y,     z, voxels, chunks, currentChunkPosition);
+
+        return up || down || front || back || right || left;
+    }
+
     private static bool CanVoxelSeeSky(int x, int y, int z, uint[] voxels, Dictionary<Vector3Int, Chunk> chunks,
         Vector3Int currentChunkPosition)
     {
@@ -509,7 +522,7 @@ public sealed class Chunk
 
     internal void OnSaved() => IsDirty = false;
 
-    internal List<AABB> GenerateCollisions()
+    internal AABB[] GenerateCollisions(Dictionary<Vector3Int, Chunk> chunks)
     {
         List<AABB> collisions = new();
         int index = 0;
@@ -521,7 +534,7 @@ public sealed class Chunk
                 {
                     int voxelIndex = FlattenIndex3D(x, y, z, ChunkSize, ChunkSize);
                     uint voxel = voxels[voxelIndex];
-                    if (voxel != 0)
+                    if (voxel != 0 && IsVoxelVisible(x, y, z, voxels, chunks, (Vector3Int)(chunkPosition / ChunkSize)))
                     {
                         Vector3 min = new Vector3(chunkPosition.X + x, chunkPosition.Y + y, chunkPosition.Z + z);
                         Vector3 max = min + Vector3.One / 2f;
@@ -532,6 +545,6 @@ public sealed class Chunk
             }
         }
 
-        return collisions;
+        return collisions.ToArray();
     }
 }
