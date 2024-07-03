@@ -29,7 +29,7 @@ public sealed class Engine : GameWindow
     public bool IsFullscreen;
     public bool IsWireframe;
     public bool Shadows = true;
-    public RenderMode RenderMode = RenderMode.Polygon;
+    public RenderMode RenderMode = RenderMode.RayTraced;
 
     public const bool EnableFrustumCulling = true;
 
