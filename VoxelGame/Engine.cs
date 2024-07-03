@@ -29,7 +29,7 @@ public sealed class Engine : GameWindow
     public bool IsFullscreen;
     public bool IsWireframe;
     public bool Shadows = true;
-    public RenderMode RenderMode = RenderMode.RayTraced;
+    public RenderMode RenderMode = RenderMode.Polygon;
 
     public const bool EnableFrustumCulling = true;
 
@@ -66,8 +66,8 @@ public sealed class Engine : GameWindow
 
     private int _lightBuffer;
 
-    private Vector3 _lightDir = new Vector3(-2, -1, -0.5f);
-    // private Vector3 _lightDir = new Vector3(-0.5f, -1f, -0.5f);
+    // private Vector3 _lightDir = new Vector3(-2, -1, -0.5f);
+    private Vector3 _lightDir = new Vector3(0, -1, 0);
 
     private string[] _imGuiChunkBuilderDropdown =
     [
@@ -82,9 +82,14 @@ public sealed class Engine : GameWindow
     private float _deltaTime;
 
     private SSEffect _tonemapper;
+    private SSEffect _skybox;
+    
     private SSEffect _raytracing;
     private SSEffect _denoiser;
+    
     private Shader _tonemapperShader;
+    private Shader _skyboxShader;
+    
     private Shader _raytracingShader;
     private Shader _denoiserShader;
 
@@ -151,6 +156,21 @@ public sealed class Engine : GameWindow
         
         _tonemapperShader = Shader.Load("BUILTIN/image-effect.vert", "Assets/Shaders/tonemapper.frag");
         _tonemapper = new SSEffect(_tonemapperShader, Size, true);
+        
+        _skyboxShader = Shader.Load("Assets/Shaders/skybox.vert", "Assets/Shaders/skybox.frag");
+        
+        _skyboxShader.Use();
+        _skyboxShader.SetUniform("SkyColourZenith", new Vector3(0.5019608f, 0.67058825f, 0.8980393f), autoUse: false);
+        _skyboxShader.SetUniform("SkyColourHorizon", new Vector3(1, 1, 1), autoUse: false);
+        _skyboxShader.SetUniform("GroundColour", new Vector3(0.5647059f, 0.5254902f, 0.5647059f), autoUse: false);
+        _skyboxShader.SetUniform("SunColour", _lightColour, autoUse: false);
+        
+        _skyboxShader.SetUniform("SunFocus", 500);
+        _skyboxShader.SetUniform("SunIntensity", 1);
+        
+        _skyboxShader.SetUniform("SunLightDirection", _lightDir);
+        
+        _skybox = new SSEffect(_skyboxShader, Size, true);
         
         _raytracingShader = Shader.Load("Assets/Shaders/raytracer.vert", "Assets/Shaders/raytracer.frag");
         
@@ -247,12 +267,30 @@ public sealed class Engine : GameWindow
 
         Vector3Int playerChunkPosition = Vector3Int.FloorToInt(Player.Position / Chunk.ChunkSize);
 
-        AABB[] collisions = [];
+        List<AABB> collisions = new();
+        
+        Vector3Int[] neighbourChunkOffsets =
+        {
+            new Vector3Int(0, 0, 1),
+            new Vector3Int(0, 0, -1),
+            new Vector3Int(0, 1, 0),
+            new Vector3Int(0, -1, 0),
+            new Vector3Int(1, 0, 0),
+            new Vector3Int(-1, 0, 0),
+        };
         
         if (Chunks.TryGetValue(playerChunkPosition, out var currentChunk))
-            collisions = currentChunk.GenerateCollisions(Chunks);
+            collisions.AddRange(currentChunk.GenerateCollisions(Chunks));
         else
             Console.WriteLine("Couldn't get chunk");
+
+        foreach (var chunkOffset in neighbourChunkOffsets)
+        {
+            if (Chunks.TryGetValue(playerChunkPosition + chunkOffset, out var chunk))
+            {
+                collisions.AddRange(chunk.GenerateCollisions(Chunks));
+            }
+        }
         
         Player.Update(Size, collisions);
         
@@ -325,16 +363,6 @@ public sealed class Engine : GameWindow
                     chunk.RebuildChunk(Chunks, recursive: true);
         
                     // Force neighbouring chunks to rebuild
-                    Vector3Int[] neighbourChunkOffsets =
-                    {
-                        new Vector3Int(0, 0, 1),
-                        new Vector3Int(0, 0, -1),
-                        new Vector3Int(0, 1, 0),
-                        new Vector3Int(0, -1, 0),
-                        new Vector3Int(1, 0, 0),
-                        new Vector3Int(-1, 0, 0),
-                    };
-        
                     foreach (var offset in neighbourChunkOffsets)
                     {
                         if (Chunks.TryGetValue(chunkPosition + offset, out var neighbour))
@@ -372,10 +400,17 @@ public sealed class Engine : GameWindow
                 _updated = true;
             }
         }
+
+        const float sunSpeed = 0.2f;
+        _lightDir.X = Mathf.Sin(Time.ElapsedTime * sunSpeed);
+        _lightDir.Y = Mathf.Cos(Time.ElapsedTime * sunSpeed);
         
         _chunkShader.Use();
         _chunkShader.SetUniform("viewPos", Player.Position, autoUse: false);
         _chunkShader.SetUniform("shadowsEnabled", Shadows ? 1 : 0, autoUse: false);
+        _chunkShader.SetUniform("dirLight.direction", _lightDir, autoUse: false);
+        
+        _skyboxShader.SetUniform("SunLightDirection", _lightDir);
 
         _test.Transform.Position = -_lightDir;
         _test.Transform.Position += Player.Position;
@@ -415,13 +450,17 @@ public sealed class Engine : GameWindow
                 Render(mode: 0);
                 ShadowMapper.Unuse(Size);
             }
-            _tonemapper.Use();
+            _skybox.Use();
             GL.PolygonMode(MaterialFace.FrontAndBack, IsWireframe ? PolygonMode.Line : PolygonMode.Fill);
             Render(mode: 1);
-            _tonemapper.Unuse();
+            _skybox.Unuse();
         
             GL.Disable(EnableCap.DepthTest);
         
+            _tonemapper.Use();
+            _skybox.Render(Player, ShadowMapper);
+            _tonemapper.Unuse();
+            
             _tonemapper.Render(Player, ShadowMapper);
         } 
         else if (RenderMode == RenderMode.RayTraced)

@@ -13,9 +13,9 @@ internal class ShadowMapper
 
     public Matrix4 LightSpaceMatrix => OrthographicMatrix * ViewMatrix;
 
-    public const float SunViewDistance = 50f;
+    public const float SunViewDistance = 1000f;
 
-    public const float NearPlane = 1.0f, FarPlane = 500f;
+    public const float NearPlane = 1.0f, FarPlane = 5000f;
 
     public const int ShadowMapWidth = 8192, ShadowMapHeight = 8192;
 

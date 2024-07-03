@@ -178,4 +178,3 @@ float calcShadow(vec4 lightSpaceFragPos) {
 
     return clamp(shadow - MIN_SHADOW_INTENSITY, 0.0, 1.0);
 }
-
