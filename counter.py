@@ -6,6 +6,9 @@ def count_lines_in_files(directory):
     extensions = ('.cs', '.vert', '.frag')
 
     for root, dirs, files in os.walk(directory):
+        # Skip directories named 'bin'
+        dirs[:] = [d for d in dirs if d != 'bin']
+        
         for file in files:
             if file.endswith(extensions):
                 file_path = os.path.join(root, file)
@@ -15,7 +18,6 @@ def count_lines_in_files(directory):
 
     return total_lines
 
-# Example usage
 directory = 'C:\\Users\\timur\\RiderProjects\\Voxel-Game\\'
 total_lines = count_lines_in_files(directory)
 print(f'Total lines in .cs, .vert, and .frag files: {total_lines}')

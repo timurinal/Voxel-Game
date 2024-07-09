@@ -77,7 +77,7 @@ public sealed class Player
     {
         Collider = AABB.CreateFromExtents(Position + ColliderOffset, ColliderSize * 0.5f);
         
-        // Frustum = new(this);
+        Frustum = new(this);
         MoveSpeed = moveSpeed;
         RotateSpeed = rotateSpeed;
 
@@ -96,14 +96,14 @@ public sealed class Player
     internal void Update(Vector2Int screenSize, IEnumerable<AABB> chunkCollisions)
     {
         float speed = MoveSpeed;
-        if (Input.GetKey(Keys.LeftShift)) speed *= 2;
+        if (Input.GetKey(Keys.LeftShift)) speed *= 7;
 
-        _velocity += Vector3.Up * (Gravity * Time.DeltaTime);
+        // _velocity += Vector3.Up * (Gravity * Time.DeltaTime);
         
         Vector3 cameraFrontXZ = new Vector3(cameraFront.X, 0, cameraFront.Z).Normalized;
 
-        if (Input.GetKey(Keys.W)) cameraPosition += speed * cameraFrontXZ * Time.DeltaTime;
-        if (Input.GetKey(Keys.S)) cameraPosition -= speed * cameraFrontXZ * Time.DeltaTime;
+        if (Input.GetKey(Keys.W)) cameraPosition += speed * cameraFront * Time.DeltaTime;
+        if (Input.GetKey(Keys.S)) cameraPosition -= speed * cameraFront * Time.DeltaTime;
         
         if (Input.GetKey(Keys.A))
             cameraPosition -= Vector3.Normalize(Vector3.Cross(cameraFront, cameraUp)) * speed * Time.DeltaTime;
@@ -116,13 +116,13 @@ public sealed class Player
         Vector3 predictedPosition = Position + (_velocity * Time.DeltaTime);
         AABB predictedCollider = AABB.CreateFromExtents(predictedPosition + ColliderOffset, ColliderSize * 0.5f);
 
-        foreach (var collision in chunkCollisions)
-        {
-            if (AABB.Intersects(collision, predictedCollider))
-            {
-                _velocity = -_velocity * Bounciness;
-            }
-        }
+        // foreach (var collision in chunkCollisions)
+        // {
+        //     if (AABB.Intersects(collision, predictedCollider))
+        //     {
+        //         _velocity = -_velocity * Bounciness;
+        //     }
+        // }
 
         if (_velocity.SqrMagnitude <= Mathf.Epsilon) _velocity = Vector3.Zero;
 
@@ -144,7 +144,7 @@ public sealed class Player
         cameraRight = Vector3.Normalize(Vector3.Cross(Vector3.Up, cameraDirection));
         cameraUp = Vector3.Cross(cameraDirection, cameraRight);
 
-        // Frustum.RecalculateFrustum(fov, _aspect);
+        Frustum.CalculateFrustum();
         
         ViewMatrix = Matrix4.LookAt(cameraPosition, cameraPosition + cameraFront, cameraUp);
         ProjectionMatrix = Matrix4.CreatePerspectiveFieldOfView(fov * Mathf.Deg2Rad, (float)screenSize.X / screenSize.Y, 
@@ -183,82 +183,41 @@ public sealed class Player
         cameraPosition = pos;
     }
     
-    public Vector3Int? Traverse()
-    {
-        Vector3 start = Position;
-        Vector3 direction = Forward.Normalized; // Ensure direction is normalized
-
-        // Start voxel
-        Vector3Int currentVoxel = new Vector3Int((int)Math.Floor(start.X), (int)Math.Floor(start.Y), (int)Math.Floor(start.Z));
-        
-        // Steps for the DDA algorithm
-        Vector3Int step = new Vector3Int(
-            direction.X > 0 ? 1 : -1,
-            direction.Y > 0 ? 1 : -1,
-            direction.Z > 0 ? 1 : -1
-        );
-
-        // Calculate initial tMax values
-        Vector3 tMax = new Vector3(
-            step.X > 0 ? ((currentVoxel.X + 1.0f - start.X) / direction.X) : ((start.X - currentVoxel.X) / -direction.X),
-            step.Y > 0 ? ((currentVoxel.Y + 1.0f - start.Y) / direction.Y) : ((start.Y - currentVoxel.Y) / -direction.Y),
-            step.Z > 0 ? ((currentVoxel.Z + 1.0f - start.Z) / direction.Z) : ((start.Z - currentVoxel.Z) / -direction.Z)
-        );
-
-        // Calculate tDelta values
-        Vector3 tDelta = new Vector3(
-            Math.Abs(1.0f / direction.X),
-            Math.Abs(1.0f / direction.Y),
-            Math.Abs(1.0f / direction.Z)
-        );
-
-        // Traverse the voxels
-        int maxIterations = 500;
-        for (int i = 0; i < maxIterations; i++)
-        {
-            // Check if the current voxel is non-air
-            uint? voxel = Engine.GetVoxelAtPosition(currentVoxel);
-            if (voxel != null && voxel != 0)
-            {
-                return currentVoxel;
-            }
-
-            // Update tMax and current voxel
-            if (tMax.X < tMax.Y)
-            {
-                if (tMax.X < tMax.Z)
-                {
-                    currentVoxel.X += step.X;
-                    tMax.X += tDelta.X;
-                }
-                else
-                {
-                    currentVoxel.Z += step.Z;
-                    tMax.Z += tDelta.Z;
-                }
-            }
-            else
-            {
-                if (tMax.Y < tMax.Z)
-                {
-                    currentVoxel.Y += step.Y;
-                    tMax.Y += tDelta.Y;
-                }
-                else
-                {
-                    currentVoxel.Z += step.Z;
-                    tMax.Z += tDelta.Z;
-                }
-            }
-
-            // Check if the ray has reached the maximum distance
-            Vector3 currentPos = new Vector3(currentVoxel.X, currentVoxel.Y, currentVoxel.Z);
-            if ((currentPos - start).SqrMagnitude >= MaxRayDistance * MaxRayDistance)
-            {
-                break;
-            }
-        }
-
-        return null;
-    }
+    // public Vector3Int? Traverse()
+    // {
+    //     // Start point
+    //     float x1 = Position.X;
+    //     float y1 = Position.Y;
+    //     float z1 = Position.Z;
+    //
+    //     // End point
+    //     Vector3 end = Position + Forward * MaxRayDistance;
+    //     float x2 = end.X;
+    //     float y2 = end.X;
+    //     float z2 = end.X;
+    //
+    //     Vector3 currentVoxelPos = new Vector3(x1, y1, z1);
+    //     int stepDir = -1;
+    //
+    //     float dx = Mathf.Sign(x2 - x1);
+    //     float deltaX = dx != 0 ? Mathf.Min(dx / (x2 - x1), 10000000f) : 10000000f;
+    //     float maxX = dx > 0 ? deltaX * (1.0f - Mathf.Fract(x1)) : deltaX * Mathf.Fract(x1);
+    //     
+    //     float dy = Mathf.Sign(y2 - y1);
+    //     float deltaY = dy != 0 ? Mathf.Min(dy / (y2 - y1), 10000000f) : 10000000f;
+    //     float maxY = dy > 0 ? deltaY * (1.0f - Mathf.Fract(y1)) : deltaY * Mathf.Fract(y1);
+    //     
+    //     float dz = Mathf.Sign(z2 - z1);
+    //     float deltaZ = dz != 0 ? Mathf.Min(dz / (z2 - z1), 10000000f) : 10000000f;
+    //     float maxZ = dz > 0 ? deltaZ * (1.0f - Mathf.Fract(z1)) : deltaZ * Mathf.Fract(z1);
+    //
+    //     while (!(maxX > 1f && maxY > 1f && maxZ > 1f))
+    //     {
+    //         uint result = GetVoxelId(currentVoxelPos);
+    //         if (result == 0)
+    //         {
+    //             
+    //         }
+    //     }
+    // }
 }

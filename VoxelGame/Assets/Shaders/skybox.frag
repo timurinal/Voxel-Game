@@ -37,7 +37,7 @@ float sampleDepthTexture(vec2 uv);
 vec3 sampleMainTexture(vec2 uv);
 float linearizeDepth(float nonLinearDepth, float near, float far);
 
-vec3 getEnvironmentLight(Ray ray);
+vec3 getSkybox(Ray ray);
 
 void main()
 {
@@ -53,7 +53,7 @@ void main()
     float sceneDepth = linearizeDepth(sceneDepthNonLinear, NearPlane, FarPlane);
     
     if (sceneDepthNonLinear >= 1)
-            finalColour = vec4(getEnvironmentLight(ray), 1.0);
+            finalColour = vec4(getSkybox(ray), 1.0);
     else
         finalColour = vec4(sampleMainTexture(texcoord), 1.0);
 }
@@ -71,12 +71,15 @@ float linearizeDepth(float nonLinearDepth, float near, float far) {
     return (2.0 * near * far) / (far + near - z * (far - near));
 }
 
-vec3 getEnvironmentLight(Ray ray) {
+vec3 getSkybox(Ray ray) {
+    const float sunFocus = 15000.0;
+    const float sunIntensity = 500.0;
+    
     float skyGradientT = pow(smoothstep(0.0, 0.4, ray.dir.y), 0.35);
     vec3 skyGradient = mix(SkyColourHorizon, SkyColourZenith, skyGradientT);
-    float sun = pow(max(0.0, dot(ray.dir, SunLightDirection)), SunFocus) * SunIntensity;
-
-    float groundToSkyT = smoothstep(-0.01, 0.0, ray.dir.y);
+    // float sun = pow(max(0.0, dot(ray.dir, -SunLightDirection)), sunFocus) * sunIntensity;
+    
+    float groundToSkyT = smoothstep(-0.1, -0.09, ray.dir.y);
     float sunMask = groundToSkyT >= 1.0 ? 1.0 : 0.0;
-    return (mix(GroundColour, skyGradient, groundToSkyT) + (sun * vec3(SunColour.r, SunColour.g, SunColour.b)) * sunMask);
+    return (mix(GroundColour, skyGradient, groundToSkyT));
 }

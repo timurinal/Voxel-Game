@@ -34,6 +34,10 @@ public sealed class Engine : GameWindow
     public const bool EnableFrustumCulling = true;
 
     public readonly Player Player;
+    
+    public static Thread MainThread { get; private set; }
+    public static Thread CurrentThread => Thread.CurrentThread;
+    public static bool IsMainThread => MainThread.ManagedThreadId == CurrentThread.ManagedThreadId;
 
     internal static List<PointLight> Lights = new();
 
@@ -53,7 +57,7 @@ public sealed class Engine : GameWindow
     private Shader _chunkShader;
     internal static Dictionary<Vector3Int, Chunk> Chunks;
     private Queue<Vector3Int> _chunksToBuild;
-    private const int MaxChunksToBuildPerFrame = 8;
+    private const int MaxChunksToBuildPerFrame = 16;
 
     private Shader _meshShader;
 
@@ -66,8 +70,8 @@ public sealed class Engine : GameWindow
 
     private int _lightBuffer;
 
-    // private Vector3 _lightDir = new Vector3(-2, -1, -0.5f);
-    private Vector3 _lightDir = new Vector3(0, -1, 0);
+    private Vector3 _lightDir = new Vector3(-2f, -2f, -0.5f);
+    // private Vector3 _lightDir = new Vector3(-1, -1, 0);
 
     private string[] _imGuiChunkBuilderDropdown =
     [
@@ -77,7 +81,7 @@ public sealed class Engine : GameWindow
 
     public static int ChunkBuilderMode = 0;
 
-    private const float FpsUpdateRate = 3f;
+    private const float FpsUpdateRate = 1.5f;
     private float _nextFpsUpdateTime = 0;
     private float _deltaTime;
 
@@ -98,6 +102,10 @@ public sealed class Engine : GameWindow
     private ShaderStorageBuffer _rtVoxelDataStorageBuffer;
     private ShaderStorageBuffer _rtVoxelStorageBuffer;
 
+    private static List<Action> _mainThreadActions = new();
+
+    private GizmoBox box;
+
     public Engine(GameWindowSettings gws, NativeWindowSettings nws) : base(gws, nws)
     {
         if (nws.NumberOfSamples != 0)
@@ -111,9 +119,11 @@ public sealed class Engine : GameWindow
         CenterWindow();
 
         Player = new Player(Size);
+        
+        MainThread = Thread.CurrentThread;
     }
 
-    protected override void OnLoad()
+    protected override async void OnLoad()
     {
         base.OnLoad();
 
@@ -144,7 +154,7 @@ public sealed class Engine : GameWindow
         _chunkShader.SetUniform("material.specular", 1);
         _chunkShader.SetUniform("material.shininess", 128.0f);
 
-        Vector3 ambientLighting = Vector3.One * 0.08f;
+        Vector3 ambientLighting = Vector3.One * 0.4f;
         DirLight dirLight = new(_lightDir, ambientLighting, Vector3.One * 1f, _lightColour);
         _chunkShader.SetUniform("dirLight.direction", dirLight.direction);
         _chunkShader.SetUniform("dirLight.ambient"  , dirLight.ambient);
@@ -162,11 +172,12 @@ public sealed class Engine : GameWindow
         _skyboxShader.Use();
         _skyboxShader.SetUniform("SkyColourZenith", new Vector3(0.5019608f, 0.67058825f, 0.8980393f), autoUse: false);
         _skyboxShader.SetUniform("SkyColourHorizon", new Vector3(1, 1, 1), autoUse: false);
-        _skyboxShader.SetUniform("GroundColour", new Vector3(0.5647059f, 0.5254902f, 0.5647059f), autoUse: false);
+        // _skyboxShader.SetUniform("GroundColour", new Vector3(0.5647059f, 0.5254902f, 0.5647059f), autoUse: false);
+        _skyboxShader.SetUniform("GroundColour", new Vector3(0.08f, 0.08f, 0.08f), autoUse: false);
         _skyboxShader.SetUniform("SunColour", _lightColour, autoUse: false);
         
-        _skyboxShader.SetUniform("SunFocus", 500);
-        _skyboxShader.SetUniform("SunIntensity", 1);
+        _skyboxShader.SetUniform("SunFocus", 15000f);
+        _skyboxShader.SetUniform("SunIntensity", 500f);
         
         _skyboxShader.SetUniform("SunLightDirection", _lightDir);
         
@@ -181,10 +192,11 @@ public sealed class Engine : GameWindow
         
         _raytracingShader.SetUniform("SkyColourZenith", new Vector3(0.5019608f, 0.67058825f, 0.8980393f), autoUse: false);
         _raytracingShader.SetUniform("SkyColourHorizon", new Vector3(1, 1, 1), autoUse: false);
-        _raytracingShader.SetUniform("GroundColour", new Vector3(0.5647059f, 0.5254902f, 0.5647059f), autoUse: false);
+        // _raytracingShader.SetUniform("GroundColour", new Vector3(0.5647059f, 0.5254902f, 0.5647059f), autoUse: false);
+        _raytracingShader.SetUniform("GroundColour", new Vector3(0.08f, 0.08f, 0.08f), autoUse: false);
         
-        _raytracingShader.SetUniform("SunFocus", 10);
-        _raytracingShader.SetUniform("SunSize", 100);
+        _raytracingShader.SetUniform("SunFocus", 15000f);
+        _raytracingShader.SetUniform("SunSize", 500f);
         
         _raytracingShader.SetUniform("SunLightDirection", _lightDir);
         
@@ -220,6 +232,17 @@ public sealed class Engine : GameWindow
         
         _rtVoxelDataStorageBuffer.SetData(Marshal.SizeOf<ShaderVoxelData>(), svd);
 
+        AABB bounds = new AABB(Vector3.Zero);
+        box = new GizmoBox(bounds);
+
+        // await Task.Run(() =>
+        // {
+        //     Console.WriteLine(IsMainThread);
+        //
+        //     Chunk c = new Chunk(Vector3Int.Zero, Shader.StandardShader);
+        //     c.BuildChunk(Chunks);
+        // });
+
         // Cube[] cubes =
         // [
         //     new Cube(new Vector3(0, 0, 0), new RTMaterial(new Vector3(0, 0, 0))),
@@ -233,7 +256,7 @@ public sealed class Engine : GameWindow
     }
 
     private bool _updated = false;
-    protected override void OnUpdateFrame(FrameEventArgs args)
+    protected override async void OnUpdateFrame(FrameEventArgs args)
     {
         base.OnUpdateFrame(args);
 
@@ -241,13 +264,20 @@ public sealed class Engine : GameWindow
 
         Input._keyboardState = KeyboardState;
         Time.DeltaTime = (float)args.Time;
+
+        // Run any main thread actions that have been registered from async functions
+        foreach (var action in _mainThreadActions)
+        {
+            action();
+        }
+        _mainThreadActions.Clear();
         
         Vector3Int playerPosition = Vector3.Round(Player.Position / Chunk.ChunkSize);
         int renderDistance = Player.ChunkRenderDistance;
         int sqrRenderDistance = Player.SqrChunkRenderDistance;
 
         List<Vector3Int> chunksToRemove = new List<Vector3Int>();
-
+        
         foreach (var chunk in Chunks)
         {
             var chunkPos = chunk.Key;
@@ -257,7 +287,7 @@ public sealed class Engine : GameWindow
                 chunksToRemove.Add(chunkPos);
             }
         }
-
+        
         foreach (var chunkPos in chunksToRemove)
         {
             Chunks.Remove(chunkPos);
@@ -279,20 +309,18 @@ public sealed class Engine : GameWindow
             new Vector3Int(-1, 0, 0),
         };
         
-        if (Chunks.TryGetValue(playerChunkPosition, out var currentChunk))
-            collisions.AddRange(currentChunk.GenerateCollisions(Chunks));
-        else
-            Console.WriteLine("Couldn't get chunk");
-
-        foreach (var chunkOffset in neighbourChunkOffsets)
-        {
-            if (Chunks.TryGetValue(playerChunkPosition + chunkOffset, out var chunk))
-            {
-                collisions.AddRange(chunk.GenerateCollisions(Chunks));
-            }
-        }
+        // if (Chunks.TryGetValue(playerChunkPosition, out var currentChunk))
+        //     collisions.AddRange(currentChunk.GenerateCollisions(Chunks));
+        //
+        // foreach (var chunkOffset in neighbourChunkOffsets)
+        // {
+        //     if (Chunks.TryGetValue(playerChunkPosition + chunkOffset, out var chunk))
+        //     {
+        //         collisions.AddRange(chunk.GenerateCollisions(Chunks));
+        //     }
+        // }
         
-        Player.Update(Size, collisions);
+        Player.Update(Size, null);
         
         if (Input.GetKeyDown(Keys.Escape))
             Close();
@@ -307,6 +335,8 @@ public sealed class Engine : GameWindow
         // Toggle wireframe
         if (Input.GetKeyDown(Keys.F1)) IsWireframe = !IsWireframe;
         if (Input.GetKeyDown(Keys.F2)) ShowGui = !ShowGui;
+
+        if (Input.GetKeyDown(Keys.F3)) Shadows = !Shadows;
 
         if (Input.GetKeyDown(Keys.Space))
         {
@@ -359,7 +389,8 @@ public sealed class Engine : GameWindow
                 {
                     var chunkPosition = _chunksToBuild.Dequeue();
                     var chunk = Chunks[chunkPosition];
-                
+
+                    // await chunk.GenerateChunkAsync(Chunks);
                     chunk.RebuildChunk(Chunks, recursive: true);
         
                     // Force neighbouring chunks to rebuild
@@ -367,6 +398,7 @@ public sealed class Engine : GameWindow
                     {
                         if (Chunks.TryGetValue(chunkPosition + offset, out var neighbour))
                         {
+                            // await neighbour.GenerateChunkAsync(Chunks);
                             neighbour.RebuildChunk(Chunks);
                         }
                     }
@@ -400,17 +432,17 @@ public sealed class Engine : GameWindow
                 _updated = true;
             }
         }
-
-        const float sunSpeed = 0.2f;
-        _lightDir.X = Mathf.Sin(Time.ElapsedTime * sunSpeed);
-        _lightDir.Y = Mathf.Cos(Time.ElapsedTime * sunSpeed);
         
         _chunkShader.Use();
         _chunkShader.SetUniform("viewPos", Player.Position, autoUse: false);
         _chunkShader.SetUniform("shadowsEnabled", Shadows ? 1 : 0, autoUse: false);
         _chunkShader.SetUniform("dirLight.direction", _lightDir, autoUse: false);
+        _chunkShader.SetUniform("Wireframe", IsWireframe ? 1 : 0, autoUse: false);
         
         _skyboxShader.SetUniform("SunLightDirection", _lightDir);
+        
+        // AABB bounds = new AABB(Player.Traverse() ?? Vector3.Zero);
+        // box.Update(bounds);
 
         _test.Transform.Position = -_lightDir;
         _test.Transform.Position += Player.Position;
@@ -453,6 +485,7 @@ public sealed class Engine : GameWindow
             _skybox.Use();
             GL.PolygonMode(MaterialFace.FrontAndBack, IsWireframe ? PolygonMode.Line : PolygonMode.Fill);
             Render(mode: 1);
+            box.Render(Player);
             _skybox.Unuse();
         
             GL.Disable(EnableCap.DepthTest);
@@ -508,7 +541,7 @@ public sealed class Engine : GameWindow
         
         string rendererString = RenderMode switch
         {
-            RenderMode.Polygon => $"Standard Rendering (Vertices: {VertexCount:N0} | Triangles: {TriangleCount:N0})",
+            RenderMode.Polygon => $"Standard Rendering (Vertices: {VertexCount:N0} | Triangles: {TriangleCount:N0} | Shadows Enabled: {Shadows})",
             RenderMode.RayTraced =>
                 $"Ray Traced Rendering ({RayTracing.RaysPerPixel} SPP, {RayTracing.MaxLightBounces} Light Bounce(s))",
             _ => "Unknown Renderer"
@@ -557,8 +590,6 @@ public sealed class Engine : GameWindow
 
                     if (!chunk.Value.IsEmpty)
                     {
-                        Vector3 dirToChunk = Player.Position - chunk.Value.chunkCentre;
-                        dirToChunk.Normalize();
                         VisibleChunks += !chunk.Value.IsEmpty ? 1 : 0;
                     
                         var c = chunk.Value.Render(Player, ShadowMapper);
@@ -585,8 +616,10 @@ public sealed class Engine : GameWindow
         
         _imGuiController.WindowResized(e.Width, e.Height);
         
-        _raytracing.UpdateSize(e.Size);
         _tonemapper.UpdateSize(e.Size);
+        _skybox.UpdateSize(e.Size);
+        
+        _raytracing.UpdateSize(e.Size);
     }
 
     protected override void OnTextInput(TextInputEventArgs e)
@@ -841,5 +874,24 @@ public sealed class Engine : GameWindow
         int y = (index / width) % height;
         int x = index % width;
         return new(x, y, z);
+    }
+    
+    [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+    private static extern int MessageBox(IntPtr hWnd, String text, String caption, uint type);
+    
+    // Constants for the MessageBox type
+    private const uint MB_OK = 0x00000000;
+    private const uint MB_ICONERROR = 0x00000010;
+
+    internal void ShowErrorMessage(Exception ex, string title, bool showStackTrace = true)
+    {
+        CursorState = CursorState.Normal;
+        MessageBox(IntPtr.Zero, showStackTrace ? $"{ex.Message}\nStack Trace:\n{ex.StackTrace}" : $"{ex.Message}",
+            title, MB_OK | MB_ICONERROR);
+    }
+
+    public static void RegisterMainThreadAction(Action action)
+    {
+        _mainThreadActions.Add(action);
     }
 }

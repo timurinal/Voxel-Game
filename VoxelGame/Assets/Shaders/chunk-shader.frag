@@ -53,6 +53,8 @@ uniform int shadowsEnabled;
 uniform Material material;
 uniform DirLight dirLight;
 
+uniform int Wireframe;
+
 uniform sampler2D shadowMap;
 
 vec2 hash2(vec2 p);
@@ -63,21 +65,30 @@ vec3 calcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir);
 float calcShadow(vec4 lightSpaceFragPos);
 
 void main() {
-    
-//    finalCol = vec4(texture(material.specular, texcoord).rgb, 1.0);
+
+//    finalCol = vec4(normal * 0.5 + 0.5, 1.0);
 //    return;
     
+    //    finalCol = vec4(texture(material.specular, texcoord).rgb, 1.0);
+    //    return;
+
+    float alpha = texture(material.diffuse, texcoord).a;
+    if (alpha <= 0.1 && Wireframe == 0) {
+        discard;
+        return;
+    }
+
     vec3 norm = normalize(normal);
     vec3 viewDir = normalize(viewPos - fragPos);
-    
+
     float shadow = calcShadow(fragPosLightSpace);
     vec3 result = calcDirLight(dirLight, norm, viewDir, shadow);
     // vec3 result = vec3(0.0);
-    
+
     if (NumPointLights > 0)
-        for (int i = 0; i < NumPointLights; i++)
-                result += calcPointLight(LightData[i], norm, fragPos, viewDir);
-            
+    for (int i = 0; i < NumPointLights; i++)
+    result += calcPointLight(LightData[i], norm, fragPos, viewDir);
+
     // TODO?: Maybe spotlights, although might not fit with the style
 
     float dist = length(fragPos - viewPos);
@@ -88,12 +99,12 @@ void main() {
     vec2 screenResolution = vec2(1920, 1080);
     vec2 uv = gl_FragCoord.xy / screenResolution.xy;
     vec2 noise = hash2(uv);
-    
+
     // finalCol = mix(vec4(result, 1.0), vec4(fogColour, 1.0), fogAmount);
     vec3 fogResult = mix(result, fogColour, fogAmount);
     vec4 lit = vec4(result, 1.0);
     // lit = clamp(lit, 0.0, 1.0);
-    
+
     // TODO: dithering
     
     finalCol = lit;
@@ -149,19 +160,19 @@ vec2 hash2(vec2 p) {
 }
 
 float calcShadow(vec4 lightSpaceFragPos) {
-    
+
     if (shadowsEnabled == 0)
-            return 0.0;
-    
+    return 0.0;
+
     vec3 projCoords = lightSpaceFragPos.xyz / lightSpaceFragPos.w;
     // transform to [0-1] range
     projCoords = projCoords * 0.5 + 0.5;
 
-//    float closestDepth = texture(shadowMap, projCoords.xy).r;
+    //    float closestDepth = texture(shadowMap, projCoords.xy).r;
     float currentDepth = projCoords.z;
 
     float bias = max(0.05 * (1.0 - dot(normal, -dirLight.direction)), 0.000000001);
-//    float shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
+    //    float shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
     float shadow = 0.0;
     vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
     for (int x = -1; x <= 1; x++) {
@@ -174,7 +185,7 @@ float calcShadow(vec4 lightSpaceFragPos) {
 
     // keep shadow at 0 ouside far plane
     if (projCoords.z > 1.0)
-        shadow = 0.0;
+    shadow = 0.0;
 
     return clamp(shadow - MIN_SHADOW_INTENSITY, 0.0, 1.0);
 }

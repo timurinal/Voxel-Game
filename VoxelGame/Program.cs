@@ -26,6 +26,13 @@ class Program
         };
 
         using var engine = new Engine(gws, nws);
-        engine.Run();
+        try
+        {
+            engine.Run();
+        }
+        catch (Exception e)
+        {
+            engine.ShowErrorMessage(e, "Critical Error");
+        }
     }
 }

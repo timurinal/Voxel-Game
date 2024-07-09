@@ -42,5 +42,12 @@
     "textureFaces": [ 9, 9, 9, 9, 9, 9 ],
     "lightColour": [ 1.0, 0.898, 0.7 ],
     "lightRange": 50
+  },
+  {
+    "id": 8,
+    "displayName": "Glass",
+    "name": "glass",
+    "textureFaces": [ 7, 7, 7, 7, 7, 7 ],
+    "transparent": true
   }
 ]

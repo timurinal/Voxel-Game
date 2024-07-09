@@ -15,6 +15,7 @@ vec3 sampleMainTexture(vec2 uv);
 float linearizeDepth(float nonLinearDepth, float near, float far);
 
 void main() {
+    
     const float gamma = 0.8;
     const float exposure = 2.2;
     vec3 hdrColour = sampleMainTexture(texcoord);

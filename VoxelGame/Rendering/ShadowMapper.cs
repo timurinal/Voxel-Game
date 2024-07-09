@@ -23,15 +23,15 @@ internal class ShadowMapper
 
     private int _depthMapFbo, _depthMap;
 
-    internal ShadowMapper()
+    public ShadowMapper()
     {
         _depthMapFbo = GL.GenFramebuffer();
         _depthMap = GL.GenTexture();
         GL.BindTexture(TextureTarget.Texture2D, _depthMap);
         GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.DepthComponent, 
             ShadowMapWidth, ShadowMapHeight, 0, PixelFormat.DepthComponent, PixelType.Float, IntPtr.Zero);
-        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Nearest);
-        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Nearest);
+        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
         GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToBorder);
         GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToBorder);
         float[] borderCol = [ 1.0f, 1.0f, 1.0f, 1.0f ];

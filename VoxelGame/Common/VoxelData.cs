@@ -8,6 +8,8 @@ public static class VoxelData
     public static Voxel[] Voxels;
 
     public const string VoxelDataPath = "Assets/voxels.json";
+
+    public const uint AirVoxelId = 0u;
     
     static VoxelData()
     {
@@ -53,6 +55,22 @@ public static class VoxelData
 
         return "air";
     }
+
+    public static bool IsTransparent(uint voxelId)
+    {
+        if (voxelId == 0)
+            return true;
+
+        foreach (var voxel in Voxels)
+        {
+            if (voxel.id == voxelId)
+            {
+                return voxel.transparent;
+            }
+        }
+
+        return true;
+    }
     
     public struct Voxel
     {
@@ -60,12 +78,13 @@ public static class VoxelData
         public string displayName;
         public string name;
         public int[] textureFaces;
+        public bool transparent;
         
         public Vector3 lightColour;
         public float lightRange;
         
         [JsonConstructor]
-        public Voxel(uint id, string displayName, string name, int[] textureFaces, float[] lightColour, float lightRange)
+        public Voxel(uint id, string displayName, string name, int[] textureFaces, bool transparent, float[] lightColour, float lightRange)
         {
             if (textureFaces.Length > 6) throw new ArgumentException("A voxel can't have more than 6 textures!");
             if (lightColour != null && lightColour.Length != 3) throw new ArgumentException("Light colour needs 3 colour properties!");
@@ -75,6 +94,8 @@ public static class VoxelData
             this.name = name;
             this.textureFaces = textureFaces;
 
+            this.transparent = transparent != null ? transparent : false;
+            
             if (lightColour != null)
                 this.lightColour = new Vector3(lightColour[0], lightColour[1], lightColour[2]);
             else
@@ -89,11 +110,12 @@ public static class VoxelData
             var displayNameString = $"Display Name: \"{displayName}\"";
             var nameString = $"Name: \"{name}\"";
             var textureFacesString = $"Texture Faces: [ {string.Join(", ", textureFaces)} ]";
+            var transparentString = $"Transparent: {transparent}";
             var lightColourString = $"Light Colour: {lightColour}";
             var lightRangeString = $"Light Range: {lightRange}";
 
             var voxelDataString =
-                $"\"{displayName}\" Voxel Data: {{\n\t{idString}\n\t{displayNameString}\n\t{nameString}\n\t{textureFacesString}\n\t{lightColourString}\n\t{lightRangeString}\n}}";
+                $"\"{displayName}\" Voxel Data: {{\n\t{idString}\n\t{displayNameString}\n\t{nameString}\n\t{textureFacesString}\n\t{transparentString}\n\t{lightColourString}\n\t{lightRangeString}\n}}";
 
             return voxelDataString;
         }

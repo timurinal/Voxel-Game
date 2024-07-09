@@ -1,12 +1,12 @@
-﻿using OpenTK.Mathematics;
-using VoxelGame.Maths;
-using VoxelGame.Rendering;
-using Vector3 = VoxelGame.Maths.Vector3;
+﻿using VoxelGame.Rendering;
+
+namespace VoxelGame.Maths;
+
 
 public class Frustum
 {
     private Player _player;
-    
+
     private Vector3 _nearTopLeft;
     private Vector3 _nearTopRight;
     private Vector3 _nearBottomLeft;
@@ -21,81 +21,53 @@ public class Frustum
     public Frustum(Player player)
     {
         _player = player;
-        
-        RecalculateFrustum(player.Fov, player.Aspect);
-    }
-
-    internal void RecalculateFrustum(float fov, float aspect)
-    {
-        CalculateFrustumPoints(fov, aspect);
-        CalculatePlanes();
-    }
-
-    private void CalculateFrustumPoints(float fov, float aspect)
-    {
-        float nearClipPlane = _player.NearClipPlane;
-        float farClipPlane = _player.FarClipPlane;
-
-        // Calculate dimensions of the near and far clip planes
-        float tanHFov = MathF.Tan(fov * 0.5f);
-        float nearHeight = tanHFov * nearClipPlane;
-        float nearWidth = nearHeight * aspect;
-        float farHeight = tanHFov * farClipPlane;
-        float farWidth = farHeight * aspect;
-
-        // Calculate points (in world space) on the near clip plane
-        Vector3 nearCenter = _player.Position + _player.Forward * nearClipPlane;
-        _nearTopLeft = nearCenter + (_player.Up * nearHeight - _player.Right * nearWidth);
-        _nearTopRight = nearCenter + (_player.Up * nearHeight + _player.Right * nearWidth);
-        _nearBottomLeft = nearCenter - (_player.Up * nearHeight - _player.Right * nearWidth);
-        _nearBottomRight = nearCenter - (_player.Up * nearHeight + _player.Right * nearWidth);
-
-        // Calculate points (in world space) on the far clip plane
-        Vector3 farCenter = _player.Position + _player.Forward * farClipPlane;
-        _farTopLeft = farCenter + (_player.Up * farHeight - _player.Right * farWidth);
-        _farTopRight = farCenter + (_player.Up * farHeight + _player.Right * farWidth);
-        _farBottomLeft = farCenter - (_player.Up * farHeight - _player.Right * farWidth);
-        _farBottomRight = farCenter - (_player.Up * farHeight + _player.Right * farWidth);
-    }
-
-    private void CalculatePlanes()
-    {
         _planes = new Plane[6];
-        
-        // Front (near) plane
-        _planes[0] = PlaneFromPoints(_nearTopLeft, _nearTopRight, _nearBottomRight);
-        // Back (far) plane
-        _planes[1] = PlaneFromPoints(_farTopRight, _farTopLeft, _farBottomLeft);
-        // Top plane
-        _planes[2] = PlaneFromPoints(_nearTopLeft, _farTopLeft, _farTopRight);
-        // Bottom plane
-        _planes[3] = PlaneFromPoints(_nearBottomRight, _farBottomRight, _farBottomLeft);
-        // Left plane
-        _planes[4] = PlaneFromPoints(_nearTopLeft, _nearBottomLeft, _farBottomLeft);
-        // Right plane
-        _planes[5] = PlaneFromPoints(_nearBottomRight, _nearTopRight, _farTopRight);
+        CalculateFrustum();
     }
 
-    private Plane PlaneFromPoints(Vector3 a, Vector3 b, Vector3 c)
+    public void CalculateFrustum()
     {
-        Vector3 ab = b - a;
-        Vector3 ac = c - a;
-        Vector3 normal = Vector3.Normalize(Vector3.Cross(ab, ac));
+        float tanVFov = Mathf.Tan(_player.VFov * 0.5f);
+        float tanHFov = Mathf.Tan(_player.HFov * 0.5f);
 
-        Plane plane = new Plane(-normal, a);
-        return plane;
+        float nh = _player.NearClipPlane * tanVFov;
+        float nw = _player.NearClipPlane * tanHFov;
+        float fh = _player.FarClipPlane * tanVFov;
+        float fw = _player.FarClipPlane * tanHFov;
+
+        Vector3 nearCenter = _player.Position + _player.Forward * _player.NearClipPlane;
+        Vector3 farCenter = _player.Position + _player.Forward * _player.FarClipPlane;
+
+        // Near plane
+        _nearTopLeft = nearCenter + (_player.Up * nh) - (_player.Right * nw);
+        _nearTopRight = nearCenter + (_player.Up * nh) + (_player.Right * nw);
+        _nearBottomLeft = nearCenter - (_player.Up * nh) - (_player.Right * nw);
+        _nearBottomRight = nearCenter - (_player.Up * nh) + (_player.Right * nw);
+
+        // Far plane
+        _farTopLeft = farCenter + (_player.Up * fh) - (_player.Right * fw);
+        _farTopRight = farCenter + (_player.Up * fh) + (_player.Right * fw);
+        _farBottomLeft = farCenter - (_player.Up * fh) - (_player.Right * fw);
+        _farBottomRight = farCenter - (_player.Up * fh) + (_player.Right * fw);
+
+        // Construct planes
+        _planes[0] = new Plane(_nearTopRight, _nearTopLeft, _nearBottomLeft); // Near plane
+        _planes[1] = new Plane(_farTopLeft, _farTopRight, _farBottomRight);  // Far plane
+        _planes[2] = new Plane(_nearTopLeft, _nearTopRight, _farTopRight);   // Top plane
+        _planes[3] = new Plane(_nearBottomRight, _nearBottomLeft, _farBottomLeft); // Bottom plane
+        _planes[4] = new Plane(_nearTopLeft, _nearBottomLeft, _farBottomLeft); // Left plane
+        _planes[5] = new Plane(_nearBottomRight, _nearTopRight, _farBottomRight); // Right plane
     }
 
     public bool IsPointInFrustum(Vector3 point)
     {
         foreach (var plane in _planes)
         {
-            if (plane.GetDistanceToPoint(point) < 0)
+            if (plane.GetDistanceFromPoint(point) < 0)
             {
-                return false;
+                return false; // Point is outside this plane
             }
         }
-
-        return true;
+        return true; // Point is inside all planes
     }
 }
