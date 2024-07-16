@@ -77,6 +77,11 @@ void main() {
         discard;
         return;
     }
+    
+    if (Wireframe == 1) {
+        finalCol = texture(material.diffuse, texcoord);
+        return;
+    }
 
     vec3 norm = normalize(normal);
     vec3 viewDir = normalize(viewPos - fragPos);
@@ -124,7 +129,7 @@ vec3 calcDirLight(DirLight light, vec3 normal, vec3 viewDir, float shadow) {
     vec3 ambient  = light.ambient  * vec3(texture(material.diffuse, texcoord));
     vec3 diffuse  = light.diffuse  * diff * vec3(texture(material.diffuse, texcoord));
     vec3 specular = light.specular * spec * vec3(texture(material.specular, texcoord).rgb);
-    return (ambient + (1.0 - shadow) * (diffuse + specular));
+    return (ambient + shadow * (diffuse + specular));
 }
 
 vec3 calcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 viewDir) {
@@ -159,33 +164,40 @@ vec2 hash2(vec2 p) {
     return -1.0 + 2.0 * fract(sin(p) * 43758.5453123);
 }
 
+float pcfSoftShadow(vec2 uv, float currentDepth, float radius, float samples) {
+    float shadow = 0.0;
+    float diskRadius = radius / float(samples);
+
+    vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+    for (int i = 0; i < samples; i++) {
+        for (int j = 0; j < samples; j++) {
+            vec2 offset = diskRadius * vec2(float(i), float(j));
+            float sampleDepth = texture(shadowMap, uv + offset * texelSize).r;
+            shadow += (currentDepth < sampleDepth ? 1.0 : 0.0);
+        }
+    }
+    shadow /= samples * samples;
+    return shadow;
+}
+
 float calcShadow(vec4 lightSpaceFragPos) {
 
     if (shadowsEnabled == 0)
-    return 0.0;
+        return 1.0 - MIN_SHADOW_INTENSITY;
 
     vec3 projCoords = lightSpaceFragPos.xyz / lightSpaceFragPos.w;
-    // transform to [0-1] range
-    projCoords = projCoords * 0.5 + 0.5;
-
-    //    float closestDepth = texture(shadowMap, projCoords.xy).r;
+    projCoords = projCoords * 0.5 + 0.5; // transform to [0-1] range
     float currentDepth = projCoords.z;
 
     float bias = max(0.05 * (1.0 - dot(normal, -dirLight.direction)), 0.000000001);
-    //    float shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
-    float shadow = 0.0;
-    vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
-    for (int x = -1; x <= 1; x++) {
-        for (int y = -1; y <= 1; y++) {
-            float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r;
-            shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
-        }
-    }
-    shadow /= 9.0;
+
+    float radius = 5.0; // adjust as needed
+    float samples = 15.0; // adjust as needed
+    float shadow = pcfSoftShadow(projCoords.xy, currentDepth - bias, radius, samples);
 
     // keep shadow at 0 ouside far plane
     if (projCoords.z > 1.0)
-    shadow = 0.0;
+        shadow = 0.0;
 
     return clamp(shadow - MIN_SHADOW_INTENSITY, 0.0, 1.0);
 }

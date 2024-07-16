@@ -17,7 +17,7 @@ internal class ShadowMapper
 
     public const float NearPlane = 1.0f, FarPlane = 5000f;
 
-    public const int ShadowMapWidth = 5, ShadowMapHeight = ShadowMapWidth;
+    public const int ShadowMapWidth = 8192, ShadowMapHeight = ShadowMapWidth;
 
     public const float OrthographicSize = 100f;
 

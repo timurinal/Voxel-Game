@@ -579,7 +579,7 @@ public sealed class Engine : GameWindow
         
         string rendererString = RenderMode switch
         {
-            RenderMode.Polygon => $"Standard Rendering (Vertices: {VertexCount:N0} | Triangles: {TriangleCount:N0} | Shadows Enabled: {Shadows})",
+            RenderMode.Polygon => $"Standard Rendering (Vertices: {VertexCount:N0} | Triangles: {TriangleCount:N0} | Loaded Chunks: {LoadedChunks} Visible Chunks: {VisibleChunks} | Shadows Enabled: {Shadows})",
             RenderMode.RayTraced =>
                 $"Ray Traced Rendering ({RayTracing.RaysPerPixel} SPP, {RayTracing.MaxLightBounces} Light Bounce(s))",
             _ => "Unknown Renderer"

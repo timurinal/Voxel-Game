@@ -47,9 +47,14 @@ public static class TerrainGenerator
         return y switch
         {
             <= 0 => VoxelData.NameToVoxelId("bedrock"),
+            <= 23 => Sample(x, y, z, scale: 0.05f) > 0.35f ? VoxelData.NameToVoxelId("stone") : VoxelData.NameToVoxelId("air"),
             <= 25 => VoxelData.NameToVoxelId("stone"),
             <= 28 => VoxelData.NameToVoxelId("dirt"),
             <= 29 => Sample(x, z) >= 0.5f ? VoxelData.NameToVoxelId("grass_block") : Sample(x, z, scale: 0.05f) >= 0.5f ? VoxelData.NameToVoxelId("glass") : VoxelData.NameToVoxelId("red_glass"),
+            <= 30 => Random.Hash((uint)new Vector3(x,   y    , z).GetHashCode()) >= 0.99f ? VoxelData.NameToVoxelId("oak_log") : VoxelData.NameToVoxelId("air"),
+            <= 31 => Random.Hash((uint)new Vector3(x, y - 1, z).GetHashCode()) >= 0.99f ? VoxelData.NameToVoxelId("oak_log") : VoxelData.NameToVoxelId("air"),
+            <= 32 => Random.Hash((uint)new Vector3(x, y - 2, z).GetHashCode()) >= 0.99f ? VoxelData.NameToVoxelId("oak_log") : VoxelData.NameToVoxelId("air"),
+            <= 33 => Random.Hash((uint)new Vector3(x, y - 3, z).GetHashCode()) >= 0.99f ? VoxelData.NameToVoxelId("oak_log") : VoxelData.NameToVoxelId("air"),
             _ => VoxelData.NameToVoxelId("air")
         };
 
