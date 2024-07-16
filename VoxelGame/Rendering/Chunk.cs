@@ -25,6 +25,8 @@ public sealed class Chunk
         new(chunkPosition.X + ChunkSize / 2f, chunkPosition.Y + ChunkSize / 2f,
             chunkPosition.Z + ChunkSize / 2f);
 
+    public AABB Bounds;
+
     public bool IsEmpty { get; private set; }
 
     // if this is true, it means the chunk has been modified since generation (or since it was last loaded from the disk)
@@ -77,6 +79,8 @@ public sealed class Chunk
         m_model = Matrix4.CreateTranslation(chunkPosition);
         
         chunkCentre = chunkPosition + new Vector3(ChunkSize / 2f, ChunkSize / 2f, ChunkSize / 2f);
+
+        Bounds = AABB.CreateFromExtents(chunkCentre, new Vector3(ChunkSize / 2f, ChunkSize / 2f, ChunkSize / 2f));
     }
 
     internal async void BuildChunk(Dictionary<Vector3Int, Chunk> chunks)

@@ -143,14 +143,14 @@ public sealed class Player
         cameraDirection = (cameraPosition - cameraTarget).Normalized;
         cameraRight = Vector3.Normalize(Vector3.Cross(Vector3.Up, cameraDirection));
         cameraUp = Vector3.Cross(cameraDirection, cameraRight);
-
-        Frustum.CalculateFrustum();
         
         ViewMatrix = Matrix4.LookAt(cameraPosition, cameraPosition + cameraFront, cameraUp);
         ProjectionMatrix = Matrix4.CreatePerspectiveFieldOfView(fov * Mathf.Deg2Rad, (float)screenSize.X / screenSize.Y, 
             NearClipPlane, FarClipPlane);
 
         VPMatrix = ViewMatrix * ProjectionMatrix;
+        
+        Frustum.CalculateFrustum();
     }
     
     private Plane TransformPlane(Plane plane, Matrix4 matrix)

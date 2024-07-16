@@ -1,4 +1,5 @@
-﻿using VoxelGame.Rendering;
+﻿using System.Numerics;
+using VoxelGame.Rendering;
 
 namespace VoxelGame.Maths;
 
@@ -6,15 +7,6 @@ namespace VoxelGame.Maths;
 public class Frustum
 {
     private Player _player;
-
-    private Vector3 _nearTopLeft;
-    private Vector3 _nearTopRight;
-    private Vector3 _nearBottomLeft;
-    private Vector3 _nearBottomRight;
-    private Vector3 _farTopLeft;
-    private Vector3 _farTopRight;
-    private Vector3 _farBottomLeft;
-    private Vector3 _farBottomRight;
 
     private Plane[] _planes;
 
@@ -27,47 +19,71 @@ public class Frustum
 
     public void CalculateFrustum()
     {
-        float tanVFov = Mathf.Tan(_player.VFov * 0.5f);
-        float tanHFov = Mathf.Tan(_player.HFov * 0.5f);
+        var vp = _player.VPMatrix;
 
-        float nh = _player.NearClipPlane * tanVFov;
-        float nw = _player.NearClipPlane * tanHFov;
-        float fh = _player.FarClipPlane * tanVFov;
-        float fw = _player.FarClipPlane * tanHFov;
+        Plane left   = new(new Vector3(vp[0, 3] + vp[0, 0], vp[1, 3] + vp[1, 0], vp[2, 3] + vp[2, 0]).Normalized, (vp[3, 3] + vp[3, 0]) / 
+                             new Vector3(vp[0, 3] + vp[0, 0], vp[1, 3] + vp[1, 0], vp[2, 3] + vp[2, 0]).Magnitude);
+        Plane right  = new(new Vector3(vp[0, 3] - vp[0, 0], vp[1, 3] - vp[1, 0], vp[2, 3] - vp[2, 0]).Normalized, (vp[3, 3] - vp[3, 0]) / 
+                             new Vector3(vp[0, 3] - vp[0, 0], vp[1, 3] - vp[1, 0], vp[2, 3] - vp[2, 0]).Magnitude);
 
-        Vector3 nearCenter = _player.Position + _player.Forward * _player.NearClipPlane;
-        Vector3 farCenter = _player.Position + _player.Forward * _player.FarClipPlane;
+        Plane bottom = new(new Vector3(vp[0, 3] + vp[0, 1], vp[1, 3] + vp[1, 1], vp[2, 3] + vp[2, 1]).Normalized, (vp[3, 3] + vp[3, 1]) / 
+                             new Vector3(vp[0, 3] + vp[0, 1], vp[1, 3] + vp[1, 1], vp[2, 3] + vp[2, 1]).Magnitude);
+        Plane top    = new(new Vector3(vp[0, 3] - vp[0, 1], vp[1, 3] - vp[1, 1], vp[2, 3] - vp[2, 1]).Normalized, (vp[3, 3] - vp[3, 1]) / 
+                             new Vector3(vp[0, 3] - vp[0, 1], vp[1, 3] - vp[1, 1], vp[2, 3] - vp[2, 1]).Magnitude);
 
-        // Near plane
-        _nearTopLeft = nearCenter + (_player.Up * nh) - (_player.Right * nw);
-        _nearTopRight = nearCenter + (_player.Up * nh) + (_player.Right * nw);
-        _nearBottomLeft = nearCenter - (_player.Up * nh) - (_player.Right * nw);
-        _nearBottomRight = nearCenter - (_player.Up * nh) + (_player.Right * nw);
+        Plane near   = new(new Vector3(vp[0, 3] + vp[0, 2], vp[1, 3] + vp[1, 2], vp[2, 3] + vp[2, 2]).Normalized, (vp[3, 3] + vp[3, 2]) / 
+                             new Vector3(vp[0, 3] + vp[0, 2], vp[1, 3] + vp[1, 2], vp[2, 3] + vp[2, 2]).Magnitude);
+        Plane far    = new(new Vector3(vp[0, 3] - vp[0, 2], vp[1, 3] - vp[1, 2], vp[2, 3] - vp[2, 2]).Normalized, (vp[3, 3] - vp[3, 2]) / 
+                             new Vector3(vp[0, 3] - vp[0, 2], vp[1, 3] - vp[1, 2], vp[2, 3] - vp[2, 2]).Magnitude);
 
-        // Far plane
-        _farTopLeft = farCenter + (_player.Up * fh) - (_player.Right * fw);
-        _farTopRight = farCenter + (_player.Up * fh) + (_player.Right * fw);
-        _farBottomLeft = farCenter - (_player.Up * fh) - (_player.Right * fw);
-        _farBottomRight = farCenter - (_player.Up * fh) + (_player.Right * fw);
-
-        // Construct planes
-        _planes[0] = new Plane(_nearTopRight, _nearTopLeft, _nearBottomLeft); // Near plane
-        _planes[1] = new Plane(_farTopLeft, _farTopRight, _farBottomRight);  // Far plane
-        _planes[2] = new Plane(_nearTopLeft, _nearTopRight, _farTopRight);   // Top plane
-        _planes[3] = new Plane(_nearBottomRight, _nearBottomLeft, _farBottomLeft); // Bottom plane
-        _planes[4] = new Plane(_nearTopLeft, _nearBottomLeft, _farBottomLeft); // Left plane
-        _planes[5] = new Plane(_nearBottomRight, _nearTopRight, _farBottomRight); // Right plane
+        _planes = [ left, right, bottom, top, near, far ];
     }
 
     public bool IsPointInFrustum(Vector3 point)
     {
-        foreach (var plane in _planes)
+        for (int i = 0; i < _planes.Length; i++)
         {
-            if (plane.GetDistanceFromPoint(point) < 0)
+            // The distance from the point to the plane should be calculated as follows
+            float distance = Vector3.Dot(_planes[i].Normal, point) + _planes[i].D;
+
+            // If the distance is negative, it means the point is behind the plane. 
+            if (distance < 0)
             {
-                return false; // Point is outside this plane
+                return false;
             }
         }
-        return true; // Point is inside all planes
+
+        // If the point is not behind any plane, it's inside the frustum
+        return true;
+    }
+    
+    public bool IsBoundingBoxInFrustum(AABB box)
+    {
+        Vector3[] corners = box.GetCorners();
+
+        for (int i = 0; i < _planes.Length; i++)
+        {
+            bool allOutside = true;
+
+            // Check if all corners are outside this plane
+            for (int j = 0; j < corners.Length; j++)
+            {
+                float distance = Vector3.Dot(_planes[i].Normal, corners[j]) + _planes[i].D;
+                if (distance >= 0)
+                {
+                    allOutside = false;
+                    break;
+                }
+            }
+
+            // If all corners are outside this plane, the bounding box is outside the frustum
+            if (allOutside)
+            {
+                return false;
+            }
+        }
+
+        // If the bounding box is not outside any plane, it is inside the frustum
+        return true;
     }
 }

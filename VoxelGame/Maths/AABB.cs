@@ -15,14 +15,14 @@ public struct AABB : IEquatable<AABB>
     public AABB(Vector3 offset)
     {
         Min = new Vector3(-0.5f, -0.5f, -0.5f) + offset;
-        Max = new Vector3( 0.5f,  0.5f,  0.5f) + offset;
+        Max = new Vector3(0.5f, 0.5f, 0.5f) + offset;
     }
-    
+
     public static AABB CreateFromExtents(Vector3 center, Vector3 extents)
     {
         return new AABB(center - extents, center + extents);
     }
-    
+
     public void Move(Vector3 dir)
     {
         Min += dir;
@@ -72,5 +72,20 @@ public struct AABB : IEquatable<AABB>
     public override bool Equals(object? obj)
     {
         return obj is AABB other && Equals(other);
+    }
+
+    public Vector3[] GetCorners()
+    {
+        return
+        [
+            new Vector3(Min.X, Min.Y, Min.Z),
+            new Vector3(Min.X, Min.Y, Max.Z),
+            new Vector3(Min.X, Max.Y, Min.Z),
+            new Vector3(Min.X, Max.Y, Max.Z),
+            new Vector3(Max.X, Min.Y, Min.Z),
+            new Vector3(Max.X, Min.Y, Max.Z),
+            new Vector3(Max.X, Max.Y, Min.Z),
+            new Vector3(Max.X, Max.Y, Max.Z)
+        ];
     }
 }

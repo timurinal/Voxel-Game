@@ -30,9 +30,9 @@ public sealed class Engine : GameWindow
     public bool IsFullscreen;
     public bool IsWireframe;
     public bool Shadows = true;
+    public bool FrustumCulling = true;
     public RenderMode RenderMode = RenderMode.Polygon;
 
-    public const bool EnableFrustumCulling = true;
 
     public readonly Player Player;
     
@@ -57,8 +57,8 @@ public sealed class Engine : GameWindow
     
     private Shader _chunkShader;
     internal static Dictionary<Vector3Int, Chunk> Chunks;
-    private Queue<Vector3Int> _chunksToBuild;
-    private const int MaxChunksToBuildPerFrame = 32;
+    private SortedList<float, Vector3Int> _chunksToBuild;
+    private const int MaxChunksToBuildPerFrame = 64;
 
     private Shader _meshShader;
 
@@ -209,7 +209,7 @@ public sealed class Engine : GameWindow
         _denoiser = new SSEffect(_denoiserShader, Size, true);
         
         Chunks = new Dictionary<Vector3Int, Chunk>();
-        _chunksToBuild = new Queue<Vector3Int>();
+        _chunksToBuild = new();
 
         _lightBuffer = GL.GenBuffer();
 
@@ -393,7 +393,16 @@ public sealed class Engine : GameWindow
 
                         if (!newChunk.IsEmpty)
                         {
-                            _chunksToBuild.Enqueue(chunkPosition); // Queue the chunk for building
+                            float sqrDst = Vector3.SqrDistance(newChunk.chunkCentre, Player.Position);
+
+                            // If there is already a chunk with the same distance,
+                            // keep adding a small value to it until that key isn't in the list
+                            do
+                            {
+                                sqrDst += 0.01f;
+                            } while (_chunksToBuild.ContainsKey(sqrDst));
+                            
+                            _chunksToBuild.Add(sqrDst, chunkPosition); // Queue the chunk for building
                             Chunks[chunkPosition] = newChunk; // Add the chunk to the dictionary
                         }
                     }
@@ -408,7 +417,10 @@ public sealed class Engine : GameWindow
             {
                 try
                 {
-                    var chunkPosition = _chunksToBuild.Dequeue();
+                    var firstKey = _chunksToBuild.Keys[0];
+                    var firstValue = _chunksToBuild[firstKey];
+                    _chunksToBuild.RemoveAt(0);
+                    var chunkPosition = firstValue;
                     var chunk = Chunks[chunkPosition];
 
                     // await chunk.GenerateChunkAsync(Chunks);
@@ -616,11 +628,14 @@ public sealed class Engine : GameWindow
 
                     if (!chunk.Value.IsEmpty)
                     {
-                        VisibleChunks += !chunk.Value.IsEmpty ? 1 : 0;
+                        if (Player.Frustum.IsBoundingBoxInFrustum(chunk.Value.Bounds) || !FrustumCulling)
+                        {
+                            VisibleChunks += !chunk.Value.IsEmpty ? 1 : 0;
                     
-                        var c = chunk.Value.Render(Player, ShadowMapper);
-                        VertexCount   += c.vertexCount;
-                        TriangleCount += c.triangleCount;
+                            var c = chunk.Value.Render(Player, ShadowMapper);
+                            VertexCount   += c.vertexCount;
+                            TriangleCount += c.triangleCount;
+                        }
                     }
                 }
             }
@@ -684,6 +699,8 @@ public sealed class Engine : GameWindow
             ImGui.Checkbox("Wireframe Rendering", ref IsWireframe);
 
             ImGui.Checkbox("Shadows", ref Shadows);
+            
+            ImGui.Checkbox("Frustum Culling", ref FrustumCulling);
             
             ImGui.SliderInt("Render distance", ref Player.ChunkRenderDistance, 1, 32);
             ImGui.SliderInt("Max FPS", ref MaxFPS, 20, 480);
