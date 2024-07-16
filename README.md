@@ -2,6 +2,7 @@ Voxel-Game
 ---
 
 A voxel game (like Minecraft) made in C# using OpenTK. Shaders are written in GLSL
+Currently very much a WIP
 
 Features
 ---
