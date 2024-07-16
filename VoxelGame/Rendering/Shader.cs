@@ -70,9 +70,9 @@ public struct Shader : IEquatable<Shader>
             int id = GL.CreateProgram();
 
             const string vertexSource =
-                "#version 330 core\n\nlayout (location = 0) in vec3 vPosition;\nlayout (location = 1) in vec2 vUv;\n\nout vec4 fragColour;\n\nuniform mat4 m_proj;\nuniform mat4 m_view;\nuniform mat4 m_model;\n\nvoid main() {\n\tgl_Position = m_model * vec4(vPosition, 1.0);\n\n\tfragColour = vec4(vUv, 0.0, 1.0);\n}";
+                "#version 330 core\n\nlayout (location = 0) in vec3 vPosition;\nlayout (location = 1) in vec2 vUv;\n\nout vec2 texcoord;\n\nuniform int useProjection;\n\nuniform mat4 m_proj;\nuniform mat4 m_view;\nuniform mat4 m_model;\n\nvoid main() {\n\tif (useProjection == 1)\n{\n\tgl_Position = m_proj * m_model * vec4(vPosition, 1.0);\n}\nelse\n{\n\tgl_Position = m_model * vec4(vPosition, 1.0);\n}\n\n\ttexcoord = vUv;\n}";
             const string fragmentSource =
-                "#version 330 core\n\nout vec4 finalColour;\n\nin vec4 fragColour;\n\nvoid main() {\n\tfinalColour = fragColour;\n}";
+                "#version 330 core\n\nout vec4 finalColour;\n\nin vec2 texcoord;\n\nuniform sampler2D Texture;\n\nvoid main() {\n\tvec4 col = texture(Texture, texcoord);\n\n\tif (col.a <= 0.1)\n\t{\n\t\tdiscard;\n\t\treturn;\n\t}\n\n\tfinalColour = col;\n}";
             
             int vertexId = GL.CreateShader(ShaderType.VertexShader);
             int fragmentId = GL.CreateShader(ShaderType.FragmentShader);

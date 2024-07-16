@@ -136,6 +136,8 @@ HitInfo rayCube(Ray ray, vec3 cubeMin, vec3 cubeMax);
 
 vec2 getVoxelUv(int voxelID, float u, float v);
 
+float remap(float value, float outputMin, float outputMax);
+
 const float faceShading[6] = float[6](
     0.6, 0.8,  // front back
     1.0, 0.4,  // top bottom
@@ -151,7 +153,13 @@ void main() {
 
     uint rngState = hashVec2(texcoord + vec2(Time, -Time));
 
-    Ray ray = createRay(_CamPos, rayDir);
+    const float offsetRange = 0.001;
+    vec3 dirOffset = vec3(
+        remap(hash(rngState), -offsetRange, offsetRange), 
+        remap(hash(rngState), -offsetRange, offsetRange), 
+        remap(hash(rngState), -offsetRange, offsetRange));
+
+    Ray ray = createRay(_CamPos + dirOffset.xyz, rayDir - dirOffset.xyz);
 
     // TODO: denoiser
     // I want to use the below code but it is too noisy, so when I have a denoiser, this will be used
@@ -191,7 +199,7 @@ vec3 getEnvironmentLight(Ray ray) {
 
     float groundToSkyT = smoothstep(-0.1, -0.09, ray.dir.y);
     float sunMask = groundToSkyT >= 1.0 ? 1.0 : 0.0;
-    return (mix(GroundColour, skyGradient, groundToSkyT) + (sun * vec3(1.0)) + (moon * vec3(1.0)));
+    return mix(GroundColour, skyGradient, groundToSkyT);
 }
 
 float hash(inout uint state) {
@@ -470,4 +478,9 @@ vec2 getVoxelUv(int voxelID, float u, float v) {
     float adjustedUnit = unit - 2 * padding;
 
     return vec2(x + u * adjustedUnit, y + v * adjustedUnit);
+}
+
+float remap(float value, float outputMin, float outputMax)
+{
+    return outputMin + (outputMax - outputMin) * 0.5 * (value + 1.0);
 }

@@ -1,4 +1,4 @@
-﻿﻿using OpenTK.Mathematics;
+﻿using OpenTK.Mathematics;
 using VoxelGame.Maths;
 using VoxelGame.TerrainGeneration;
 using Vector2 = VoxelGame.Maths.Vector2;
@@ -14,6 +14,8 @@ public sealed class Chunk
     public const int ChunkVolume = ChunkArea * ChunkSize;
     public static readonly float ChunkSphereRadius = ChunkSize * Mathf.Sqrt(3) / 2f;
     
+    const int Stride = 9; // each vertex has 3 position floats, 3 normal floats, 2 UV floats, and 1 faceid integer
+    
     public const int MaxStackSize = 250_000;
     
     public Vector3Int chunkPosition;
@@ -27,6 +29,9 @@ public sealed class Chunk
 
     // if this is true, it means the chunk has been modified since generation (or since it was last loaded from the disk)
     public bool IsDirty { get; private set; } = false;
+
+    // This is true when the chunk is fully ready to be rendered by OpenGL
+    private bool IsRenderReady = false;
     
     public uint solidVoxelCount { get; private set; }
 
@@ -48,8 +53,8 @@ public sealed class Chunk
         voxels = new uint[ChunkVolume];
 
         // Array.Fill<uint>(voxels, 1);
-        
-        for (int i = 0; i < ChunkVolume; i++)
+
+        Parallel.For(0, ChunkVolume, i =>
         {
             int x = i % ChunkSize;
             int y = (i / ChunkSize) % ChunkSize;
@@ -63,7 +68,7 @@ public sealed class Chunk
             // voxels[i] = TerrainGenerator.Sample(globalX, globalY, globalZ) > 0.5f ? 2u : 0u;
         
             voxels[i] = TerrainGenerator.SampleTerrain(globalX, globalY, globalZ);
-        }
+        });
 
         _vao = GL.GenVertexArray();
         _vbo = GL.GenBuffer();
@@ -74,7 +79,7 @@ public sealed class Chunk
         chunkCentre = chunkPosition + new Vector3(ChunkSize / 2f, ChunkSize / 2f, ChunkSize / 2f);
     }
 
-    internal void BuildChunk(Dictionary<Vector3Int, Chunk> chunks)
+    internal async void BuildChunk(Dictionary<Vector3Int, Chunk> chunks)
     {
         solidVoxelCount = 0;
 
@@ -86,6 +91,36 @@ public sealed class Chunk
                 break;
             }
 
+        var result = await Task.Run(() => BuildChunkAsync(chunks));
+        if (result.hasData)
+        {
+            Engine.RegisterMainThreadAction(() =>
+            {
+                GL.BindVertexArray(_vao);
+                GL.BindBuffer(BufferTarget.ArrayBuffer, _vbo);
+                GL.BufferData(BufferTarget.ArrayBuffer, result.data.Length * sizeof(float), result.data, BufferUsageHint.StaticDraw);
+
+                GL.BindBuffer(BufferTarget.ElementArrayBuffer, _ebo);
+                GL.BufferData(BufferTarget.ElementArrayBuffer, result.triangles.Length * sizeof(int), result.triangles, BufferUsageHint.StaticDraw);
+
+                GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, Stride * sizeof(float), 0 * sizeof(float));
+                GL.VertexAttribPointer(1, 3, VertexAttribPointerType.Float, false, Stride * sizeof(float), 3 * sizeof(float));
+                GL.VertexAttribPointer(2, 2, VertexAttribPointerType.Float, false, Stride * sizeof(float), 6 * sizeof(float));
+                GL.VertexAttribPointer(3, 1, VertexAttribPointerType.Float, false, Stride * sizeof(float), 8 * sizeof(float));
+                GL.EnableVertexAttribArray(0);
+                GL.EnableVertexAttribArray(1);
+                GL.EnableVertexAttribArray(2);
+                GL.EnableVertexAttribArray(3);
+
+                GL.BindVertexArray(0);
+
+                IsRenderReady = true;
+            });
+        }
+    }
+    
+    private (bool hasData, float[] data, int[] triangles) BuildChunkAsync(Dictionary<Vector3Int, Chunk> chunks)
+    {
         if (!IsEmpty)
         {
             List<Vector3> vertices = new();
@@ -104,7 +139,7 @@ public sealed class Chunk
                 if (voxels[i] != 0)
                 {
                     solidVoxelCount++;
-                    
+
                     int voxelID = (int)voxels[i];
 
                     // Front face
@@ -140,7 +175,7 @@ public sealed class Chunk
 
                     // Back face
                     if (IsTransparent(voxelPosition.X, voxelPosition.Y, voxelPosition.Z + 1, voxels, chunks,
-                        (Vector3Int)(chunkPosition / ChunkSize)))
+                            (Vector3Int)(chunkPosition / ChunkSize)))
                     {
                         Vector2 uv00 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Back, 1, 1);
                         Vector2 uv01 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Back, 1, 0);
@@ -298,49 +333,37 @@ public sealed class Chunk
             _triangleCount = triangles.Count;
             _vertexCount = vertices.Count;
 
-            const int stride = 9; // each vertex has 3 position floats, 3 normal floats, 2 UV floats, and 1 faceid integer
-            Span<float> data = stackalloc float[vertices.Count * stride];
+            Span<float> data = stackalloc float[vertices.Count * Stride];
 
-            int len = vertices.Count * stride;
+            int len = vertices.Count * Stride;
             if (len < MaxStackSize)
-                data = stackalloc float[vertices.Count * stride];
+                data = stackalloc float[vertices.Count * Stride];
             else
-                data = new float[vertices.Count * stride];
+                data = new float[vertices.Count * Stride];
                 
             for (int i = 0; i < vertices.Count; i++)
             {
-                data[i * stride + 0] = vertices[i].X;
-                data[i * stride + 1] = vertices[i].Y;
-                data[i * stride + 2] = vertices[i].Z;
+                data[i * Stride + 0] = vertices[i].X;
+                data[i * Stride + 1] = vertices[i].Y;
+                data[i * Stride + 2] = vertices[i].Z;
                 
-                data[i * stride + 3] = normals[i].X;
-                data[i * stride + 4] = normals[i].Y;
-                data[i * stride + 5] = normals[i].Z;
+                data[i * Stride + 3] = normals[i].X;
+                data[i * Stride + 4] = normals[i].Y;
+                data[i * Stride + 5] = normals[i].Z;
                 
-                data[i * stride + 6] = uvs[i].X;
-                data[i * stride + 7] = uvs[i].Y;
+                data[i * Stride + 6] = uvs[i].X;
+                data[i * Stride + 7] = uvs[i].Y;
                 
-                data[i * stride + 8] = faceIds[i];
+                data[i * Stride + 8] = faceIds[i];
             }
 
-            GL.BindVertexArray(_vao);
-            GL.BindBuffer(BufferTarget.ArrayBuffer, _vbo);
-            GL.BufferData(BufferTarget.ArrayBuffer, data.Length * sizeof(float), data.ToArray(), BufferUsageHint.StaticDraw);
+            if (_triangleCount <= 0)
+                IsEmpty = true;
 
-            GL.BindBuffer(BufferTarget.ElementArrayBuffer, _ebo);
-            GL.BufferData(BufferTarget.ElementArrayBuffer, triangles.Count * sizeof(int), triangles.ToArray(), BufferUsageHint.StaticDraw);
-
-            GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, stride * sizeof(float), 0 * sizeof(float));
-            GL.VertexAttribPointer(1, 3, VertexAttribPointerType.Float, false, stride * sizeof(float), 3 * sizeof(float));
-            GL.VertexAttribPointer(2, 2, VertexAttribPointerType.Float, false, stride * sizeof(float), 6 * sizeof(float));
-            GL.VertexAttribPointer(3, 1, VertexAttribPointerType.Float, false, stride * sizeof(float), 8 * sizeof(float));
-            GL.EnableVertexAttribArray(0);
-            GL.EnableVertexAttribArray(1);
-            GL.EnableVertexAttribArray(2);
-            GL.EnableVertexAttribArray(3);
-
-            GL.BindVertexArray(0);
+            return (true, data.ToArray(), triangles.ToArray());
         }
+
+        return (false, null, null);
     }
     
     internal void RebuildChunk(Dictionary<Vector3Int, Chunk> chunks, bool recursive = false)
@@ -465,7 +488,7 @@ public sealed class Chunk
 
     internal (int vertexCount, int triangleCount) Render(Player player, ShadowMapper shadowMapper)
     {
-        if (IsEmpty)
+        if (IsEmpty || !IsRenderReady)
             return (0, 0);
         
         _shader.Use();
@@ -485,7 +508,7 @@ public sealed class Chunk
         ErrorCode glError = GL.GetError();
         if (glError != ErrorCode.NoError)
         {
-            throw new GLException($"OpenGL Error: {glError}");
+            throw new GLException($"1. OpenGL Error: {glError}");
         }
         GL.BindVertexArray(0);
 
@@ -494,7 +517,7 @@ public sealed class Chunk
     public (int vertexCount, int triangleCount) Render(Matrix4 m_proj, Matrix4 m_view, Shader shaderOverride,
         bool overrideShader = false)
     {
-        if (IsEmpty)
+        if (IsEmpty || !IsRenderReady)
             return (0, 0);
 
         Engine.BatchCount++;
@@ -521,7 +544,7 @@ public sealed class Chunk
         ErrorCode glError = GL.GetError();
         if (glError != ErrorCode.NoError)
         {
-            throw new GLException($"OpenGL Error: {glError}");
+            throw new GLException($"2. OpenGL Error: {glError}");
         }
         GL.BindVertexArray(0);
 

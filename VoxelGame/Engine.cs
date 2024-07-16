@@ -1,5 +1,6 @@
 ﻿// 6,953 lines of code :D
 
+using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using ImGuiNET;
 using OpenTK.Mathematics;
@@ -57,7 +58,7 @@ public sealed class Engine : GameWindow
     private Shader _chunkShader;
     internal static Dictionary<Vector3Int, Chunk> Chunks;
     private Queue<Vector3Int> _chunksToBuild;
-    private const int MaxChunksToBuildPerFrame = 16;
+    private const int MaxChunksToBuildPerFrame = 32;
 
     private Shader _meshShader;
 
@@ -102,9 +103,11 @@ public sealed class Engine : GameWindow
     private ShaderStorageBuffer _rtVoxelDataStorageBuffer;
     private ShaderStorageBuffer _rtVoxelStorageBuffer;
 
-    private static List<Action> _mainThreadActions = new();
+    private static readonly ConcurrentQueue<Action> _mainThreadActions = new ConcurrentQueue<Action>();
 
     private GizmoBox box;
+    
+    private readonly object _syncObj = new object();
 
     public Engine(GameWindowSettings gws, NativeWindowSettings nws) : base(gws, nws)
     {
@@ -234,6 +237,12 @@ public sealed class Engine : GameWindow
 
         AABB bounds = new AABB(Vector3.Zero);
         box = new GizmoBox(bounds);
+        
+        // UIRenderer.CreateQuad(new(0, 0, 0), Vector3.One, true, 55);
+        // UIRenderer.CreateQuad(new(0.85f, 0, 0), Vector3.One, true, 4);
+        // UIRenderer.CreateQuad(new(1.70f, 0, 0), Vector3.One, true, 11);
+        // UIRenderer.CreateQuad(new(2.15f, 0, 0), Vector3.One, true, 11);
+        // UIRenderer.CreateQuad(new(2.65f, 0, 0), Vector3.One, true, 14);
 
         // await Task.Run(() =>
         // {
@@ -266,11 +275,19 @@ public sealed class Engine : GameWindow
         Time.DeltaTime = (float)args.Time;
 
         // Run any main thread actions that have been registered from async functions
-        foreach (var action in _mainThreadActions)
+        Action actionToExecute;
+
+        while (_mainThreadActions.TryDequeue(out actionToExecute)) 
         {
-            action();
+            try
+            {
+                actionToExecute();
+            }
+            catch (Exception e)
+            {
+                // handle or log exceptions
+            }
         }
-        _mainThreadActions.Clear();
         
         Vector3Int playerPosition = Vector3.Round(Player.Position / Chunk.ChunkSize);
         int renderDistance = Player.ChunkRenderDistance;
@@ -373,8 +390,12 @@ public sealed class Engine : GameWindow
                     {
                         // TODO: Load chunks from disk
                         var newChunk = new Chunk(chunkWorldPosition, _chunkShader);
-                        _chunksToBuild.Enqueue(chunkPosition); // Queue the chunk for building
-                        Chunks[chunkPosition] = newChunk; // Add the chunk to the dictionary
+
+                        if (!newChunk.IsEmpty)
+                        {
+                            _chunksToBuild.Enqueue(chunkPosition); // Queue the chunk for building
+                            Chunks[chunkPosition] = newChunk; // Add the chunk to the dictionary
+                        }
                     }
                 }
             }
@@ -391,7 +412,8 @@ public sealed class Engine : GameWindow
                     var chunk = Chunks[chunkPosition];
 
                     // await chunk.GenerateChunkAsync(Chunks);
-                    chunk.RebuildChunk(Chunks, recursive: true);
+                    // chunk.RebuildChunk(Chunks, recursive: true);
+                    chunk.BuildChunk(Chunks);
         
                     // Force neighbouring chunks to rebuild
                     foreach (var offset in neighbourChunkOffsets)
@@ -399,7 +421,7 @@ public sealed class Engine : GameWindow
                         if (Chunks.TryGetValue(chunkPosition + offset, out var neighbour))
                         {
                             // await neighbour.GenerateChunkAsync(Chunks);
-                            neighbour.RebuildChunk(Chunks);
+                            neighbour.BuildChunk(Chunks);
                         }
                     }
                 }
@@ -509,6 +531,10 @@ public sealed class Engine : GameWindow
             _raytracing.Render(Player, ShadowMapper);
         }
         
+        GL.Enable(EnableCap.DepthTest);
+        
+        GL.Disable(EnableCap.DepthTest);
+        UIRenderer.Render(Player);
         GL.Enable(EnableCap.DepthTest);
         
         if (ShowGui)
@@ -892,6 +918,6 @@ public sealed class Engine : GameWindow
 
     public static void RegisterMainThreadAction(Action action)
     {
-        _mainThreadActions.Add(action);
+        _mainThreadActions.Enqueue(action);
     }
 }
