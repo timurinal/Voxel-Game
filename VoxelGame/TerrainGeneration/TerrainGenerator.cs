@@ -49,7 +49,7 @@ public static class TerrainGenerator
             <= 0 => VoxelData.NameToVoxelId("bedrock"),
             <= 25 => VoxelData.NameToVoxelId("stone"),
             <= 28 => VoxelData.NameToVoxelId("dirt"),
-            <= 29 => Sample(x, z) >= 0.5f ? VoxelData.NameToVoxelId("grass_block") : VoxelData.NameToVoxelId("dirt"),
+            <= 29 => Sample(x, z) >= 0.5f ? VoxelData.NameToVoxelId("grass_block") : Sample(x, z, scale: 0.05f) >= 0.5f ? VoxelData.NameToVoxelId("glass") : VoxelData.NameToVoxelId("red_glass"),
             _ => VoxelData.NameToVoxelId("air")
         };
 

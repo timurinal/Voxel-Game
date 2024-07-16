@@ -72,6 +72,25 @@ public static class VoxelData
         return true;
     }
     
+    public static bool IsTransparent(uint voxelId, uint selfVoxelId)
+    {
+        if (voxelId == 0)
+            return true;
+
+        bool isVoxelTransparent = IsTransparent(voxelId);
+        bool isSelfTransparent = IsTransparent(selfVoxelId);
+        
+        foreach (var voxel in Voxels)
+        {
+            if (voxel.id == voxelId || isVoxelTransparent == isSelfTransparent)
+            {
+                return voxel.transparent;
+            }
+        }
+
+        return true;
+    }
+    
     public struct Voxel
     {
         public uint id;

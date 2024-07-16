@@ -49,5 +49,12 @@
     "name": "glass",
     "textureFaces": [ 7, 7, 7, 7, 7, 7 ],
     "transparent": true
+  },
+  {
+    "id": 9,
+    "displayName": "Red Glass",
+    "name": "red_glass",
+    "textureFaces": [ 10, 10, 10, 10, 10, 10 ],
+    "transparent": true
   }
 ]

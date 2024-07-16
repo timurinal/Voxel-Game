@@ -8,7 +8,7 @@ namespace VoxelGame.Rendering;
 
 public sealed class Chunk
 {
-    public const int ChunkSize = 16;
+    public const int ChunkSize = 32;
     public const int HChunkSize = ChunkSize / 2;
     public const int ChunkArea = ChunkSize * ChunkSize;
     public const int ChunkVolume = ChunkArea * ChunkSize;
@@ -148,7 +148,7 @@ public sealed class Chunk
 
                     // Front face
                     if (IsTransparent(voxelPosition.X, voxelPosition.Y, voxelPosition.Z - 1, voxels, chunks,
-                            (Vector3Int)(chunkPosition / ChunkSize)))
+                            (Vector3Int)(chunkPosition / ChunkSize), voxels[i]))
                     {
                         Vector2 uv00 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Front, 1, 1);
                         Vector2 uv01 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Front, 1, 0);
@@ -179,7 +179,7 @@ public sealed class Chunk
 
                     // Back face
                     if (IsTransparent(voxelPosition.X, voxelPosition.Y, voxelPosition.Z + 1, voxels, chunks,
-                            (Vector3Int)(chunkPosition / ChunkSize)))
+                            (Vector3Int)(chunkPosition / ChunkSize), voxels[i]))
                     {
                         Vector2 uv00 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Back, 1, 1);
                         Vector2 uv01 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Back, 1, 0);
@@ -210,7 +210,7 @@ public sealed class Chunk
 
                     // Top face
                     if (IsTransparent(voxelPosition.X, voxelPosition.Y + 1, voxelPosition.Z, voxels, chunks,
-                            (Vector3Int)(chunkPosition / ChunkSize)))
+                            (Vector3Int)(chunkPosition / ChunkSize), voxels[i]))
                     {
                         Vector2 uv00 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Top, 1, 1);
                         Vector2 uv01 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Top, 1, 0);
@@ -241,7 +241,7 @@ public sealed class Chunk
 
                     // Bottom face
                     if (IsTransparent(voxelPosition.X, voxelPosition.Y - 1, voxelPosition.Z, voxels, chunks,
-                            (Vector3Int)(chunkPosition / ChunkSize)))
+                            (Vector3Int)(chunkPosition / ChunkSize), voxels[i]))
                     {
                         Vector2 uv00 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Bottom, 1, 1);
                         Vector2 uv01 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Bottom, 1, 0);
@@ -272,7 +272,7 @@ public sealed class Chunk
 
                     // Right face
                     if (IsTransparent(voxelPosition.X + 1, voxelPosition.Y, voxelPosition.Z, voxels, chunks,
-                            (Vector3Int)(chunkPosition / ChunkSize)))
+                            (Vector3Int)(chunkPosition / ChunkSize), voxels[i]))
                     {
                         Vector2 uv00 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Right, 1, 1);
                         Vector2 uv01 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Right, 1, 0);
@@ -303,7 +303,7 @@ public sealed class Chunk
 
                     // Left face
                     if (IsTransparent(voxelPosition.X - 1, voxelPosition.Y, voxelPosition.Z, voxels, chunks,
-                            (Vector3Int)(chunkPosition / ChunkSize)))
+                            (Vector3Int)(chunkPosition / ChunkSize), voxels[i]))
                     {
                         Vector2 uv00 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Left, 1, 1);
                         Vector2 uv01 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Left, 1, 0);
@@ -337,13 +337,7 @@ public sealed class Chunk
             _triangleCount = triangles.Count;
             _vertexCount = vertices.Count;
 
-            Span<float> data = stackalloc float[vertices.Count * Stride];
-
-            int len = vertices.Count * Stride;
-            if (len < MaxStackSize)
-                data = stackalloc float[vertices.Count * Stride];
-            else
-                data = new float[vertices.Count * Stride];
+            var data = new float[vertices.Count * Stride];
                 
             for (int i = 0; i < vertices.Count; i++)
             {
@@ -364,7 +358,7 @@ public sealed class Chunk
             if (_triangleCount <= 0)
                 IsEmpty = true;
 
-            return (true, data.ToArray(), triangles.ToArray());
+            return (true, data, triangles.ToArray());
         }
 
         return (false, null, null);
@@ -398,7 +392,7 @@ public sealed class Chunk
         IsDirty = true;
     }
 
-    public static bool IsTransparent(int x, int y, int z, uint[] voxels, Dictionary<Vector3Int, Chunk> chunks, Vector3Int currentChunkPosition)
+    public static bool IsTransparent(int x, int y, int z, uint[] voxels, Dictionary<Vector3Int, Chunk> chunks, Vector3Int currentChunkPosition, uint selfVoxelId)
     {
         // Check if the coordinates are outside of the current chunk boundaries
         if (x < 0 || y < 0 || z < 0 || x >= ChunkSize || y >= ChunkSize || z >= ChunkSize)
@@ -418,7 +412,7 @@ public sealed class Chunk
                 int localY = (y + ChunkSize) % ChunkSize;
                 int localZ = (z + ChunkSize) % ChunkSize;
                 int index = FlattenIndex3D(localX, localY, localZ, ChunkSize, ChunkSize);
-                return VoxelData.IsTransparent(neighborChunk.voxels[index]);
+                return VoxelData.IsTransparent(neighborChunk.voxels[index], selfVoxelId);
             }
             else
             {
@@ -429,60 +423,21 @@ public sealed class Chunk
         {
             // Inside current chunk
             int index = FlattenIndex3D(x, y, z, ChunkSize, ChunkSize);
-            return VoxelData.IsTransparent(voxels[index]);
+            return VoxelData.IsTransparent(voxels[index], selfVoxelId);
         }
     }
 
     public static bool IsVoxelVisible(int x, int y, int z, uint[] voxels, Dictionary<Vector3Int, Chunk> chunks,
-        Vector3Int currentChunkPosition)
+        Vector3Int currentChunkPosition, uint selfVoxelId)
     {
-        bool up    = IsTransparent(  x,   y + 1, z, voxels, chunks, currentChunkPosition);
-        bool down  = IsTransparent(  x,   y - 1, z, voxels, chunks, currentChunkPosition);
-        bool front = IsTransparent(  x,     y,   z + 1, voxels, chunks, currentChunkPosition);
-        bool back  = IsTransparent(  x,     y,   z - 1, voxels, chunks, currentChunkPosition);
-        bool right = IsTransparent(x + 1, y,     z, voxels, chunks, currentChunkPosition);
-        bool left  = IsTransparent(x - 1, y,     z, voxels, chunks, currentChunkPosition);
+        bool up    = IsTransparent(  x,   y + 1, z, voxels, chunks, currentChunkPosition, selfVoxelId);
+        bool down  = IsTransparent(  x,   y - 1, z, voxels, chunks, currentChunkPosition, selfVoxelId);
+        bool front = IsTransparent(  x,     y,   z + 1, voxels, chunks, currentChunkPosition, selfVoxelId);
+        bool back  = IsTransparent(  x,     y,   z - 1, voxels, chunks, currentChunkPosition, selfVoxelId);
+        bool right = IsTransparent(x + 1, y,     z, voxels, chunks, currentChunkPosition, selfVoxelId);
+        bool left  = IsTransparent(x - 1, y,     z, voxels, chunks, currentChunkPosition, selfVoxelId);
 
         return up || down || front || back || right || left;
-    }
-
-    private static bool CanVoxelSeeSky(int x, int y, int z, uint[] voxels, Dictionary<Vector3Int, Chunk> chunks,
-        Vector3Int currentChunkPosition)
-    {
-        // Assuming that y is the vertical axis.
-        // Find the highest chunk.
-        int highestChunkY = chunks.Values.Max(chunk => chunk.chunkPosition.Y);
-
-        // Check each voxel directly above the current one, up to slightly above the highest chunk.
-        for (int yCheck = y + 1; yCheck <= highestChunkY + 1; yCheck++)
-        {
-            // If the checked location is outside the bounds of the current chunk, find the relevant chunk.
-            if (yCheck >= ChunkSize)
-            {
-                var chunkPosAbove =
-                    currentChunkPosition + new Vector3Int(0, 1, 0); // Assuming chunks are stacked vertically.
-                if (chunks.TryGetValue(chunkPosAbove, out var chunkAbove))
-                {
-                    if (!IsTransparent(x, yCheck - ChunkSize, z, chunkAbove.voxels, chunks,
-                            chunkPosAbove)) // Translate Y check position to relevant chunk.
-                    {
-                        return false;
-                    }
-                }
-                // If chunk above does not exist, then it is all air.
-            }
-            else
-            {
-                // If any voxel in the current chunk is not air, this voxel cannot see the sky.
-                if (!IsTransparent(x, yCheck, z, voxels, chunks, currentChunkPosition))
-                {
-                    return false;
-                }
-            }
-        }
-
-        // All voxels above are air, this voxel can see the sky.
-        return true;
     }
     
     public static int FlattenIndex3D(int x, int y, int z, int width, int height)
@@ -569,7 +524,7 @@ public sealed class Chunk
                 {
                     int voxelIndex = FlattenIndex3D(x, y, z, ChunkSize, ChunkSize);
                     uint voxel = voxels[voxelIndex];
-                    if (voxel != 0 && IsVoxelVisible(x, y, z, voxels, chunks, (Vector3Int)(chunkPosition / ChunkSize)))
+                    if (voxel != 0 && IsVoxelVisible(x, y, z, voxels, chunks, (Vector3Int)(chunkPosition / ChunkSize), voxel))
                     {
                         Vector3 min = new Vector3(chunkPosition.X + x, chunkPosition.Y + y, chunkPosition.Z + z);
                         Vector3 max = min + Vector3.One / 2f;
