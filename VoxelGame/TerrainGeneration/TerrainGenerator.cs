@@ -47,7 +47,7 @@ public static class TerrainGenerator
         return y switch
         {
             <= 0 => VoxelData.NameToVoxelId("bedrock"),
-            <= 23 => Sample(x, y, z, scale: 0.05f) > 0.35f ? VoxelData.NameToVoxelId("stone") : VoxelData.NameToVoxelId("air"),
+            // <= 23 => Sample(x, y, z, scale: 0.05f) > 0.35f ? VoxelData.NameToVoxelId("stone") : VoxelData.NameToVoxelId("air"),
             <= 25 => VoxelData.NameToVoxelId("stone"),
             <= 28 => VoxelData.NameToVoxelId("dirt"),
             <= 29 => Sample(x, z) >= 0.5f ? VoxelData.NameToVoxelId("grass_block") : Sample(x, z, scale: 0.05f) >= 0.5f ? VoxelData.NameToVoxelId("glass") : VoxelData.NameToVoxelId("red_glass"),

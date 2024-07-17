@@ -17,6 +17,7 @@ out float faceId;
 out vec3 normal;
 out vec3 fragPos;
 out vec4 fragPosLightSpace;
+out float fogDepth;
 
 void main() {
     vec4 pos = m_model * vec4(vPosition, 1.0);
@@ -27,4 +28,5 @@ void main() {
     texcoord = vTexCoord;
     faceId = vFaceId;
     fragPosLightSpace = m_lightOrtho * m_lightView * pos;
+    fogDepth = -((m_view * m_model) * vec4(vPosition, 1.0)).z;
 }

@@ -11,10 +11,10 @@ public static class UIRenderer
     
     public static void CreateQuad(Vector3 position, Vector3 size, bool useProjection = true, int i = 0)
     {
-        Vector2 uv00 = TextureAtlas.GetUVForFont(i, 0, 1);
-        Vector2 uv01 = TextureAtlas.GetUVForFont(i, 0, 0);
-        Vector2 uv10 = TextureAtlas.GetUVForFont(i, 1, 1);
-        Vector2 uv11 = TextureAtlas.GetUVForFont(i, 1, 0);
+        Vector2 uv00 = FontAtlas.GetUVForFont(i, 0, 1);
+        Vector2 uv01 = FontAtlas.GetUVForFont(i, 0, 0);
+        Vector2 uv10 = FontAtlas.GetUVForFont(i, 1, 1);
+        Vector2 uv11 = FontAtlas.GetUVForFont(i, 1, 0);
         
         var element = new UIElement(Shader.StandardUIShader, useProjection)
         {
@@ -187,7 +187,7 @@ public static class UIRenderer
             
             _shader.SetUniform("useProjection", useProjection ? 1 : 0, autoUse: false);
             
-            TextureAtlas.FontTexture.Use(TextureUnit.Texture7);
+            FontAtlas.FontTexture.Use(TextureUnit.Texture7);
             _shader.SetUniform("Texture", 7);
             
             GL.DrawElements(PrimitiveType.Triangles, _triangles.Length, DrawElementsType.UnsignedInt, 0);

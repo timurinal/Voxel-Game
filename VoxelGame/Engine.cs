@@ -139,13 +139,14 @@ public sealed class Engine : GameWindow
         
         GL.DepthFunc(DepthFunction.Less);
 
-        GL.ClearColor(0.7f, 0.9f, 1.0f, 1f);
+        GL.ClearColor(0.6f, 0.75f, 1f, 1.0f);
         
         // Initialise ImGUI
         _imGuiController = new ImGuiController(Size.X, Size.Y);
         // load any imgui fonts here
 
         TextureAtlas.Init();
+        FontAtlas.Init();
 
         // Make the window visible after setting up so it appears in place and not in a random location
         IsVisible = true;
@@ -163,9 +164,6 @@ public sealed class Engine : GameWindow
         _chunkShader.SetUniform("dirLight.ambient"  , dirLight.ambient);
         _chunkShader.SetUniform("dirLight.diffuse"  , dirLight.diffuse);
         _chunkShader.SetUniform("dirLight.specular" , dirLight.specular);
-        
-        _chunkShader.SetUniform("fogColour", new Vector3(0.6f, 0.75f, 1f));
-        _chunkShader.SetUniform("fogDensity", 0.03f);
         
         _tonemapperShader = Shader.Load("BUILTIN/image-effect.vert", "Assets/Shaders/tonemapper.frag");
         _tonemapper = new SSEffect(_tonemapperShader, Size, true);
@@ -237,12 +235,28 @@ public sealed class Engine : GameWindow
 
         AABB bounds = new AABB(Vector3.Zero);
         box = new GizmoBox(bounds);
-        
-        // UIRenderer.CreateQuad(new(0, 0, 0), Vector3.One, true, 55);
-        // UIRenderer.CreateQuad(new(0.85f, 0, 0), Vector3.One, true, 4);
-        // UIRenderer.CreateQuad(new(1.70f, 0, 0), Vector3.One, true, 11);
-        // UIRenderer.CreateQuad(new(2.15f, 0, 0), Vector3.One, true, 11);
-        // UIRenderer.CreateQuad(new(2.65f, 0, 0), Vector3.One, true, 14);
+
+        // const float atlasWidthInPixels = FontAtlas.FontAtlasWidth;
+        // const float additionalSpacing = 0.8f; // Adjust this value as per your needs
+        // float xOffset = 0;
+        //
+        // for (int i = 0; i < 5; i++)
+        // {
+        //     FontAtlas.CharacterSet.Character character;
+        //
+        //     if (i == 0) character = FontAtlas.MainCharacterSet.GetCharacter('H');
+        //     else if (i == 1) character = FontAtlas.MainCharacterSet.GetCharacter('e');
+        //     else if (i == 2) character = FontAtlas.MainCharacterSet.GetCharacter('l');
+        //     else if (i == 3) character = FontAtlas.MainCharacterSet.GetCharacter('l');
+        //     else if (i == 4) character = FontAtlas.MainCharacterSet.GetCharacter('o');
+        //     else character = FontAtlas.CharacterSet.MissingCharacter;
+        //
+        //     float characterWidthRelative = character.Width / atlasWidthInPixels;
+        //
+        //     UIRenderer.CreateQuad(new(xOffset, 0, 0), Vector3.One, true, character.Id);
+        //
+        //     xOffset += characterWidthRelative + additionalSpacing;
+        // }
 
         // await Task.Run(() =>
         // {
@@ -283,9 +297,9 @@ public sealed class Engine : GameWindow
             {
                 actionToExecute();
             }
+            // ReSharper disable once EmptyGeneralCatchClause
             catch (Exception e)
             {
-                // handle or log exceptions
             }
         }
         
@@ -474,9 +488,10 @@ public sealed class Engine : GameWindow
         _chunkShader.SetUniform("Wireframe", IsWireframe ? 1 : 0, autoUse: false);
         
         _skyboxShader.SetUniform("SunLightDirection", _lightDir);
-        
-        // AABB bounds = new AABB(Player.Traverse() ?? Vector3.Zero);
-        // box.Update(bounds);
+
+        var result = Player.Traverse();
+        AABB bounds = new AABB(result.Item1 ? result.Item2 : Vector3.Zero);
+        box.Update(bounds);
 
         _test.Transform.Position = -_lightDir;
         _test.Transform.Position += Player.Position;
@@ -516,17 +531,13 @@ public sealed class Engine : GameWindow
                 Render(mode: 0);
                 ShadowMapper.Unuse(Size);
             }
-            _skybox.Use();
+            _tonemapper.Use();
             GL.PolygonMode(MaterialFace.FrontAndBack, IsWireframe ? PolygonMode.Line : PolygonMode.Fill);
             Render(mode: 1);
             box.Render(Player);
-            _skybox.Unuse();
+            _tonemapper.Unuse();
         
             GL.Disable(EnableCap.DepthTest);
-        
-            _tonemapper.Use();
-            _skybox.Render(Player, ShadowMapper);
-            _tonemapper.Unuse();
             
             _tonemapper.Render(Player, ShadowMapper);
         } 
@@ -878,7 +889,7 @@ public sealed class Engine : GameWindow
         }
     }
 
-    public static uint? GetVoxelAtPosition(Vector3Int position)
+    public static (uint? voxelId, int voxelIndex, Vector3Int voxelLocalPos, Vector3Int chunk) GetVoxelAtPosition(Vector3Int position)
     {
         // Determine the chunk position by dividing the voxel position by the chunk size
         Vector3Int chunkPosition = new Vector3Int(
@@ -904,11 +915,11 @@ public sealed class Engine : GameWindow
             int index = Chunk.FlattenIndex3D(localPosition.X, localPosition.Y, localPosition.Z, Chunk.ChunkSize, Chunk.ChunkSize);
 
             // Return the voxel value at the calculated index
-            return chunk.voxels[index];
+            return (chunk.voxels[index], index, localPosition, chunkPosition);
         }
 
         // Return null if the chunk does not exist
-        return null;
+        return (null, 0, Vector3Int.Zero, Vector3Int.Zero);
     }
 
     public static Vector3Int UnflattenIndex(int index, int width, int height)

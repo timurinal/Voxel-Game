@@ -15,7 +15,7 @@ public sealed class Player
     public static Vector3 ColliderSize => new Vector3(0.8f, 1.8f, 0.8f);
     public static Vector3 ColliderOffset => new Vector3(0f, -0.7f, 0f);
     
-    private const float MaxRayDistance = 8f;
+    private const float MaxRayDistance = 5f;
     
     public static int ChunkRenderDistance = 8;
     public static int SqrChunkRenderDistance => ChunkRenderDistance * ChunkRenderDistance;
@@ -41,7 +41,7 @@ public sealed class Player
     public float VFov => fov * Mathf.Deg2Rad;
     public float HFov => 2 * Mathf.Atan(Mathf.Tan(VFov * 0.5f) * Aspect);
 
-    public Vector3 Forward => cameraFront.Normalized;
+    public Vector3 Forward => -cameraDirection.Normalized;
     public Vector3 Right => Vector3.Cross(Forward, Vector3.Up).Normalized;
     public Vector3 Up => Vector3.Cross(Right, Forward).Normalized;
     
@@ -152,13 +152,6 @@ public sealed class Player
         
         Frustum.CalculateFrustum();
     }
-    
-    private Plane TransformPlane(Plane plane, Matrix4 matrix)
-    {
-        Vector4 planeVec = new Vector4(plane.Normal.X, plane.Normal.Y, plane.Normal.Z, plane.D);
-        Vector4 transformedPlaneVec = Vector4.Transform(planeVec, matrix);
-        return new Plane(transformedPlaneVec);
-    }
 
     internal void UpdateProjection(Vector2Int screenSize, float fov = 65f)
     {
@@ -183,41 +176,84 @@ public sealed class Player
         cameraPosition = pos;
     }
     
-    // public Vector3Int? Traverse()
-    // {
-    //     // Start point
-    //     float x1 = Position.X;
-    //     float y1 = Position.Y;
-    //     float z1 = Position.Z;
-    //
-    //     // End point
-    //     Vector3 end = Position + Forward * MaxRayDistance;
-    //     float x2 = end.X;
-    //     float y2 = end.X;
-    //     float z2 = end.X;
-    //
-    //     Vector3 currentVoxelPos = new Vector3(x1, y1, z1);
-    //     int stepDir = -1;
-    //
-    //     float dx = Mathf.Sign(x2 - x1);
-    //     float deltaX = dx != 0 ? Mathf.Min(dx / (x2 - x1), 10000000f) : 10000000f;
-    //     float maxX = dx > 0 ? deltaX * (1.0f - Mathf.Fract(x1)) : deltaX * Mathf.Fract(x1);
-    //     
-    //     float dy = Mathf.Sign(y2 - y1);
-    //     float deltaY = dy != 0 ? Mathf.Min(dy / (y2 - y1), 10000000f) : 10000000f;
-    //     float maxY = dy > 0 ? deltaY * (1.0f - Mathf.Fract(y1)) : deltaY * Mathf.Fract(y1);
-    //     
-    //     float dz = Mathf.Sign(z2 - z1);
-    //     float deltaZ = dz != 0 ? Mathf.Min(dz / (z2 - z1), 10000000f) : 10000000f;
-    //     float maxZ = dz > 0 ? deltaZ * (1.0f - Mathf.Fract(z1)) : deltaZ * Mathf.Fract(z1);
-    //
-    //     while (!(maxX > 1f && maxY > 1f && maxZ > 1f))
-    //     {
-    //         uint result = GetVoxelId(currentVoxelPos);
-    //         if (result == 0)
-    //         {
-    //             
-    //         }
-    //     }
-    // }
+    public (bool, Vector3Int, Vector3) Traverse()
+    {
+        // Start point
+        float x1 = Position.X;
+        float y1 = Position.Y;
+        float z1 = Position.Z;
+
+        // End point
+        Vector3 end = Position + Forward * MaxRayDistance;
+        float x2 = end.X;
+        float y2 = end.Y;
+        float z2 = end.Z;
+
+        Vector3Int currentVoxelPos = new Vector3Int(Mathf.RoundToInt(x1), Mathf.RoundToInt(y1), Mathf.RoundToInt(z1));
+        int stepDir = -1;
+
+        float dx = Mathf.Sign(x2 - x1);
+        float deltaX = dx != 0 ? Mathf.Abs(1 / (x2 - x1)) : float.MaxValue;
+        float maxX = dx > 0 ? deltaX * (1.0f - Mathf.Frac(x1)) : deltaX * Mathf.Frac(x1);
+
+        float dy = Mathf.Sign(y2 - y1);
+        float deltaY = dy != 0 ? Mathf.Abs(1 / (y2 - y1)) : float.MaxValue;
+        float maxY = dy > 0 ? deltaY * (1.0f - Mathf.Frac(y1)) : deltaY * Mathf.Frac(y1);
+
+        float dz = Mathf.Sign(z2 - z1);
+        float deltaZ = dz != 0 ? Mathf.Abs(1 / (z2 - z1)) : float.MaxValue;
+        float maxZ = dz > 0 ? deltaZ * (1.0f - Mathf.Frac(z1)) : deltaZ * Mathf.Frac(z1);
+
+        Vector3 voxelNormal = Vector3.Zero;
+
+        while (maxX <= 1f || maxY <= 1f || maxZ <= 1f)
+        {
+            var result = Engine.GetVoxelAtPosition(currentVoxelPos);
+            var id = result.voxelId ?? 0;
+            if (id != 0)
+            {
+                if (stepDir == 0)
+                    voxelNormal.X = -dx;
+                else if (stepDir == 1)
+                    voxelNormal.Y = -dy;
+                else if (stepDir == 2)
+                    voxelNormal.Z = -dz;
+
+                return (true, currentVoxelPos, voxelNormal);
+            }
+
+            if (maxX < maxY)
+            {
+                if (maxX < maxZ)
+                {
+                    currentVoxelPos.X += (int)dx;
+                    maxX += deltaX;
+                    stepDir = 0;
+                }
+                else
+                {
+                    currentVoxelPos.Z += (int)dz;
+                    maxZ += deltaZ;
+                    stepDir = 2;
+                }
+            }
+            else
+            {
+                if (maxY < maxZ)
+                {
+                    currentVoxelPos.Y += (int)dy;
+                    maxY += deltaY;
+                    stepDir = 1;
+                }
+                else
+                {
+                    currentVoxelPos.Z += (int)dz;
+                    maxZ += deltaZ;
+                    stepDir = 2;
+                }
+            }
+        }
+
+        return (false, Vector3Int.Zero, Vector3.Zero);
+    }
 }

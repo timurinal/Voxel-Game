@@ -153,7 +153,7 @@ public static class Mathf
 
     public static int Floor(float v) => (int)Math.Floor(v);
 
-    public static float Fract(float v)
+    public static float Frac(float v)
     {
         return v - Mathf.Floor(v);
     }

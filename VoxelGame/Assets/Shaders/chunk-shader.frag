@@ -42,11 +42,9 @@ in float faceId;
 in vec3 normal;
 in vec3 fragPos;
 in vec4 fragPosLightSpace;
+in float fogDepth;
 
 uniform vec3 viewPos;
-
-uniform vec3 fogColour;
-uniform float fogDensity;
 
 uniform int shadowsEnabled;
 
@@ -56,6 +54,10 @@ uniform DirLight dirLight;
 uniform int Wireframe;
 
 uniform sampler2D shadowMap;
+
+const vec3 fogColour = vec3(0.6, 0.75, 1);
+const float fogNear = 128.0;
+const float fogFar = 150.0;
 
 vec2 hash2(vec2 p);
 
@@ -95,22 +97,13 @@ void main() {
     result += calcPointLight(LightData[i], norm, fragPos, viewDir);
 
     // TODO?: Maybe spotlights, although might not fit with the style
-
-    float dist = length(fragPos - viewPos);
-    float fogAmount = 1.0 - exp(-pow((dist * fogDensity), 2));
-    fogAmount = clamp(fogAmount, 0.0, 1.0);
-
-    float ditherAmount = 1.0 / 16.0;
-    vec2 screenResolution = vec2(1920, 1080);
-    vec2 uv = gl_FragCoord.xy / screenResolution.xy;
-    vec2 noise = hash2(uv);
-
-    // finalCol = mix(vec4(result, 1.0), vec4(fogColour, 1.0), fogAmount);
-    vec3 fogResult = mix(result, fogColour, fogAmount);
+    
     vec4 lit = vec4(result, 1.0);
-    // lit = clamp(lit, 0.0, 1.0);
 
     // TODO: dithering
+    
+    float fog = smoothstep(fogNear, fogFar, fogDepth);
+    lit = vec4(mix(lit.rgb, fogColour, fog), 1.0);
     
     finalCol = lit;
 }
@@ -192,7 +185,7 @@ float calcShadow(vec4 lightSpaceFragPos) {
     float bias = max(0.05 * (1.0 - dot(normal, -dirLight.direction)), 0.000000001);
 
     float radius = 5.0; // adjust as needed
-    float samples = 15.0; // adjust as needed
+    float samples = 30.0; // adjust as needed
     float shadow = pcfSoftShadow(projCoords.xy, currentDepth - bias, radius, samples);
 
     // keep shadow at 0 ouside far plane
