@@ -16,11 +16,9 @@ How to use
 **IT IS STRONGLY RECOMMENDED THAT YOU HAVE THE LATEST VERSION OF YOUR GPU DRIVERS BEFORE CONTINUING**
 
 ### Ready-to-play release
-First, start by ensuring you have .NET 8 installed by downloading it from the [official .NET site](https://dotnet.microsoft.com/en-us/download/dotnet/8.0)<br>
+First, start by ensuring you have .NET 8 installed by downloading it from the [official .NET site](https://dotnet.microsoft.com/en-us/download/dotnet/8.0). You may need to restart your system for changes to take effect.<br>
 Then, download one of the releases in Github and run the executable.<br>
-There is a shortcut in the root of the folder that runs the correct executable. Binaries are found in the /bin/ folder as well as runtime assets being located in /bin/Assets
-
-Launch the exe marked with -RT to lauch the ray-traced version. Not recommended unless you have a good GPU
+There is a shortcut in the root of the folder that runs the correct executable. Binaries are found in the /bin/ folder. Resources like shaders, and textures are compiled into VoxelGame.dll.
 
 ### Source code
 Start by cloning the repository.<br>
