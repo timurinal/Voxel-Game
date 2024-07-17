@@ -591,7 +591,7 @@ public sealed class Engine : GameWindow
             _ => "Unknown Renderer"
         };
         
-        Title = $"Voxel Game 0.0.0 (OpenGL 4 - {rendererString}) | Position: ({posX}, {posY}, {posZ}) | Frame Time: {Mathf.Round(_deltaTime * 1000f, 2)}ms ({Mathf.RoundToInt(1f / _deltaTime)} FPS)";
+        Title = $"Voxel Game 0.0.1b (OpenGL 4 - {rendererString}) | Position: ({posX}, {posY}, {posZ}) | Frame Time: {Mathf.Round(_deltaTime * 1000f, 2)}ms ({Mathf.RoundToInt(1f / _deltaTime)} FPS)";
         
         SwapBuffers();
     }
