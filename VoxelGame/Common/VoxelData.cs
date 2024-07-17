@@ -7,15 +7,22 @@ public static class VoxelData
 {
     public static Voxel[] Voxels;
 
-    public const string VoxelDataPath = "Assets/voxels.json";
+    public const string VoxelDataLocation = "VoxelGame.Assets.voxels.json";
 
     public const uint AirVoxelId = 0u;
     
     static VoxelData()
     {
-        using var fileReader = File.OpenText(VoxelDataPath);
-        var serializer = new JsonSerializer();
-        Voxels = (Voxel[])serializer.Deserialize(fileReader, typeof(Voxel[]));
+        if (Environment.LoadAssemblyStream(VoxelDataLocation, out var stream))
+        {
+            using var streamReader = new StreamReader(stream);
+            var serializer = new JsonSerializer();
+            Voxels = (Voxel[])serializer.Deserialize(streamReader, typeof(Voxel[]));
+        }
+        else
+        {
+            throw new Exception($"Couldn't find voxel data file at location {VoxelDataLocation}");
+        }
     }
 
     internal static int GetTextureFace(uint voxelId, VoxelFace face) => Voxels[voxelId].textureFaces[(int)face];

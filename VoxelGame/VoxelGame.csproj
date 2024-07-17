@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <OutputType>Exe</OutputType>
+        <OutputType>WinExe</OutputType>
         <TargetFramework>net8.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
@@ -22,10 +22,10 @@
 
     <ItemGroup>
       <None Update="Textures\uv-checker.png">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        <CopyToOutputDirectory>Never</CopyToOutputDirectory>
       </None>
       <None Update="Textures\atlas-main.png">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        <CopyToOutputDirectory>Never</CopyToOutputDirectory>
       </None>
       <None Update="Assets\Fonts\JetBrainsMono-Bold.ttf">
         <CopyToOutputDirectory>Never</CopyToOutputDirectory>
@@ -35,12 +35,6 @@
       </None>
       <None Update="Assets\Textures\skybox\front.png">
         <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-      </None>
-      <None Update="libs\libSimplexNoise.a">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
-      <None Update="libs\libSimplexNoise.dll">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
       <None Update="Assets\Textures\atlas-font.pdn">
         <CopyToOutputDirectory>Never</CopyToOutputDirectory>
@@ -69,9 +63,7 @@
       <None Remove="Assets\Shaders\denoiser.frag" />
       <EmbeddedResource Include="Assets\Shaders\denoiser.frag" />
       <None Remove="Assets\voxels.json" />
-      <EmbeddedResource Include="Assets\voxels.json">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </EmbeddedResource>
+      <EmbeddedResource Include="Assets\voxels.json" />
       <None Remove="Assets\Shaders\BUILTIN.json" />
       <EmbeddedResource Include="Assets\Shaders\BUILTIN.json" />
       <None Remove="Assets\Textures\atlas-main.png" />
@@ -95,9 +87,7 @@
       <None Remove="Assets\Textures\crosshair.png" />
       <EmbeddedResource Include="Assets\Textures\crosshair.png" />
       <None Remove="Assets\character-set.json" />
-      <EmbeddedResource Include="Assets\character-set.json">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </EmbeddedResource>
+      <EmbeddedResource Include="Assets\character-set.json" />
     </ItemGroup>
 
 </Project>

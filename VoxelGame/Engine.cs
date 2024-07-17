@@ -27,7 +27,7 @@ public sealed class Engine : GameWindow
     
     public bool ShowGui { get; set; }
 
-    public bool IsFullscreen;
+    public bool IsFullscreen = true;
     public bool IsWireframe;
     public bool Shadows = true;
     public bool FrustumCulling = true;
@@ -124,6 +124,8 @@ public sealed class Engine : GameWindow
         Player = new Player(Size);
         
         MainThread = Thread.CurrentThread;
+
+        IsFullscreen = true;
     }
 
     protected override async void OnLoad()

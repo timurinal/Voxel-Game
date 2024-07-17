@@ -9,7 +9,7 @@ public static class FontAtlas
     public const int FontAtlasWidth = 128, FontAtlasHeight = 128;
     public const int CharacterSize = 8;
     public const string FontAtlasPath = "VoxelGame.Assets.Textures.atlas-font.png";
-    public const string CharacterSetPath = "Assets/character-set.json";
+    public const string CharacterSetLocation = "VoxelGame.Assets.character-set.json";
     
     public static Texture2D FontTexture { get; private set; }
 
@@ -19,7 +19,7 @@ public static class FontAtlas
     {
         FontTexture = Texture2D.LoadFromAssembly(FontAtlasPath, false, false, false);
 
-        MainCharacterSet = new CharacterSet(CharacterSetPath);
+        MainCharacterSet = new CharacterSet(CharacterSetLocation);
     }
     
     internal static Vector2 GetUVForFont(int fontId, int u, int v)
@@ -39,11 +39,19 @@ public static class FontAtlas
         
         public static Character MissingCharacter => new('\u0000', 0, 5);
 
-        public CharacterSet(string jsonPath)
+        public CharacterSet(string location)
         {
-            using var fileReader = File.OpenText(jsonPath);
-            var serializer = new JsonSerializer();
-            Characters = (Character[])serializer.Deserialize(fileReader, typeof(Character[]));
+            
+            if (Environment.LoadAssemblyStream(location, out var stream))
+            {
+                using var streamReader = new StreamReader(stream);
+                var serializer = new JsonSerializer();
+                Characters = (Character[])serializer.Deserialize(streamReader, typeof(Character[]));
+            }
+            else
+            {
+                throw new Exception($"Couldn't find character data file at location {location}");
+            }
         }
 
         public Character GetCharacter(char character)
