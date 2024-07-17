@@ -28,40 +28,13 @@
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
       <None Update="Assets\Fonts\JetBrainsMono-Bold.ttf">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
-      <None Update="Assets\Shaders\chunk-shader.frag">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
-      <None Update="Assets\Shaders\chunk-shader.vert">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
-      <None Update="Assets\Textures\atlas-main.png">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
-      <None Update="Assets\Textures\uv-checker.png">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
-      <None Update="Assets\Textures\atlas-specular.png">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
-      <None Update="Assets\Shaders\skybox.frag">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
-      <None Update="Assets\Shaders\skybox.vert">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        <CopyToOutputDirectory>Never</CopyToOutputDirectory>
       </None>
       <None Update="Assets\Textures\skybox\down.png">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        <CopyToOutputDirectory>Never</CopyToOutputDirectory>
       </None>
       <None Update="Assets\Textures\skybox\front.png">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
-      <None Update="Assets\Shaders\depth.frag">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
-      <None Update="Assets\Shaders\depth.vert">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        <CopyToOutputDirectory>Never</CopyToOutputDirectory>
       </None>
       <None Update="libs\libSimplexNoise.a">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
@@ -69,33 +42,62 @@
       <None Update="libs\libSimplexNoise.dll">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
-      <None Update="Assets\voxels.json">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <None Update="Assets\Textures\atlas-font.pdn">
+        <CopyToOutputDirectory>Never</CopyToOutputDirectory>
       </None>
-      <None Update="Assets\Shaders\tonemapper.frag">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <None Update="Assets\Fonts\font-atlas_0.tga">
+        <CopyToOutputDirectory>Never</CopyToOutputDirectory>
       </None>
-      <None Update="Assets\Shaders\bloom.frag">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <None Update="Assets\Fonts\font-atlas.fnt">
+        <CopyToOutputDirectory>Never</CopyToOutputDirectory>
       </None>
-      <None Update="Assets\Shaders\fxaa.frag">
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Remove="Assets\Shaders\tonemapper.frag" />
+      <EmbeddedResource Include="Assets\Shaders\tonemapper.frag" />
+      <None Remove="Assets\Textures\atlas-font.png" />
+      <EmbeddedResource Include="Assets\Textures\atlas-font.png" />
+      <None Remove="Assets\Shaders\depth.frag" />
+      <EmbeddedResource Include="Assets\Shaders\depth.frag" />
+      <None Remove="Assets\Shaders\raytracer.vert" />
+      <EmbeddedResource Include="Assets\Shaders\raytracer.vert" />
+      <None Remove="Assets\Shaders\bloom.frag" />
+      <EmbeddedResource Include="Assets\Shaders\bloom.frag" />
+      <None Remove="Assets\Shaders\fxaa.frag" />
+      <EmbeddedResource Include="Assets\Shaders\fxaa.frag" />
+      <None Remove="Assets\Shaders\denoiser.frag" />
+      <EmbeddedResource Include="Assets\Shaders\denoiser.frag" />
+      <None Remove="Assets\voxels.json" />
+      <EmbeddedResource Include="Assets\voxels.json">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
-      <None Update="Assets\Shaders\raytracer.frag">
+      </EmbeddedResource>
+      <None Remove="Assets\Shaders\BUILTIN.json" />
+      <EmbeddedResource Include="Assets\Shaders\BUILTIN.json" />
+      <None Remove="Assets\Textures\atlas-main.png" />
+      <EmbeddedResource Include="Assets\Textures\atlas-main.png" />
+      <None Remove="Assets\Shaders\chunk-shader.vert" />
+      <EmbeddedResource Include="Assets\Shaders\chunk-shader.vert" />
+      <None Remove="Assets\Shaders\chunk-shader.frag" />
+      <EmbeddedResource Include="Assets\Shaders\chunk-shader.frag" />
+      <None Remove="Assets\Shaders\depth.vert" />
+      <EmbeddedResource Include="Assets\Shaders\depth.vert" />
+      <None Remove="Assets\Textures\uv-checker.png" />
+      <EmbeddedResource Include="Assets\Textures\uv-checker.png" />
+      <None Remove="Assets\Shaders\raytracer.frag" />
+      <EmbeddedResource Include="Assets\Shaders\raytracer.frag" />
+      <None Remove="Assets\Shaders\skybox.vert" />
+      <EmbeddedResource Include="Assets\Shaders\skybox.vert" />
+      <None Remove="Assets\Shaders\skybox.frag" />
+      <EmbeddedResource Include="Assets\Shaders\skybox.frag" />
+      <None Remove="Assets\Textures\atlas-specular.png" />
+      <EmbeddedResource Include="Assets\Textures\atlas-specular.png" />
+      <None Remove="Assets\Textures\crosshair.png" />
+      <EmbeddedResource Include="Assets\Textures\crosshair.png" />
+      <None Remove="Assets\character-set.json" />
+      <EmbeddedResource Include="Assets\character-set.json">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
-      <None Update="Assets\Shaders\raytracer.vert">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
-      <None Update="Assets\Shaders\denoiser.frag">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
-      <None Update="Assets\Textures\atlas-font.png">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
-      <None Update="Assets\character-set.json">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
+      </EmbeddedResource>
     </ItemGroup>
 
 </Project>

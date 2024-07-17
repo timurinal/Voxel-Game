@@ -23,7 +23,7 @@ public enum RenderMode
 
 public sealed class Engine : GameWindow
 {
-    public static readonly string DataPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VoxelGame");
+    public static readonly string DataPath = Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData), "VoxelGame");
     
     public bool ShowGui { get; set; }
 
@@ -145,14 +145,30 @@ public sealed class Engine : GameWindow
         _imGuiController = new ImGuiController(Size.X, Size.Y);
         // load any imgui fonts here
 
-        TextureAtlas.Init();
-        FontAtlas.Init();
-
         // Make the window visible after setting up so it appears in place and not in a random location
         IsVisible = true;
 
-        _depthShader = Shader.Load("Assets/Shaders/depth.vert", "Assets/Shaders/depth.frag");
-        _chunkShader = Shader.Load("Assets/Shaders/chunk-shader.vert", "Assets/Shaders/chunk-shader.frag");
+        // Load all the shaders
+
+        var assetLoadTimer = new System.Diagnostics.Stopwatch();
+        assetLoadTimer.Start();
+        
+        Console.WriteLine("Loading assets...");
+        
+        TextureAtlas.Init();
+        FontAtlas.Init();
+        
+        _depthShader = Shader.LoadFromAssembly("VoxelGame.Assets.Shaders.depth.vert", "VoxelGame.Assets.Shaders.depth.frag");
+        _chunkShader = Shader.LoadFromAssembly("VoxelGame.Assets.Shaders.chunk-shader.vert", "VoxelGame.Assets.Shaders.chunk-shader.frag");
+        _tonemapperShader = Shader.LoadFromAssembly("BUILTIN.image-effect.vert", "VoxelGame.Assets.Shaders.tonemapper.frag");
+        _skyboxShader = Shader.LoadFromAssembly("VoxelGame.Assets.Shaders.skybox.vert", "VoxelGame.Assets.Shaders.skybox.frag");
+        _raytracingShader = Shader.LoadFromAssembly("VoxelGame.Assets.Shaders.raytracer.vert", "VoxelGame.Assets.Shaders.raytracer.frag");
+        _denoiserShader = Shader.LoadFromAssembly("BUILTIN.image-effect.vert", "VoxelGame.Assets.Shaders.denoiser.frag");
+        
+        _testTexture = Texture2D.LoadFromAssembly("VoxelGame.Assets.Textures.uv-checker.png", useLinearSampling: true, generateMipmaps: true);
+
+        assetLoadTimer.Stop();
+        Console.WriteLine($"Loaded all assets in {assetLoadTimer.ElapsedMilliseconds}ms");
 
         _chunkShader.SetUniform("material.diffuse", 0);
         _chunkShader.SetUniform("material.specular", 1);
@@ -165,10 +181,7 @@ public sealed class Engine : GameWindow
         _chunkShader.SetUniform("dirLight.diffuse"  , dirLight.diffuse);
         _chunkShader.SetUniform("dirLight.specular" , dirLight.specular);
         
-        _tonemapperShader = Shader.Load("BUILTIN/image-effect.vert", "Assets/Shaders/tonemapper.frag");
         _tonemapper = new SSEffect(_tonemapperShader, Size, true);
-        
-        _skyboxShader = Shader.Load("Assets/Shaders/skybox.vert", "Assets/Shaders/skybox.frag");
         
         _skyboxShader.Use();
         _skyboxShader.SetUniform("SkyColourZenith", new Vector3(0.5019608f, 0.67058825f, 0.8980393f), autoUse: false);
@@ -183,8 +196,6 @@ public sealed class Engine : GameWindow
         _skyboxShader.SetUniform("SunLightDirection", _lightDir);
         
         _skybox = new SSEffect(_skyboxShader, Size, true);
-        
-        _raytracingShader = Shader.Load("Assets/Shaders/raytracer.vert", "Assets/Shaders/raytracer.frag");
         
         _raytracingShader.Use();
         _raytracingShader.SetUniform("MaxLightBounces", RayTracing.MaxLightBounces, autoUse: false);
@@ -203,7 +214,6 @@ public sealed class Engine : GameWindow
         
         _raytracing = new SSEffect(_raytracingShader, Size, true);
 
-        _denoiserShader = Shader.Load("BUILTIN/image-effect.vert", "Assets/Shaders/denoiser.frag");
         _denoiser = new SSEffect(_denoiserShader, Size, true);
         
         Chunks = new Dictionary<Vector3Int, Chunk>();
@@ -217,8 +227,6 @@ public sealed class Engine : GameWindow
         {
             _test.Colours[i] = Colour.Yellow;
         }
-
-        _testTexture = new Texture2D("Assets/Textures/uv-checker.png", useLinearSampling: true, generateMipmaps: true);
 
         _rtVoxelDataStorageBuffer = new ShaderStorageBuffer(0);
         _rtVoxelStorageBuffer = new ShaderStorageBuffer(1);

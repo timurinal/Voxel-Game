@@ -8,7 +8,7 @@ public static class FontAtlas
 {
     public const int FontAtlasWidth = 128, FontAtlasHeight = 128;
     public const int CharacterSize = 8;
-    public const string FontAtlasPath = "Assets/Textures/atlas-font.png";
+    public const string FontAtlasPath = "VoxelGame.Assets.Textures.atlas-font.png";
     public const string CharacterSetPath = "Assets/character-set.json";
     
     public static Texture2D FontTexture { get; private set; }
@@ -17,7 +17,7 @@ public static class FontAtlas
 
     internal static void Init()
     {
-        FontTexture = new(FontAtlasPath, false, false, false);
+        FontTexture = Texture2D.LoadFromAssembly(FontAtlasPath, false, false, false);
 
         MainCharacterSet = new CharacterSet(CharacterSetPath);
     }

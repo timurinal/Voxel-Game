@@ -68,8 +68,8 @@ float calcShadow(vec4 lightSpaceFragPos);
 
 void main() {
 
-    finalCol = vec4(normal * 0.5 + 0.5, 1.0);
-    return;
+//    finalCol = vec4(normal * 0.5 + 0.5, 1.0);
+//    return;
     
     //    finalCol = vec4(texture(material.specular, texcoord).rgb, 1.0);
     //    return;

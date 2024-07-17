@@ -198,6 +198,36 @@ public struct Shader : IEquatable<Shader>
 
         return new Shader { _id = id };
     }
+    public static Shader LoadFromAssembly(string vertexShaderLocation, string fragmentShaderLocation)
+    {
+        int id = GL.CreateProgram();
+
+        SubShader vertexShader;
+        
+        if (vertexShaderLocation == "BUILTIN.image-effect.vert")
+            vertexShader = SubShader.CreateFromSource(SSEffect.DefaultVertexShader, ShaderType.VertexShader);
+        else
+            vertexShader = SubShader.LoadFromAssembly(vertexShaderLocation, ShaderType.VertexShader);
+        
+        SubShader fragmentShader = SubShader.LoadFromAssembly(fragmentShaderLocation, ShaderType.FragmentShader);
+        
+        GL.AttachShader(id, vertexShader._id);
+        GL.AttachShader(id, fragmentShader._id);
+        
+        GL.LinkProgram(id);
+        
+        GL.DetachShader(id, vertexShader._id);
+        GL.DetachShader(id, fragmentShader._id);
+        
+        GL.DeleteShader(vertexShader._id);
+        GL.DeleteShader(fragmentShader._id);
+
+        string log = GL.GetProgramInfoLog(id);
+        if (!string.IsNullOrEmpty(log))
+            throw new ShaderErrorException(log);
+
+        return new Shader { _id = id };
+    }
 
     internal void Use()
     {
@@ -280,6 +310,30 @@ public struct Shader : IEquatable<Shader>
             string log = GL.GetShaderInfoLog(id);
             if (!string.IsNullOrEmpty(log))
                 throw new ShaderErrorException(path, log);
+
+            return new SubShader { _id = id };
+        }
+        public static SubShader LoadFromAssembly(string location, ShaderType type)
+        {
+            int id = GL.CreateShader(type);
+            
+            string source = string.Empty;
+            if (Environment.LoadAssemblyStream(location, out var stream))
+            {
+                using var reader = new StreamReader(stream);
+                source = reader.ReadToEnd();
+            }
+            else
+            {
+                throw new ShaderErrorException($"Couldn't find shader at location {location} in current assembly!");
+            }
+            
+            GL.ShaderSource(id, source);
+            GL.CompileShader(id);
+
+            string log = GL.GetShaderInfoLog(id);
+            if (!string.IsNullOrEmpty(log))
+                throw new ShaderErrorException(log);
 
             return new SubShader { _id = id };
         }

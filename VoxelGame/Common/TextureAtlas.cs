@@ -17,16 +17,16 @@ public static class TextureAtlas
 {
     public const int AtlasWidth = 256, AtlasHeight = 256;
     public const int VoxelTextureSize = 16;
-    public const string AlbedoAtlasPath = "Assets/Textures/atlas-main.png";
-    public const string SpecularAtlasPath = "Assets/Textures/atlas-specular.png";
+    public const string AlbedoAtlasPath = "VoxelGame.Assets.Textures.atlas-main.png";
+    public const string SpecularAtlasPath = "VoxelGame.Assets.Textures.atlas-specular.png";
     
     public static Texture2D AlbedoTexture { get; private set; }
     public static Texture2D SpecularTexture { get; private set; }
 
     internal static void Init()
     {
-        AlbedoTexture = new(AlbedoAtlasPath, false, false, true);
-        SpecularTexture = new(SpecularAtlasPath, false, true, true);
+        AlbedoTexture = Texture2D.LoadFromAssembly(AlbedoAtlasPath, false, false, true);
+        SpecularTexture = Texture2D.LoadFromAssembly(SpecularAtlasPath, false, true, true);
     }
     
     internal static Vector2 GetUVForVoxelFace(int voxelID, VoxelFace face, int u, int v)
