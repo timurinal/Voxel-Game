@@ -58,7 +58,7 @@ public sealed class Engine : GameWindow
     private Shader _chunkShader;
     internal static Dictionary<Vector3Int, Chunk> Chunks;
     private SortedList<float, Vector3Int> _chunksToBuild;
-    private const int MaxChunksToBuildPerFrame = 64;
+    private const int MaxChunksToBuildPerFrame = 16;
 
     private Shader _meshShader;
 
@@ -257,25 +257,6 @@ public sealed class Engine : GameWindow
         //
         //     xOffset += characterWidthRelative + additionalSpacing;
         // }
-
-        // await Task.Run(() =>
-        // {
-        //     Console.WriteLine(IsMainThread);
-        //
-        //     Chunk c = new Chunk(Vector3Int.Zero, Shader.StandardShader);
-        //     c.BuildChunk(Chunks);
-        // });
-
-        // Cube[] cubes =
-        // [
-        //     new Cube(new Vector3(0, 0, 0), new RTMaterial(new Vector3(0, 0, 0))),
-        //     new Cube(new Vector3(0, 1.5f, 0), new RTMaterial(new Vector3(1, 0, 0))),
-        //     new Cube(new Vector3(0, -1.5f, 0), new RTMaterial(new Vector3(0, 0, 1))),
-        // ];
-        //
-        // _rtVoxelStorageBuffer.SetData(Marshal.SizeOf<Cube>(), cubes);
-        //
-        // _raytracingShader.SetUniform("NumCubes", cubes.Length);
     }
 
     private bool _updated = false;
@@ -411,10 +392,16 @@ public sealed class Engine : GameWindow
 
                             // If there is already a chunk with the same distance,
                             // keep adding a small value to it until that key isn't in the list
+                            // To prevent an infinite loop, only run this code a maximum of 100 times.
+                            // But to ensure that the new key actually is different, the amount added increases
+                            // with each iteration
+                            int i = 0;
+                            const int maxIterations = 100;
                             do
                             {
-                                sqrDst += 0.01f;
-                            } while (_chunksToBuild.ContainsKey(sqrDst));
+                                sqrDst += 0.01f * (i / 10f);
+                                i++;
+                            } while (_chunksToBuild.ContainsKey(sqrDst) && i < maxIterations);
                             
                             _chunksToBuild.Add(sqrDst, chunkPosition); // Queue the chunk for building
                             Chunks[chunkPosition] = newChunk; // Add the chunk to the dictionary
@@ -612,8 +599,10 @@ public sealed class Engine : GameWindow
             {
                 foreach (var chunk in Chunks)
                 {
-                    
-                    var c = chunk.Value.Render(ShadowMapper.OrthographicMatrix, ShadowMapper.ViewMatrix, overrideShader: true, shaderOverride: _depthShader);
+                    if (ShadowMapper.Frustum.IsBoundingBoxInFrustum(chunk.Value.Bounds) || !FrustumCulling)
+                    {
+                        var c = chunk.Value.Render(ShadowMapper.OrthographicMatrix, ShadowMapper.ViewMatrix, overrideShader: true, shaderOverride: _depthShader);
+                    }
                 }
             }
             catch (GLException e) // for some reason, I get an opengl invalid value error when rendering the chunks but

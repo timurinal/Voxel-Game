@@ -1,4 +1,5 @@
 ﻿using System.Numerics;
+using OpenTK.Mathematics;
 using VoxelGame.Rendering;
 
 namespace VoxelGame.Maths;
@@ -6,21 +7,21 @@ namespace VoxelGame.Maths;
 
 public class Frustum
 {
-    private Player _player;
-
     private Plane[] _planes;
 
-    public Frustum(Player player)
+    public Frustum()
     {
-        _player = player;
         _planes = new Plane[6];
-        CalculateFrustum();
+    }
+    
+    public Frustum(Matrix4 vp)
+    {
+        _planes = new Plane[6];
+        CalculateFrustum(vp);
     }
 
-    public void CalculateFrustum()
+    public void CalculateFrustum(Matrix4 vp)
     {
-        var vp = _player.VPMatrix;
-
         Plane left   = new(new Vector3(vp[0, 3] + vp[0, 0], vp[1, 3] + vp[1, 0], vp[2, 3] + vp[2, 0]).Normalized, (vp[3, 3] + vp[3, 0]) / 
                              new Vector3(vp[0, 3] + vp[0, 0], vp[1, 3] + vp[1, 0], vp[2, 3] + vp[2, 0]).Magnitude);
         Plane right  = new(new Vector3(vp[0, 3] - vp[0, 0], vp[1, 3] - vp[1, 0], vp[2, 3] - vp[2, 0]).Normalized, (vp[3, 3] - vp[3, 0]) / 

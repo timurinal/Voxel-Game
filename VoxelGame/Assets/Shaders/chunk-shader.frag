@@ -56,8 +56,8 @@ uniform int Wireframe;
 uniform sampler2D shadowMap;
 
 const vec3 fogColour = vec3(0.6, 0.75, 1);
-const float fogNear = 128.0;
-const float fogFar = 150.0;
+const float fogNear = 180.0;
+const float fogFar = 210.0;
 
 vec2 hash2(vec2 p);
 
@@ -68,8 +68,8 @@ float calcShadow(vec4 lightSpaceFragPos);
 
 void main() {
 
-//    finalCol = vec4(normal * 0.5 + 0.5, 1.0);
-//    return;
+    finalCol = vec4(normal * 0.5 + 0.5, 1.0);
+    return;
     
     //    finalCol = vec4(texture(material.specular, texcoord).rgb, 1.0);
     //    return;
@@ -102,8 +102,8 @@ void main() {
 
     // TODO: dithering
     
-    float fog = smoothstep(fogNear, fogFar, fogDepth);
-    lit = vec4(mix(lit.rgb, fogColour, fog), 1.0);
+//    float fog = smoothstep(fogNear, fogFar, fogDepth);
+//    lit = vec4(mix(lit.rgb, fogColour, fog), 1.0);
     
     finalCol = lit;
 }
@@ -162,8 +162,10 @@ float pcfSoftShadow(vec2 uv, float currentDepth, float radius, float samples) {
     float diskRadius = radius / float(samples);
 
     vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
-    for (int i = 0; i < samples; i++) {
-        for (int j = 0; j < samples; j++) {
+    
+    int halfSamples = int(samples / 2.0);
+    for (int i = -halfSamples; i < halfSamples; i++) {
+        for (int j = -halfSamples; j < halfSamples; j++) {
             vec2 offset = diskRadius * vec2(float(i), float(j));
             float sampleDepth = texture(shadowMap, uv + offset * texelSize).r;
             shadow += (currentDepth < sampleDepth ? 1.0 : 0.0);

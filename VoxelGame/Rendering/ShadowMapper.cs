@@ -11,7 +11,7 @@ internal class ShadowMapper
     public Matrix4 OrthographicMatrix;
     public Matrix4 ViewMatrix;
 
-    public Matrix4 LightSpaceMatrix => OrthographicMatrix * ViewMatrix;
+    public Matrix4 VPMatrix;
 
     public const float SunViewDistance = 1000f;
 
@@ -19,7 +19,9 @@ internal class ShadowMapper
 
     public const int ShadowMapWidth = 8192, ShadowMapHeight = ShadowMapWidth;
 
-    public const float OrthographicSize = 100f;
+    public const float OrthographicSize = 200f;
+
+    public Frustum Frustum;
 
     private int _depthMapFbo, _depthMap;
 
@@ -39,6 +41,8 @@ internal class ShadowMapper
         GL.BindFramebuffer(FramebufferTarget.Framebuffer, _depthMapFbo);
         GL.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthAttachment, TextureTarget.Texture2D, _depthMap, 0);
         GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+
+        Frustum = new Frustum();
     }
 
     internal void Use()
@@ -61,5 +65,9 @@ internal class ShadowMapper
         OrthographicMatrix = Matrix4.CreateOrthographicOffCenter(-OrthographicSize, OrthographicSize, -OrthographicSize, OrthographicSize, NearPlane, FarPlane);
         Vector3 eyePosition = -lightDir * SunViewDistance + player.Position;
         ViewMatrix = Matrix4.LookAt(eyePosition, player.Position, Vector3.Up);
+
+        VPMatrix = ViewMatrix * OrthographicMatrix;
+        
+        Frustum.CalculateFrustum(VPMatrix);
     }
 }

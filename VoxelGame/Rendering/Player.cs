@@ -77,7 +77,6 @@ public sealed class Player
     {
         Collider = AABB.CreateFromExtents(Position + ColliderOffset, ColliderSize * 0.5f);
         
-        Frustum = new(this);
         MoveSpeed = moveSpeed;
         RotateSpeed = rotateSpeed;
 
@@ -91,6 +90,10 @@ public sealed class Player
         ViewMatrix = Matrix4.LookAt(cameraPosition, cameraPosition + cameraFront, cameraUp);
         ProjectionMatrix = Matrix4.CreatePerspectiveFieldOfView(VFov, _aspect, 
             NearClipPlane, FarClipPlane);
+        
+        VPMatrix = ViewMatrix * ProjectionMatrix;
+        
+        Frustum = new(VPMatrix);
     }
 
     internal void Update(Vector2Int screenSize, IEnumerable<AABB> chunkCollisions)
@@ -150,7 +153,7 @@ public sealed class Player
 
         VPMatrix = ViewMatrix * ProjectionMatrix;
         
-        Frustum.CalculateFrustum();
+        Frustum.CalculateFrustum(VPMatrix);
     }
 
     internal void UpdateProjection(Vector2Int screenSize, float fov = 65f)
