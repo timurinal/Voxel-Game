@@ -19,7 +19,7 @@ How to use
 ### Ready-to-play release
 First, start by ensuring you have .NET 8 installed by downloading it from the [official .NET site](https://dotnet.microsoft.com/en-us/download/dotnet/8.0). You may need to restart your system for changes to take effect.<br>
 Then, download one of the releases in Github and run the executable.<br>
-There is a batch file in the root of the folder that runs the correct executable. Windows Defender might have an issue with the batch file but if you don't want to run. it, you can run `VoxelEngine.exe` manually.<br>Binaries are found in the /bin/ folder. Resources like shaders, and textures are compiled into VoxelGame.dll.
+There is a batch file in the root of the folder that runs the correct executable. Windows Defender might have an issue with the batch file but if you don't want to run it, you can run `VoxelEngine.exe` manually.<br>Binaries are found in the /bin/ folder. Resources like shaders, and textures are compiled into VoxelGame.dll.
 
 ### Source code
 Start by cloning the repository.<br>
