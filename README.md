@@ -9,6 +9,7 @@ Features
 
 - Infinite procedural terrain in each direction
 - Custom-made lighting engine with realtime shadows for directional lights, and a point light system with specular highlights
+- Fast, multithreaded chunk builder
 
 How to use
 ---
@@ -18,7 +19,7 @@ How to use
 ### Ready-to-play release
 First, start by ensuring you have .NET 8 installed by downloading it from the [official .NET site](https://dotnet.microsoft.com/en-us/download/dotnet/8.0). You may need to restart your system for changes to take effect.<br>
 Then, download one of the releases in Github and run the executable.<br>
-There is a shortcut in the root of the folder that runs the correct executable. Binaries are found in the /bin/ folder. Resources like shaders, and textures are compiled into VoxelGame.dll.
+There is a batch file in the root of the folder that runs the correct executable. Windows Defender might have an issue with the batch file but if you don't want to run it, you can run `VoxelEngine.exe` manually.<br>Binaries are found in the /bin/ folder. Resources like shaders, and textures are compiled into VoxelGame.dll.
 
 ### Source code
 Start by cloning the repository.<br>
@@ -30,13 +31,4 @@ Any required packages should automatically be installed by your IDE's package ma
 Planned for the future
 ---
 
-Progress is tracked on a [Trello board](https://trello.com/b/lt8gN72f)<br>
-- Physics engine that allows for player gravity
-- Debug information on screen
-- UI system
-- Non blocking chunk generation
-- Lighting improvements
-- Point and spot light shadows
-- Shadow cascading
-- Biomes
-- Chunk saving and loading
+Progress is tracked on a [Trello board](https://trello.com/b/lt8gN72f)
