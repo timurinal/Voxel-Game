@@ -49,6 +49,8 @@
 
     <ItemGroup>
       <None Remove="Assets\Shaders\tonemapper.frag" />
+      <EmbeddedResource Include="Assets\Shaders\chunk-shader-transparency.frag" />
+      <EmbeddedResource Include="Assets\Shaders\chunk-shader-transparency.vert" />
       <EmbeddedResource Include="Assets\Shaders\tonemapper.frag" />
       <None Remove="Assets\Textures\atlas-font.png" />
       <EmbeddedResource Include="Assets\Textures\atlas-font.png" />

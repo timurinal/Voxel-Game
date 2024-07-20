@@ -1,4 +1,5 @@
-﻿using OpenTK.Windowing.Desktop;
+﻿using OpenTK.Windowing.Common;
+using OpenTK.Windowing.Desktop;
 using VoxelGame.Maths;
 
 namespace VoxelGame;
@@ -26,6 +27,10 @@ class Program
             ClientSize = new(1280, 720), 
             MinimumClientSize = new(640, 360),
             Title = "Voxel Game",
+            
+#if DEBUG
+            Flags = ContextFlags.Debug
+#endif
         };
 
         using var engine = new Engine(gws, nws);

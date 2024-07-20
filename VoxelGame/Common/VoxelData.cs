@@ -97,6 +97,20 @@ public static class VoxelData
 
         return true;
     }
+
+    public static bool IsLiquid(uint voxelId)
+    {
+        if (voxelId == 0)
+            return false;
+
+        foreach (var voxel in Voxels)
+        {
+            if (voxel.id == voxelId)
+                return voxel.liquid;
+        }
+
+        return false;
+    }
     
     public struct Voxel
     {
@@ -105,12 +119,13 @@ public static class VoxelData
         public string name;
         public int[] textureFaces;
         public bool transparent;
+        public bool liquid;
         
         public Vector3 lightColour;
         public float lightRange;
         
         [JsonConstructor]
-        public Voxel(uint id, string displayName, string name, int[] textureFaces, bool transparent, float[] lightColour, float lightRange)
+        public Voxel(uint id, string displayName, string name, int[] textureFaces, bool transparent, bool liquid, float[] lightColour, float lightRange)
         {
             if (textureFaces.Length > 6) throw new ArgumentException("A voxel can't have more than 6 textures!");
             if (lightColour != null && lightColour.Length != 3) throw new ArgumentException("Light colour needs 3 colour properties!");
@@ -121,6 +136,7 @@ public static class VoxelData
             this.textureFaces = textureFaces;
 
             this.transparent = transparent != null ? transparent : false;
+            this.liquid = liquid != null ? liquid : false;
             
             if (lightColour != null)
                 this.lightColour = new Vector3(lightColour[0], lightColour[1], lightColour[2]);

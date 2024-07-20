@@ -17,7 +17,12 @@ public sealed class Player
     
     private const float MaxRayDistance = 5f;
     
+#if RELEASE
     public static int ChunkRenderDistance = 8;
+#elif DEBUG
+    public static int ChunkRenderDistance = 4;
+#endif
+    
     public static int SqrChunkRenderDistance => ChunkRenderDistance * ChunkRenderDistance;
 
     public readonly Frustum Frustum;

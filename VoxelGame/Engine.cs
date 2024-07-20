@@ -9,6 +9,7 @@ using OpenTK.Windowing.Desktop;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using VoxelGame.Maths;
 using VoxelGame.Rendering;
+using ErrorCode = OpenTK.Graphics.OpenGL4.ErrorCode;
 using Random = VoxelGame.Maths.Random;
 using Vector2 = VoxelGame.Maths.Vector2;
 using Vector3 = VoxelGame.Maths.Vector3;
@@ -56,6 +57,7 @@ public sealed class Engine : GameWindow
     private Shader _depthShader;
     
     private Shader _chunkShader;
+    private Shader _chunkShaderTransparency;
     internal static Dictionary<Vector3Int, Chunk> Chunks;
     private SortedList<float, Vector3Int> _chunksToBuild;
     private const int MaxChunksToBuildPerFrame = 16;
@@ -103,7 +105,8 @@ public sealed class Engine : GameWindow
     private ShaderStorageBuffer _rtVoxelDataStorageBuffer;
     private ShaderStorageBuffer _rtVoxelStorageBuffer;
 
-    private static readonly ConcurrentQueue<Action> _mainThreadActions = new ConcurrentQueue<Action>();
+    private static readonly ConcurrentQueue<Action> _mainThreadActions = new();
+    private static readonly Queue<Action> _transparentChunkDrawCalls = new();
 
     private GizmoBox box;
     
@@ -136,10 +139,14 @@ public sealed class Engine : GameWindow
         GL.Enable(EnableCap.CullFace);
         GL.Enable(EnableCap.DepthTest);
 
+        // GL.Enable(EnableCap.Blend);
+        
         GL.CullFace(CullFaceMode.Back);
         GL.FrontFace(FrontFaceDirection.Cw);
         
         GL.DepthFunc(DepthFunction.Less);
+        
+        GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
 
         GL.ClearColor(0.6f, 0.75f, 1f, 1.0f);
         
@@ -160,8 +167,9 @@ public sealed class Engine : GameWindow
         TextureAtlas.Init();
         FontAtlas.Init();
         
-        _depthShader = Shader.LoadFromAssembly("VoxelGame.Assets.Shaders.depth.vert", "VoxelGame.Assets.Shaders.depth.frag");
         _chunkShader = Shader.LoadFromAssembly("VoxelGame.Assets.Shaders.chunk-shader.vert", "VoxelGame.Assets.Shaders.chunk-shader.frag");
+        _chunkShaderTransparency = Shader.LoadFromAssembly("VoxelGame.Assets.Shaders.chunk-shader-transparency.vert", "VoxelGame.Assets.Shaders.chunk-shader-transparency.frag");
+        _depthShader = Shader.LoadFromAssembly("VoxelGame.Assets.Shaders.depth.vert", "VoxelGame.Assets.Shaders.depth.frag");
         _tonemapperShader = Shader.LoadFromAssembly("BUILTIN.image-effect.vert", "VoxelGame.Assets.Shaders.tonemapper.frag");
         _skyboxShader = Shader.LoadFromAssembly("VoxelGame.Assets.Shaders.skybox.vert", "VoxelGame.Assets.Shaders.skybox.frag");
         _raytracingShader = Shader.LoadFromAssembly("VoxelGame.Assets.Shaders.raytracer.vert", "VoxelGame.Assets.Shaders.raytracer.frag");
@@ -175,6 +183,8 @@ public sealed class Engine : GameWindow
         _chunkShader.SetUniform("material.diffuse", 0);
         _chunkShader.SetUniform("material.specular", 1);
         _chunkShader.SetUniform("material.shininess", 128.0f);
+        
+        _chunkShaderTransparency.SetUniform("Albedo", 0);
 
         Vector3 ambientLighting = Vector3.One * 0.4f;
         DirLight dirLight = new(_lightDir, ambientLighting, Vector3.One * 1f, _lightColour);
@@ -364,7 +374,7 @@ public sealed class Engine : GameWindow
         {
             _updated = false;
             
-            var chunk = Chunks[Vector3Int.Zero];
+            var chunk = Chunks[new Vector3Int(0, 0, 0)];
             for (int i = 0; i < chunk.voxels.Length; i++)
             {
                 chunk.voxels[i] = chunk.voxels[i] == 4u ? 4u : 0u;
@@ -394,7 +404,7 @@ public sealed class Engine : GameWindow
                     if (!Chunks.ContainsKey(chunkPosition) && chunkWorldPosition.Y >= 0)
                     {
                         // TODO: Load chunks from disk
-                        var newChunk = new Chunk(chunkWorldPosition, _chunkShader);
+                        var newChunk = new Chunk(chunkWorldPosition, _chunkShader, _chunkShaderTransparency);
 
                         if (!newChunk.IsEmpty)
                         {
@@ -648,6 +658,15 @@ public sealed class Engine : GameWindow
                         }
                     }
                 }
+
+                GL.Enable(EnableCap.Blend);
+                var transparentChunkCopy = new List<Action>(_transparentChunkDrawCalls);
+                _transparentChunkDrawCalls.Clear();
+                foreach (var drawCall in transparentChunkCopy)
+                {
+                    drawCall();
+                }
+                GL.Disable(EnableCap.Blend);
             }
             catch (GLException e)
             {
@@ -946,5 +965,22 @@ public sealed class Engine : GameWindow
     public static void RegisterMainThreadAction(Action action)
     {
         _mainThreadActions.Enqueue(action);
+    }
+
+    internal static void RegisterTransparentChunkDrawCall(Action action)
+    {
+        _transparentChunkDrawCalls.Enqueue(action);
+    }
+
+    internal static void CheckGLError(string title)
+    {
+#if DEBUG
+        ErrorCode error;
+        int i = 1;
+        while ((error = GL.GetError()) != ErrorCode.NoError)
+        {
+            Console.WriteLine($"{title} ({i++}): {error}");
+        }
+#endif
     }
 }

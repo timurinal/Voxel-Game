@@ -14,12 +14,14 @@ public sealed class Chunk
     public const int ChunkVolume = ChunkArea * ChunkSize;
     public static readonly float ChunkSphereRadius = ChunkSize * Mathf.Sqrt(3) / 2f;
     
-    const int Stride = 9; // each vertex has 3 position floats, 3 normal floats, 2 UV floats, and 1 faceid integer
+    const int Stride = 8; // each vertex has 3 position floats, 3 normal floats, 2 UV floats
     
     public const int MaxStackSize = 250_000;
     
     public Vector3Int chunkPosition;
     public Vector3 chunkCentre;
+
+    public Vector3Int ChunkSpacePosition => Vector3.Round(chunkPosition / ChunkSize);
 
     public Vector3 Center =>
         new(chunkPosition.X + ChunkSize / 2f, chunkPosition.Y + ChunkSize / 2f,
@@ -34,6 +36,8 @@ public sealed class Chunk
 
     // This is true when the chunk is fully ready to be rendered by OpenGL
     private bool IsRenderReady = false;
+
+    private bool ContainsTransparentVoxels = false;
     
     public uint solidVoxelCount { get; private set; }
 
@@ -41,16 +45,20 @@ public sealed class Chunk
 
     private Shader _shader;
     private int _vao, _vbo, _ebo;
+    
+    private Shader _transparentShader;
+    private int _transparentVao, _transparentVbo, _transparentEbo;
 
     private int _vertexCount;
-    private int _triangleCount;
+    private int _triangleCount, _transparentTriangleCount;
 
     private Matrix4 m_model;
 
-    public Chunk(Vector3Int chunkPosition, Shader shader)
+    public Chunk(Vector3Int chunkPosition, Shader shader, Shader transparentShader)
     {
         this.chunkPosition = chunkPosition;
         _shader = shader;
+        _transparentShader = transparentShader;
 
         voxels = new uint[ChunkVolume];
 
@@ -75,6 +83,10 @@ public sealed class Chunk
         _vao = GL.GenVertexArray();
         _vbo = GL.GenBuffer();
         _ebo = GL.GenBuffer();
+        
+        _transparentVao = GL.GenVertexArray();
+        _transparentVbo = GL.GenBuffer();
+        _transparentEbo = GL.GenBuffer();
         
         m_model = Matrix4.CreateTranslation(chunkPosition);
         
@@ -118,224 +130,815 @@ public sealed class Chunk
 
                 GL.BindVertexArray(0);
 
+                if (result.containsTransparentVoxels)
+                {
+                    GL.BindVertexArray(_transparentVao);
+                    GL.BindBuffer(BufferTarget.ArrayBuffer, _transparentVbo);
+                    GL.BufferData(BufferTarget.ArrayBuffer, result.transparentData.Length * sizeof(float), result.transparentData, BufferUsageHint.StaticDraw);
+
+                    GL.BindBuffer(BufferTarget.ElementArrayBuffer, _transparentEbo);
+                    GL.BufferData(BufferTarget.ElementArrayBuffer, result.transparentTriangles.Length * sizeof(int), result.transparentTriangles, BufferUsageHint.StaticDraw);
+
+                    GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, Stride * sizeof(float), 0 * sizeof(float));
+                    GL.VertexAttribPointer(1, 3, VertexAttribPointerType.Float, false, Stride * sizeof(float), 3 * sizeof(float));
+                    GL.VertexAttribPointer(2, 2, VertexAttribPointerType.Float, false, Stride * sizeof(float), 6 * sizeof(float));
+                    GL.VertexAttribPointer(3, 1, VertexAttribPointerType.Float, false, Stride * sizeof(float), 8 * sizeof(float));
+                    GL.EnableVertexAttribArray(0);
+                    GL.EnableVertexAttribArray(1);
+                    GL.EnableVertexAttribArray(2);
+                    GL.EnableVertexAttribArray(3);
+
+                    GL.BindVertexArray(0);
+                }
+                
+                ContainsTransparentVoxels = result.containsTransparentVoxels;
+
                 IsRenderReady = true;
+                
+                Engine.CheckGLError("End of chunk generation");
             });
         }
     }
     
-    private (bool hasData, float[] data, int[] triangles) BuildChunkAsync(Dictionary<Vector3Int, Chunk> chunks)
+    private (bool hasData, float[] data, int[] triangles, bool containsTransparentVoxels, float[] transparentData, int[] transparentTriangles) BuildChunkAsync(Dictionary<Vector3Int, Chunk> chunks)
     {
         if (!IsEmpty)
         {
             List<Vector3> vertices = new();
             List<Vector3> normals = new();
             List<Vector2> uvs = new();
-            List<int> faceIds = new(); // 0 = front, 1 = back, 2 = up, 3 = down, 4 = right, 5 = left
             List<int> triangles = new();
+            
+            List<Vector3> transparentVertices = new();
+            List<Vector3> transparentNormals = new();
+            List<Vector2> transparentUvs = new();
+            List<int> transparentTriangles = new();
+            
+            bool containsTransparentVoxels = false;
 
-            for (int i = 0, triangleIndex = 0; i < voxels.Length; i++)
+            for (int i = 0, triangleIndex = 0, transparentTriangleIndex = 0; i < voxels.Length; i++)
             {
                 int x = i % ChunkSize;
                 int y = (i / ChunkSize) % ChunkSize;
                 int z = i / ChunkArea;
                 Vector3Int voxelPosition = new(x, y, z);
                 Vector3Int worldPosition = chunkPosition * ChunkSize + new Vector3Int(x, y, z);
+                
                 if (voxels[i] != 0)
                 {
                     solidVoxelCount++;
 
                     int voxelID = (int)voxels[i];
+                    uint uvoxelID = voxels[i];
 
-                    // Front face
-                    if (IsTransparent(voxelPosition.X, voxelPosition.Y, voxelPosition.Z - 1, voxels, chunks,
-                            (Vector3Int)(chunkPosition / ChunkSize), voxels[i]))
+                    bool isTransparent = VoxelData.IsTransparent(uvoxelID);
+
+                    containsTransparentVoxels |= isTransparent;
+
+                    const float liquidHeight = 0.4375f;
+
+                    if (!isTransparent)
                     {
-                        Vector2 uv00 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Front, 1, 1);
-                        Vector2 uv01 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Front, 1, 0);
-                        Vector2 uv10 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Front, 0, 1);
-                        Vector2 uv11 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Front, 0, 0);
-                        vertices.AddRange(new Vector3[]
+                        // Front face
+                        if (IsTransparent(voxelPosition.X, voxelPosition.Y, voxelPosition.Z - 1, voxels, chunks,
+                                (Vector3Int)(chunkPosition / ChunkSize), voxels[i]))
                         {
-                            new(x - 0.5f, y - 0.5f, z - 0.5f),
-                            new(x - 0.5f, y + 0.5f, z - 0.5f),
-                            new(x + 0.5f, y - 0.5f, z - 0.5f),
-                            new(x + 0.5f, y + 0.5f, z - 0.5f),
-                        });
-                        for (int j = 0; j < 4; j++)
-                            normals.Add(new Vector3(0, 0, -1));
-                        uvs.AddRange(new[]
+                            Vector2 uv00 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Front, 1, 1);
+                            Vector2 uv01 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Front, 1, 0);
+                            Vector2 uv10 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Front, 0, 1);
+                            Vector2 uv11 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Front, 0, 0);
+
+                            if (VoxelData.IsLiquid(uvoxelID))
+                            {
+                                uint aboveVoxelId =
+                                    Engine.GetVoxelAtPosition(voxelPosition + new Vector3Int(0, 1, 0)).voxelId ?? 0;
+                                bool isLiquidAbove = VoxelData.IsLiquid(aboveVoxelId);
+
+                                if (!isLiquidAbove)
+                                {
+                                    vertices.AddRange(new Vector3[]
+                                    {
+                                        new(x - 0.5f, y - 0.5f, z - 0.5f),
+                                        new(x - 0.5f, y + 0.5f, z - 0.5f),
+                                        new(x + 0.5f, y - 0.5f, z - 0.5f),
+                                        new(x + 0.5f, y + 0.5f, z - 0.5f),
+                                    });
+                                }
+                                else
+                                {
+                                    vertices.AddRange(new Vector3[]
+                                    {
+                                        new(x - 0.5f, y - 0.5f, z - 0.5f),
+                                        new(x - 0.5f, y + liquidHeight, z - 0.5f),
+                                        new(x + 0.5f, y - 0.5f, z - 0.5f),
+                                        new(x + 0.5f, y + liquidHeight, z - 0.5f),
+                                    });
+                                }
+                            }
+                            else
+                            {
+                                vertices.AddRange(new Vector3[]
+                                {
+                                    new(x - 0.5f, y - 0.5f, z - 0.5f),
+                                    new(x - 0.5f, y + 0.5f, z - 0.5f),
+                                    new(x + 0.5f, y - 0.5f, z - 0.5f),
+                                    new(x + 0.5f, y + 0.5f, z - 0.5f),
+                                });
+                            }
+                            
+                            for (int j = 0; j < 4; j++)
+                                normals.Add(new Vector3(0, 0, -1));
+                            uvs.AddRange(new[]
+                            {
+                                uv00, uv01, uv10, uv11
+                            });
+                            triangles.AddRange(new[]
+                            {
+                                0 + triangleIndex, 2 + triangleIndex, 1 + triangleIndex,
+                                2 + triangleIndex, 3 + triangleIndex, 1 + triangleIndex,
+                            });
+                            triangleIndex += 4;
+                        }
+
+                        // Back face
+                        if (IsTransparent(voxelPosition.X, voxelPosition.Y, voxelPosition.Z + 1, voxels, chunks,
+                                (Vector3Int)(chunkPosition / ChunkSize), voxels[i]))
                         {
-                            uv00, uv01, uv10, uv11
-                        });
-                        for (int j = 0; j < 4; j++)
-                            faceIds.Add(0);
-                        triangles.AddRange(new[]
+                            Vector2 uv00 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Back, 1, 1);
+                            Vector2 uv01 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Back, 1, 0);
+                            Vector2 uv10 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Back, 0, 1);
+                            Vector2 uv11 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Back, 0, 0);
+                            
+                            if (VoxelData.IsLiquid(uvoxelID))
+                            {
+                                uint aboveVoxelId =
+                                    Engine.GetVoxelAtPosition(voxelPosition + new Vector3Int(0, 1, 0)).voxelId ?? 0;
+                                bool isLiquidAbove = VoxelData.IsLiquid(aboveVoxelId);
+
+                                if (!isLiquidAbove)
+                                {
+                                    vertices.AddRange(new Vector3[]
+                                    {
+                                        new(x - 0.5f, y - 0.5f, z + 0.5f),
+                                        new(x - 0.5f, y + 0.5f, z + 0.5f),
+                                        new(x + 0.5f, y - 0.5f, z + 0.5f),
+                                        new(x + 0.5f, y + 0.5f, z + 0.5f),
+                                    });
+                                }
+                                else
+                                {
+                                    vertices.AddRange(new Vector3[]
+                                    {
+                                        new(x - 0.5f, y - 0.5f, z + 0.5f),
+                                        new(x - 0.5f, y + liquidHeight, z + 0.5f),
+                                        new(x + 0.5f, y - 0.5f, z + 0.5f),
+                                        new(x + 0.5f, y + liquidHeight, z + 0.5f),
+                                    });
+                                }
+                            }
+                            else
+                            {
+                                vertices.AddRange(new Vector3[]
+                                {
+                                    new(x - 0.5f, y - 0.5f, z + 0.5f),
+                                    new(x - 0.5f, y + 0.5f, z + 0.5f),
+                                    new(x + 0.5f, y - 0.5f, z + 0.5f),
+                                    new(x + 0.5f, y + 0.5f, z + 0.5f),
+                                });
+                            }
+                            
+                            for (int j = 0; j < 4; j++)
+                                normals.Add(new Vector3(0, 0, 1));
+                            uvs.AddRange(new[]
+                            {
+                                uv00, uv01, uv10, uv11
+                            });
+                            triangles.AddRange(new[]
+                            {
+                                0 + triangleIndex, 1 + triangleIndex, 2 + triangleIndex,
+                                2 + triangleIndex, 1 + triangleIndex, 3 + triangleIndex,
+                            });
+                            triangleIndex += 4;
+                        }
+
+                        // Top face
+                        if (IsTransparent(voxelPosition.X, voxelPosition.Y + 1, voxelPosition.Z, voxels, chunks,
+                                (Vector3Int)(chunkPosition / ChunkSize), voxels[i]))
                         {
-                            0 + triangleIndex, 2 + triangleIndex, 1 + triangleIndex,
-                            2 + triangleIndex, 3 + triangleIndex, 1 + triangleIndex,
-                        });
-                        triangleIndex += 4;
+                            Vector2 uv00 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Top, 1, 1);
+                            Vector2 uv01 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Top, 1, 0);
+                            Vector2 uv10 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Top, 0, 1);
+                            Vector2 uv11 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Top, 0, 0);
+
+                            if (VoxelData.IsLiquid(uvoxelID))
+                            {
+                                uint aboveVoxelId =
+                                    Engine.GetVoxelAtPosition(voxelPosition + new Vector3Int(0, 1, 0)).voxelId ?? 0;
+                                bool isLiquidAbove = VoxelData.IsLiquid(aboveVoxelId);
+
+                                if (!isLiquidAbove)
+                                {
+                                    vertices.AddRange(new Vector3[]
+                                    {
+                                        new(x - 0.5f, y + 0.5f, z - 0.5f),
+                                        new(x + 0.5f, y + 0.5f, z - 0.5f),
+                                        new(x - 0.5f, y + 0.5f, z + 0.5f),
+                                        new(x + 0.5f, y + 0.5f, z + 0.5f),
+                                    });
+                                }
+                                else
+                                {
+                                    vertices.AddRange(new Vector3[]
+                                    {
+                                        new(x - 0.5f, y + liquidHeight, z - 0.5f),
+                                        new(x + 0.5f, y + liquidHeight, z - 0.5f),
+                                        new(x - 0.5f, y + liquidHeight, z + 0.5f),
+                                        new(x + 0.5f, y + liquidHeight, z + 0.5f),
+                                    });
+                                }
+                            }
+                            else
+                            {
+                                vertices.AddRange(new Vector3[]
+                                {
+                                    new(x - 0.5f, y + 0.5f, z - 0.5f),
+                                    new(x + 0.5f, y + 0.5f, z - 0.5f),
+                                    new(x - 0.5f, y + 0.5f, z + 0.5f),
+                                    new(x + 0.5f, y + 0.5f, z + 0.5f),
+                                });
+                            }
+                            
+                            for (int j = 0; j < 4; j++)
+                                normals.Add(new Vector3(0, 1, 0));
+                            uvs.AddRange(new[]
+                            {
+                                uv00, uv01, uv10, uv11
+                            });
+                            triangles.AddRange(new[]
+                            {
+                                0 + triangleIndex, 1 + triangleIndex, 2 + triangleIndex,
+                                2 + triangleIndex, 1 + triangleIndex, 3 + triangleIndex,
+                            });
+                            triangleIndex += 4;
+                        }
+
+                        // Bottom face
+                        if (IsTransparent(voxelPosition.X, voxelPosition.Y - 1, voxelPosition.Z, voxels, chunks,
+                                (Vector3Int)(chunkPosition / ChunkSize), voxels[i]))
+                        {
+                            Vector2 uv00 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Bottom, 1, 1);
+                            Vector2 uv01 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Bottom, 1, 0);
+                            Vector2 uv10 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Bottom, 0, 1);
+                            Vector2 uv11 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Bottom, 0, 0);
+
+                            if (VoxelData.IsLiquid(uvoxelID))
+                            {
+                                uint aboveVoxelId =
+                                    Engine.GetVoxelAtPosition(voxelPosition + new Vector3Int(0, 1, 0)).voxelId ?? 0;
+                                bool isLiquidAbove = VoxelData.IsLiquid(aboveVoxelId);
+
+                                if (!isLiquidAbove)
+                                {
+                                    vertices.AddRange(new Vector3[]
+                                    {
+                                        new(x - 0.5f, y - 0.5f, z - 0.5f),
+                                        new(x + 0.5f, y - 0.5f, z - 0.5f),
+                                        new(x - 0.5f, y - 0.5f, z + 0.5f),
+                                        new(x + 0.5f, y - 0.5f, z + 0.5f),
+                                    });
+                                }
+                                else
+                                {
+                                    vertices.AddRange(new Vector3[]
+                                    {
+                                        new(x - 0.5f, y - liquidHeight, z - 0.5f),
+                                        new(x + 0.5f, y - liquidHeight, z - 0.5f),
+                                        new(x - 0.5f, y - liquidHeight, z + 0.5f),
+                                        new(x + 0.5f, y - liquidHeight, z + 0.5f),
+                                    });
+                                }
+                            }
+                            else
+                            {
+                                vertices.AddRange(new Vector3[]
+                                {
+                                    new(x - 0.5f, y - 0.5f, z - 0.5f),
+                                    new(x + 0.5f, y - 0.5f, z - 0.5f),
+                                    new(x - 0.5f, y - 0.5f, z + 0.5f),
+                                    new(x + 0.5f, y - 0.5f, z + 0.5f),
+                                });
+                            }
+                            
+                            for (int j = 0; j < 4; j++)
+                                normals.Add(new Vector3(0, -1, 0));
+                            uvs.AddRange(new[]
+                            {
+                                uv00, uv01, uv10, uv11
+                            });
+                            triangles.AddRange(new[]
+                            {
+                                0 + triangleIndex, 2 + triangleIndex, 1 + triangleIndex,
+                                2 + triangleIndex, 3 + triangleIndex, 1 + triangleIndex,
+                            });
+                            triangleIndex += 4;
+                        }
+
+                        // Right face
+                        if (IsTransparent(voxelPosition.X + 1, voxelPosition.Y, voxelPosition.Z, voxels, chunks,
+                                (Vector3Int)(chunkPosition / ChunkSize), voxels[i]))
+                        {
+                            Vector2 uv00 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Right, 1, 1);
+                            Vector2 uv01 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Right, 1, 0);
+                            Vector2 uv10 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Right, 0, 1);
+                            Vector2 uv11 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Right, 0, 0);
+
+                            if (VoxelData.IsLiquid(uvoxelID))
+                            {
+                                uint aboveVoxelId =
+                                    Engine.GetVoxelAtPosition(voxelPosition + new Vector3Int(0, 1, 0)).voxelId ?? 0;
+                                bool isLiquidAbove = VoxelData.IsLiquid(aboveVoxelId);
+
+                                if (!isLiquidAbove)
+                                {
+                                    vertices.AddRange(new Vector3[]
+                                    {
+                                        new(x + 0.5f, y - 0.5f, z - 0.5f),
+                                        new(x + 0.5f, y + 0.5f, z - 0.5f),
+                                        new(x + 0.5f, y - 0.5f, z + 0.5f),
+                                        new(x + 0.5f, y + 0.5f, z + 0.5f),
+                                    });
+                                }
+                                else
+                                {
+                                    vertices.AddRange(new Vector3[]
+                                    {
+                                        new(x + 0.5f, y - 0.5f, z - 0.5f),
+                                        new(x + 0.5f, y + liquidHeight, z - 0.5f),
+                                        new(x + 0.5f, y - 0.5f, z + 0.5f),
+                                        new(x + 0.5f, y + liquidHeight, z + 0.5f),
+                                    });
+                                }
+                            }
+                            else
+                            {
+                                vertices.AddRange(new Vector3[]
+                                {
+                                    new(x + 0.5f, y - 0.5f, z - 0.5f),
+                                    new(x + 0.5f, y + 0.5f, z - 0.5f),
+                                    new(x + 0.5f, y - 0.5f, z + 0.5f),
+                                    new(x + 0.5f, y + 0.5f, z + 0.5f),
+                                });
+                            }
+                            
+                            for (int j = 0; j < 4; j++)
+                                normals.Add(new Vector3(1, 0, 0));
+                            uvs.AddRange(new[]
+                            {
+                                uv00, uv01, uv10, uv11
+                            });
+                            triangles.AddRange(new[]
+                            {
+                                0 + triangleIndex, 2 + triangleIndex, 1 + triangleIndex,
+                                2 + triangleIndex, 3 + triangleIndex, 1 + triangleIndex,
+                            });
+                            triangleIndex += 4;
+                        }
+
+                        // Left face
+                        if (IsTransparent(voxelPosition.X - 1, voxelPosition.Y, voxelPosition.Z, voxels, chunks,
+                                (Vector3Int)(chunkPosition / ChunkSize), voxels[i]))
+                        {
+                            Vector2 uv00 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Left, 1, 1);
+                            Vector2 uv01 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Left, 1, 0);
+                            Vector2 uv10 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Left, 0, 1);
+                            Vector2 uv11 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Left, 0, 0);
+
+                            if (VoxelData.IsLiquid(uvoxelID))
+                            {
+                                uint aboveVoxelId =
+                                    Engine.GetVoxelAtPosition(voxelPosition + new Vector3Int(0, 1, 0)).voxelId ?? 0;
+                                bool isLiquidAbove = VoxelData.IsLiquid(aboveVoxelId);
+
+                                if (!isLiquidAbove)
+                                {
+                                    vertices.AddRange(new Vector3[]
+                                    {
+                                        new(x - 0.5f, y - 0.5f, z - 0.5f),
+                                        new(x - 0.5f, y + 0.5f, z - 0.5f),
+                                        new(x - 0.5f, y - 0.5f, z + 0.5f),
+                                        new(x - 0.5f, y + 0.5f, z + 0.5f),
+                                    });
+                                }
+                                else
+                                {
+                                    vertices.AddRange(new Vector3[]
+                                    {
+                                        new(x - 0.5f, y - 0.5f, z - 0.5f),
+                                        new(x - 0.5f, y + liquidHeight, z - 0.5f),
+                                        new(x - 0.5f, y - 0.5f, z + 0.5f),
+                                        new(x - 0.5f, y + liquidHeight, z + 0.5f),
+                                    });
+                                }
+                            }
+                            else
+                            {
+                                vertices.AddRange(new Vector3[]
+                                {
+                                    new(x - 0.5f, y - 0.5f, z - 0.5f),
+                                    new(x - 0.5f, y + 0.5f, z - 0.5f),
+                                    new(x - 0.5f, y - 0.5f, z + 0.5f),
+                                    new(x - 0.5f, y + 0.5f, z + 0.5f),
+                                });
+                            }
+                            
+                            for (int j = 0; j < 4; j++)
+                                normals.Add(new Vector3(-1, 0, 1));
+                            uvs.AddRange(new[]
+                            {
+                                uv00, uv01, uv10, uv11
+                            });
+                            triangles.AddRange(new[]
+                            {
+                                0 + triangleIndex, 1 + triangleIndex, 2 + triangleIndex,
+                                2 + triangleIndex, 1 + triangleIndex, 3 + triangleIndex,
+                            });
+                            triangleIndex += 4;
+                        }
                     }
-
-                    // Back face
-                    if (IsTransparent(voxelPosition.X, voxelPosition.Y, voxelPosition.Z + 1, voxels, chunks,
-                            (Vector3Int)(chunkPosition / ChunkSize), voxels[i]))
+                    else
                     {
-                        Vector2 uv00 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Back, 1, 1);
-                        Vector2 uv01 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Back, 1, 0);
-                        Vector2 uv10 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Back, 0, 1);
-                        Vector2 uv11 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Back, 0, 0);
-                        vertices.AddRange(new Vector3[]
+                        // Front face
+                        if (IsTransparent(voxelPosition.X, voxelPosition.Y, voxelPosition.Z - 1, voxels, chunks,
+                                (Vector3Int)(chunkPosition / ChunkSize), voxels[i]))
                         {
-                            new(x - 0.5f, y - 0.5f, z + 0.5f),
-                            new(x - 0.5f, y + 0.5f, z + 0.5f),
-                            new(x + 0.5f, y - 0.5f, z + 0.5f),
-                            new(x + 0.5f, y + 0.5f, z + 0.5f),
-                        });
-                        for (int j = 0; j < 4; j++)
-                            normals.Add(new Vector3(0, 0, 1));
-                        uvs.AddRange(new[]
-                        {
-                            uv00, uv01, uv10, uv11
-                        });
-                        for (int j = 0; j < 4; j++)
-                            faceIds.Add(1);
-                        triangles.AddRange(new[]
-                        {
-                            0 + triangleIndex, 1 + triangleIndex, 2 + triangleIndex,
-                            2 + triangleIndex, 1 + triangleIndex, 3 + triangleIndex,
-                        });
-                        triangleIndex += 4;
-                    }
+                            Vector2 uv00 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Front, 1, 1);
+                            Vector2 uv01 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Front, 1, 0);
+                            Vector2 uv10 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Front, 0, 1);
+                            Vector2 uv11 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Front, 0, 0);
 
-                    // Top face
-                    if (IsTransparent(voxelPosition.X, voxelPosition.Y + 1, voxelPosition.Z, voxels, chunks,
-                            (Vector3Int)(chunkPosition / ChunkSize), voxels[i]))
-                    {
-                        Vector2 uv00 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Top, 1, 1);
-                        Vector2 uv01 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Top, 1, 0);
-                        Vector2 uv10 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Top, 0, 1);
-                        Vector2 uv11 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Top, 0, 0);
-                        vertices.AddRange(new Vector3[]
-                        {
-                            new(x - 0.5f, y + 0.5f, z - 0.5f),
-                            new(x + 0.5f, y + 0.5f, z - 0.5f),
-                            new(x - 0.5f, y + 0.5f, z + 0.5f),
-                            new(x + 0.5f, y + 0.5f, z + 0.5f),
-                        });
-                        for (int j = 0; j < 4; j++)
-                            normals.Add(new Vector3(0, 1, 0));
-                        uvs.AddRange(new[]
-                        {
-                            uv00, uv01, uv10, uv11
-                        });
-                        for (int j = 0; j < 4; j++)
-                            faceIds.Add(2);
-                        triangles.AddRange(new[]
-                        {
-                            0 + triangleIndex, 1 + triangleIndex, 2 + triangleIndex,
-                            2 + triangleIndex, 1 + triangleIndex, 3 + triangleIndex,
-                        });
-                        triangleIndex += 4;
-                    }
+                            if (VoxelData.IsLiquid(uvoxelID))
+                            {
+                                uint aboveVoxelId =
+                                    Engine.GetVoxelAtPosition(voxelPosition + new Vector3Int(0, 1, 0)).voxelId ?? 0;
+                                bool isLiquidAbove = VoxelData.IsLiquid(aboveVoxelId);
 
-                    // Bottom face
-                    if (IsTransparent(voxelPosition.X, voxelPosition.Y - 1, voxelPosition.Z, voxels, chunks,
-                            (Vector3Int)(chunkPosition / ChunkSize), voxels[i]))
-                    {
-                        Vector2 uv00 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Bottom, 1, 1);
-                        Vector2 uv01 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Bottom, 1, 0);
-                        Vector2 uv10 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Bottom, 0, 1);
-                        Vector2 uv11 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Bottom, 0, 0);
-                        vertices.AddRange(new Vector3[]
-                        {
-                            new(x - 0.5f, y - 0.5f, z - 0.5f),
-                            new(x + 0.5f, y - 0.5f, z - 0.5f),
-                            new(x - 0.5f, y - 0.5f, z + 0.5f),
-                            new(x + 0.5f, y - 0.5f, z + 0.5f),
-                        });
-                        for (int j = 0; j < 4; j++)
-                            normals.Add(new Vector3(0, -1, 0));
-                        uvs.AddRange(new[]
-                        {
-                            uv00, uv01, uv10, uv11
-                        });
-                        for (int j = 0; j < 4; j++)
-                            faceIds.Add(3);
-                        triangles.AddRange(new[]
-                        {
-                            0 + triangleIndex, 2 + triangleIndex, 1 + triangleIndex,
-                            2 + triangleIndex, 3 + triangleIndex, 1 + triangleIndex,
-                        });
-                        triangleIndex += 4;
-                    }
+                                if (!isLiquidAbove)
+                                {
+                                    transparentVertices.AddRange(new Vector3[]
+                                    {
+                                        new(x - 0.5f, y - 0.5f, z - 0.5f),
+                                        new(x - 0.5f, y + 0.5f, z - 0.5f),
+                                        new(x + 0.5f, y - 0.5f, z - 0.5f),
+                                        new(x + 0.5f, y + 0.5f, z - 0.5f),
+                                    });
+                                }
+                                else
+                                {
+                                    transparentVertices.AddRange(new Vector3[]
+                                    {
+                                        new(x - 0.5f, y - 0.5f, z - 0.5f),
+                                        new(x - 0.5f, y + liquidHeight, z - 0.5f),
+                                        new(x + 0.5f, y - 0.5f, z - 0.5f),
+                                        new(x + 0.5f, y + liquidHeight, z - 0.5f),
+                                    });
+                                }
+                            }
+                            else
+                            {
+                                transparentVertices.AddRange(new Vector3[]
+                                {
+                                    new(x - 0.5f, y - 0.5f, z - 0.5f),
+                                    new(x - 0.5f, y + 0.5f, z - 0.5f),
+                                    new(x + 0.5f, y - 0.5f, z - 0.5f),
+                                    new(x + 0.5f, y + 0.5f, z - 0.5f),
+                                });
+                            }
+                            
+                            for (int j = 0; j < 4; j++)
+                                transparentNormals.Add(new Vector3(0, 0, -1));
+                            transparentUvs.AddRange(new[]
+                            {
+                                uv00, uv01, uv10, uv11
+                            });
+                            transparentTriangles.AddRange(new[]
+                            {
+                                0 + transparentTriangleIndex, 2 + transparentTriangleIndex, 1 + transparentTriangleIndex,
+                                2 + transparentTriangleIndex, 3 + transparentTriangleIndex, 1 + transparentTriangleIndex,
+                            });
+                            transparentTriangleIndex += 4;
+                        }
 
-                    // Right face
-                    if (IsTransparent(voxelPosition.X + 1, voxelPosition.Y, voxelPosition.Z, voxels, chunks,
-                            (Vector3Int)(chunkPosition / ChunkSize), voxels[i]))
-                    {
-                        Vector2 uv00 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Right, 1, 1);
-                        Vector2 uv01 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Right, 1, 0);
-                        Vector2 uv10 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Right, 0, 1);
-                        Vector2 uv11 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Right, 0, 0);
-                        vertices.AddRange(new Vector3[]
+                        // Back face
+                        if (IsTransparent(voxelPosition.X, voxelPosition.Y, voxelPosition.Z + 1, voxels, chunks,
+                                (Vector3Int)(chunkPosition / ChunkSize), voxels[i]))
                         {
-                            new(x + 0.5f, y - 0.5f, z - 0.5f),
-                            new(x + 0.5f, y + 0.5f, z - 0.5f),
-                            new(x + 0.5f, y - 0.5f, z + 0.5f),
-                            new(x + 0.5f, y + 0.5f, z + 0.5f),
-                        });
-                        for (int j = 0; j < 4; j++)
-                            normals.Add(new Vector3(1, 0, 0));
-                        uvs.AddRange(new[]
-                        {
-                            uv00, uv01, uv10, uv11
-                        });
-                        for (int j = 0; j < 4; j++)
-                            faceIds.Add(4);
-                        triangles.AddRange(new[]
-                        {
-                            0 + triangleIndex, 2 + triangleIndex, 1 + triangleIndex,
-                            2 + triangleIndex, 3 + triangleIndex, 1 + triangleIndex,
-                        });
-                        triangleIndex += 4;
-                    }
+                            Vector2 uv00 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Back, 1, 1);
+                            Vector2 uv01 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Back, 1, 0);
+                            Vector2 uv10 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Back, 0, 1);
+                            Vector2 uv11 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Back, 0, 0);
+                            
+                            if (VoxelData.IsLiquid(uvoxelID))
+                            {
+                                uint aboveVoxelId =
+                                    Engine.GetVoxelAtPosition(voxelPosition + new Vector3Int(0, 1, 0)).voxelId ?? 0;
+                                bool isLiquidAbove = VoxelData.IsLiquid(aboveVoxelId);
 
-                    // Left face
-                    if (IsTransparent(voxelPosition.X - 1, voxelPosition.Y, voxelPosition.Z, voxels, chunks,
-                            (Vector3Int)(chunkPosition / ChunkSize), voxels[i]))
-                    {
-                        Vector2 uv00 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Left, 1, 1);
-                        Vector2 uv01 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Left, 1, 0);
-                        Vector2 uv10 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Left, 0, 1);
-                        Vector2 uv11 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Left, 0, 0);
-                        vertices.AddRange(new Vector3[]
+                                if (!isLiquidAbove)
+                                {
+                                    transparentVertices.AddRange(new Vector3[]
+                                    {
+                                        new(x - 0.5f, y - 0.5f, z + 0.5f),
+                                        new(x - 0.5f, y + 0.5f, z + 0.5f),
+                                        new(x + 0.5f, y - 0.5f, z + 0.5f),
+                                        new(x + 0.5f, y + 0.5f, z + 0.5f),
+                                    });
+                                }
+                                else
+                                {
+                                    transparentVertices.AddRange(new Vector3[]
+                                    {
+                                        new(x - 0.5f, y - 0.5f, z + 0.5f),
+                                        new(x - 0.5f, y + liquidHeight, z + 0.5f),
+                                        new(x + 0.5f, y - 0.5f, z + 0.5f),
+                                        new(x + 0.5f, y + liquidHeight, z + 0.5f),
+                                    });
+                                }
+                            }
+                            else
+                            {
+                                transparentVertices.AddRange(new Vector3[]
+                                {
+                                    new(x - 0.5f, y - 0.5f, z + 0.5f),
+                                    new(x - 0.5f, y + 0.5f, z + 0.5f),
+                                    new(x + 0.5f, y - 0.5f, z + 0.5f),
+                                    new(x + 0.5f, y + 0.5f, z + 0.5f),
+                                });
+                            }
+                            
+                            for (int j = 0; j < 4; j++)
+                                transparentNormals.Add(new Vector3(0, 0, 1));
+                            transparentUvs.AddRange(new[]
+                            {
+                                uv00, uv01, uv10, uv11
+                            });
+                            transparentTriangles.AddRange(new[]
+                            {
+                                0 + transparentTriangleIndex, 1 + transparentTriangleIndex, 2 + transparentTriangleIndex,
+                                2 + transparentTriangleIndex, 1 + transparentTriangleIndex, 3 + transparentTriangleIndex,
+                            });
+                            transparentTriangleIndex += 4;
+                        }
+
+                        // Top face
+                        if (IsTransparent(voxelPosition.X, voxelPosition.Y + 1, voxelPosition.Z, voxels, chunks,
+                                (Vector3Int)(chunkPosition / ChunkSize), voxels[i]))
                         {
-                            new(x - 0.5f, y - 0.5f, z - 0.5f),
-                            new(x - 0.5f, y + 0.5f, z - 0.5f),
-                            new(x - 0.5f, y - 0.5f, z + 0.5f),
-                            new(x - 0.5f, y + 0.5f, z + 0.5f),
-                        });
-                        for (int j = 0; j < 4; j++)
-                            normals.Add(new Vector3(-1, 0, 1));
-                        uvs.AddRange(new[]
+                            Vector2 uv00 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Top, 1, 1);
+                            Vector2 uv01 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Top, 1, 0);
+                            Vector2 uv10 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Top, 0, 1);
+                            Vector2 uv11 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Top, 0, 0);
+
+                            if (VoxelData.IsLiquid(uvoxelID))
+                            {
+                                uint aboveVoxelId =
+                                    Engine.GetVoxelAtPosition(voxelPosition + new Vector3Int(0, 1, 0)).voxelId ?? 0;
+                                bool isLiquidAbove = VoxelData.IsLiquid(aboveVoxelId);
+
+                                if (!isLiquidAbove)
+                                {
+                                    transparentVertices.AddRange(new Vector3[]
+                                    {
+                                        new(x - 0.5f, y + 0.5f, z - 0.5f),
+                                        new(x + 0.5f, y + 0.5f, z - 0.5f),
+                                        new(x - 0.5f, y + 0.5f, z + 0.5f),
+                                        new(x + 0.5f, y + 0.5f, z + 0.5f),
+                                    });
+                                }
+                                else
+                                {
+                                    transparentVertices.AddRange(new Vector3[]
+                                    {
+                                        new(x - 0.5f, y + liquidHeight, z - 0.5f),
+                                        new(x + 0.5f, y + liquidHeight, z - 0.5f),
+                                        new(x - 0.5f, y + liquidHeight, z + 0.5f),
+                                        new(x + 0.5f, y + liquidHeight, z + 0.5f),
+                                    });
+                                }
+                            }
+                            else
+                            {
+                                transparentVertices.AddRange(new Vector3[]
+                                {
+                                    new(x - 0.5f, y + 0.5f, z - 0.5f),
+                                    new(x + 0.5f, y + 0.5f, z - 0.5f),
+                                    new(x - 0.5f, y + 0.5f, z + 0.5f),
+                                    new(x + 0.5f, y + 0.5f, z + 0.5f),
+                                });
+                            }
+                            
+                            for (int j = 0; j < 4; j++)
+                                transparentNormals.Add(new Vector3(0, 1, 0));
+                            transparentUvs.AddRange(new[]
+                            {
+                                uv00, uv01, uv10, uv11
+                            });
+                            transparentTriangles.AddRange(new[]
+                            {
+                                0 + transparentTriangleIndex, 1 + transparentTriangleIndex, 2 + transparentTriangleIndex,
+                                2 + transparentTriangleIndex, 1 + transparentTriangleIndex, 3 + transparentTriangleIndex,
+                            });
+                            transparentTriangleIndex += 4;
+                        }
+
+                        // Bottom face
+                        if (IsTransparent(voxelPosition.X, voxelPosition.Y - 1, voxelPosition.Z, voxels, chunks,
+                                (Vector3Int)(chunkPosition / ChunkSize), voxels[i]))
                         {
-                            uv00, uv01, uv10, uv11
-                        });
-                        for (int j = 0; j < 4; j++)
-                            faceIds.Add(5);
-                        triangles.AddRange(new[]
+                            Vector2 uv00 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Bottom, 1, 1);
+                            Vector2 uv01 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Bottom, 1, 0);
+                            Vector2 uv10 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Bottom, 0, 1);
+                            Vector2 uv11 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Bottom, 0, 0);
+
+                            if (VoxelData.IsLiquid(uvoxelID))
+                            {
+                                uint aboveVoxelId =
+                                    Engine.GetVoxelAtPosition(voxelPosition + new Vector3Int(0, 1, 0)).voxelId ?? 0;
+                                bool isLiquidAbove = VoxelData.IsLiquid(aboveVoxelId);
+
+                                if (!isLiquidAbove)
+                                {
+                                    transparentVertices.AddRange(new Vector3[]
+                                    {
+                                        new(x - 0.5f, y - 0.5f, z - 0.5f),
+                                        new(x + 0.5f, y - 0.5f, z - 0.5f),
+                                        new(x - 0.5f, y - 0.5f, z + 0.5f),
+                                        new(x + 0.5f, y - 0.5f, z + 0.5f),
+                                    });
+                                }
+                                else
+                                {
+                                    transparentVertices.AddRange(new Vector3[]
+                                    {
+                                        new(x - 0.5f, y - liquidHeight, z - 0.5f),
+                                        new(x + 0.5f, y - liquidHeight, z - 0.5f),
+                                        new(x - 0.5f, y - liquidHeight, z + 0.5f),
+                                        new(x + 0.5f, y - liquidHeight, z + 0.5f),
+                                    });
+                                }
+                            }
+                            else
+                            {
+                                transparentVertices.AddRange(new Vector3[]
+                                {
+                                    new(x - 0.5f, y - 0.5f, z - 0.5f),
+                                    new(x + 0.5f, y - 0.5f, z - 0.5f),
+                                    new(x - 0.5f, y - 0.5f, z + 0.5f),
+                                    new(x + 0.5f, y - 0.5f, z + 0.5f),
+                                });
+                            }
+                            
+                            for (int j = 0; j < 4; j++)
+                                transparentNormals.Add(new Vector3(0, -1, 0));
+                            transparentUvs.AddRange(new[]
+                            {
+                                uv00, uv01, uv10, uv11
+                            });
+                            transparentTriangles.AddRange(new[]
+                            {
+                                0 + transparentTriangleIndex, 2 + transparentTriangleIndex, 1 + transparentTriangleIndex,
+                                2 + transparentTriangleIndex, 3 + transparentTriangleIndex, 1 + transparentTriangleIndex,
+                            });
+                            transparentTriangleIndex += 4;
+                        }
+
+                        // Right face
+                        if (IsTransparent(voxelPosition.X + 1, voxelPosition.Y, voxelPosition.Z, voxels, chunks,
+                                (Vector3Int)(chunkPosition / ChunkSize), voxels[i]))
                         {
-                            0 + triangleIndex, 1 + triangleIndex, 2 + triangleIndex,
-                            2 + triangleIndex, 1 + triangleIndex, 3 + triangleIndex,
-                        });
-                        triangleIndex += 4;
+                            Vector2 uv00 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Right, 1, 1);
+                            Vector2 uv01 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Right, 1, 0);
+                            Vector2 uv10 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Right, 0, 1);
+                            Vector2 uv11 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Right, 0, 0);
+
+                            if (VoxelData.IsLiquid(uvoxelID))
+                            {
+                                uint aboveVoxelId =
+                                    Engine.GetVoxelAtPosition(voxelPosition + new Vector3Int(0, 1, 0)).voxelId ?? 0;
+                                bool isLiquidAbove = VoxelData.IsLiquid(aboveVoxelId);
+
+                                if (!isLiquidAbove)
+                                {
+                                    transparentVertices.AddRange(new Vector3[]
+                                    {
+                                        new(x + 0.5f, y - 0.5f, z - 0.5f),
+                                        new(x + 0.5f, y + 0.5f, z - 0.5f),
+                                        new(x + 0.5f, y - 0.5f, z + 0.5f),
+                                        new(x + 0.5f, y + 0.5f, z + 0.5f),
+                                    });
+                                }
+                                else
+                                {
+                                    transparentVertices.AddRange(new Vector3[]
+                                    {
+                                        new(x + 0.5f, y - 0.5f, z - 0.5f),
+                                        new(x + 0.5f, y + liquidHeight, z - 0.5f),
+                                        new(x + 0.5f, y - 0.5f, z + 0.5f),
+                                        new(x + 0.5f, y + liquidHeight, z + 0.5f),
+                                    });
+                                }
+                            }
+                            else
+                            {
+                                transparentVertices.AddRange(new Vector3[]
+                                {
+                                    new(x + 0.5f, y - 0.5f, z - 0.5f),
+                                    new(x + 0.5f, y + 0.5f, z - 0.5f),
+                                    new(x + 0.5f, y - 0.5f, z + 0.5f),
+                                    new(x + 0.5f, y + 0.5f, z + 0.5f),
+                                });
+                            }
+                            
+                            for (int j = 0; j < 4; j++)
+                                transparentNormals.Add(new Vector3(1, 0, 0));
+                            transparentUvs.AddRange(new[]
+                            {
+                                uv00, uv01, uv10, uv11
+                            });
+                            transparentTriangles.AddRange(new[]
+                            {
+                                0 + transparentTriangleIndex, 2 + transparentTriangleIndex, 1 + transparentTriangleIndex,
+                                2 + transparentTriangleIndex, 3 + transparentTriangleIndex, 1 + transparentTriangleIndex,
+                            });
+                            transparentTriangleIndex += 4;
+                        }
+
+                        // Left face
+                        if (IsTransparent(voxelPosition.X - 1, voxelPosition.Y, voxelPosition.Z, voxels, chunks,
+                                (Vector3Int)(chunkPosition / ChunkSize), voxels[i]))
+                        {
+                            Vector2 uv00 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Left, 1, 1);
+                            Vector2 uv01 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Left, 1, 0);
+                            Vector2 uv10 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Left, 0, 1);
+                            Vector2 uv11 = TextureAtlas.GetUVForVoxelFace(voxelID - 1, VoxelFace.Left, 0, 0);
+
+                            if (VoxelData.IsLiquid(uvoxelID))
+                            {
+                                uint aboveVoxelId =
+                                    Engine.GetVoxelAtPosition(voxelPosition + new Vector3Int(0, 1, 0)).voxelId ?? 0;
+                                bool isLiquidAbove = VoxelData.IsLiquid(aboveVoxelId);
+
+                                if (!isLiquidAbove)
+                                {
+                                    transparentVertices.AddRange(new Vector3[]
+                                    {
+                                        new(x - 0.5f, y - 0.5f, z - 0.5f),
+                                        new(x - 0.5f, y + 0.5f, z - 0.5f),
+                                        new(x - 0.5f, y - 0.5f, z + 0.5f),
+                                        new(x - 0.5f, y + 0.5f, z + 0.5f),
+                                    });
+                                }
+                                else
+                                {
+                                    transparentVertices.AddRange(new Vector3[]
+                                    {
+                                        new(x - 0.5f, y - 0.5f, z - 0.5f),
+                                        new(x - 0.5f, y + liquidHeight, z - 0.5f),
+                                        new(x - 0.5f, y - 0.5f, z + 0.5f),
+                                        new(x - 0.5f, y + liquidHeight, z + 0.5f),
+                                    });
+                                }
+                            }
+                            else
+                            {
+                                transparentVertices.AddRange(new Vector3[]
+                                {
+                                    new(x - 0.5f, y - 0.5f, z - 0.5f),
+                                    new(x - 0.5f, y + 0.5f, z - 0.5f),
+                                    new(x - 0.5f, y - 0.5f, z + 0.5f),
+                                    new(x - 0.5f, y + 0.5f, z + 0.5f),
+                                });
+                            }
+                            
+                            for (int j = 0; j < 4; j++)
+                                transparentNormals.Add(new Vector3(-1, 0, 1));
+                            transparentUvs.AddRange(new[]
+                            {
+                                uv00, uv01, uv10, uv11
+                            });
+                            transparentTriangles.AddRange(new[]
+                            {
+                                0 + transparentTriangleIndex, 1 + transparentTriangleIndex, 2 + transparentTriangleIndex,
+                                2 + transparentTriangleIndex, 1 + transparentTriangleIndex, 3 + transparentTriangleIndex,
+                            });
+                            transparentTriangleIndex += 4;
+                        }
                     }
                 }
             }
 
-            _triangleCount = triangles.Count;
             _vertexCount = vertices.Count;
+            _triangleCount = triangles.Count;
+            _transparentTriangleCount = transparentTriangles.Count;
 
             var data = new float[vertices.Count * Stride];
                 
@@ -351,21 +954,37 @@ public sealed class Chunk
                 
                 data[i * Stride + 6] = uvs[i].X;
                 data[i * Stride + 7] = uvs[i].Y;
+            }
+            
+            var transparentData = new float[transparentVertices.Count * Stride];
+            
+            for (int i = 0; i < transparentVertices.Count; i++)
+            {
+                transparentData[i * Stride + 0] = transparentVertices[i].X;
+                transparentData[i * Stride + 1] = transparentVertices[i].Y;
+                transparentData[i * Stride + 2] = transparentVertices[i].Z;
                 
-                data[i * Stride + 8] = faceIds[i];
+                transparentData[i * Stride + 3] = transparentNormals[i].X;
+                transparentData[i * Stride + 4] = transparentNormals[i].Y;
+                transparentData[i * Stride + 5] = transparentNormals[i].Z;
+                
+                transparentData[i * Stride + 6] = transparentUvs[i].X;
+                transparentData[i * Stride + 7] = transparentUvs[i].Y;
             }
 
             if (_triangleCount <= 0)
                 IsEmpty = true;
 
-            return (true, data, triangles.ToArray());
+            return (true, data, triangles.ToArray(), containsTransparentVoxels, transparentData, transparentTriangles.ToArray());
         }
 
-        return (false, null, null);
+        return (false, null, null, false, null, null);
     }
     
     internal void RebuildChunk(Dictionary<Vector3Int, Chunk> chunks, bool recursive = false)
     {
+        // Console.WriteLine($"Chunk at position {chunkPosition} has been rebuilt!");
+        
         BuildChunk(chunks);
 
         Vector3Int[] neighbourChunkOffsets =
@@ -382,9 +1001,9 @@ public sealed class Chunk
         {
             foreach (var offset in neighbourChunkOffsets)
             {
-                if (chunks.TryGetValue(chunkPosition + offset, out var neighbour))
+                if (chunks.TryGetValue(ChunkSpacePosition + offset, out var neighbour))
                 {
-                    neighbour.RebuildChunk(chunks);
+                    neighbour.BuildChunk(chunks);
                 }
             }
         }
@@ -464,12 +1083,28 @@ public sealed class Chunk
         GL.ActiveTexture(TextureUnit.Texture2);
         GL.BindTexture(TextureTarget.Texture2D, shadowMapper.DepthMap);
         GL.DrawElements(PrimitiveType.Triangles, _triangleCount, DrawElementsType.UnsignedInt, 0);
-        ErrorCode glError = GL.GetError();
-        if (glError != ErrorCode.NoError)
-        {
-            throw new GLException($"1. OpenGL Error: {glError}");
-        }
+
         GL.BindVertexArray(0);
+        
+        if (ContainsTransparentVoxels)
+        {
+            Engine.RegisterTransparentChunkDrawCall(() =>
+            {
+                _transparentShader.Use();
+                _transparentShader.SetUniform("m_proj", ref player.ProjectionMatrix, autoUse: false);
+                _transparentShader.SetUniform("m_view", ref player.ViewMatrix, autoUse: false);
+                _transparentShader.SetUniform("m_model", ref m_model, autoUse: false);
+            
+                GL.BindVertexArray(_transparentVao);
+                TextureAtlas.AlbedoTexture.Use(TextureUnit.Texture0);
+                TextureAtlas.SpecularTexture.Use(TextureUnit.Texture1);
+                GL.DrawElements(PrimitiveType.Triangles, _transparentTriangleCount, DrawElementsType.UnsignedInt, 0);
+            
+                GL.BindVertexArray(0);
+            });
+        }
+        
+        Engine.CheckGLError("Chunk render (normal pass)");
 
         return (_vertexCount, _triangleCount / 3);
     }
@@ -500,11 +1135,9 @@ public sealed class Chunk
         TextureAtlas.AlbedoTexture.Use(TextureUnit.Texture0);
         TextureAtlas.SpecularTexture.Use(TextureUnit.Texture1);
         GL.DrawElements(PrimitiveType.Triangles, _triangleCount, DrawElementsType.UnsignedInt, 0);
-        ErrorCode glError = GL.GetError();
-        if (glError != ErrorCode.NoError)
-        {
-            throw new GLException($"2. OpenGL Error: {glError}");
-        }
+        
+        Engine.CheckGLError("Chunk render (shadow pass)");
+        
         GL.BindVertexArray(0);
 
         return (_vertexCount, _triangleCount / 3);

@@ -26,7 +26,7 @@ public static class TextureAtlas
     internal static void Init()
     {
         AlbedoTexture = Texture2D.LoadFromAssembly(AlbedoAtlasPath, false, false, true);
-        SpecularTexture = Texture2D.LoadFromAssembly(SpecularAtlasPath, false, true, true);
+        SpecularTexture = Texture2D.LoadFromAssembly(SpecularAtlasPath, false, false, true);
     }
     
     internal static Vector2 GetUVForVoxelFace(int voxelID, VoxelFace face, int u, int v)

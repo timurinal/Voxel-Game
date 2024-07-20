@@ -56,5 +56,19 @@
     "name": "red_glass",
     "textureFaces": [ 10, 10, 10, 10, 10, 10 ],
     "transparent": true
+  },
+  {
+    "id": 10,
+    "displayName": "Sand",
+    "name": "sand",
+    "textureFaces": [ 11, 11, 11, 11, 11, 11 ]
+  },
+  {
+    "id": 11,
+    "displayName": "Water",
+    "name": "water",
+    "textureFaces": [ 16, 16, 16, 16, 16, 16 ],
+    "transparent": true,
+    "liquid": true
   }
 ]

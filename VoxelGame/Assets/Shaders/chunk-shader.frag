@@ -42,7 +42,6 @@ in float faceId;
 in vec3 normal;
 in vec3 fragPos;
 in vec4 fragPosLightSpace;
-in float fogDepth;
 
 uniform vec3 viewPos;
 
@@ -55,10 +54,6 @@ uniform int Wireframe;
 
 uniform sampler2D shadowMap;
 
-const vec3 fogColour = vec3(0.6, 0.75, 1);
-const float fogNear = 180.0;
-const float fogFar = 210.0;
-
 vec2 hash2(vec2 p);
 
 vec3 calcDirLight(DirLight light, vec3 normal, vec3 viewDir, float shadow);
@@ -68,17 +63,17 @@ float calcShadow(vec4 lightSpaceFragPos);
 
 void main() {
 
-//    finalCol = vec4(normal * 0.5 + 0.5, 1.0);
+//    finalCol = vec4(normal, 1.0);
 //    return;
     
     //    finalCol = vec4(texture(material.specular, texcoord).rgb, 1.0);
     //    return;
 
     float alpha = texture(material.diffuse, texcoord).a;
-    if (alpha <= 0.1 && Wireframe == 0) {
-        discard;
-        return;
-    }
+//    if (alpha <= 0.1 && Wireframe == 0) {
+//        discard;
+//        return;
+//    }
     
     if (Wireframe == 1) {
         finalCol = texture(material.diffuse, texcoord);
@@ -101,10 +96,7 @@ void main() {
     vec4 lit = vec4(result, 1.0);
 
     // TODO: dithering
-    
-//    float fog = smoothstep(fogNear, fogFar, fogDepth);
-//    lit = vec4(mix(lit.rgb, fogColour, fog), 1.0);
-    
+
     finalCol = lit;
 }
 

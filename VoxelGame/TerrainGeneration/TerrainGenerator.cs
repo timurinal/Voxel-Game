@@ -44,64 +44,48 @@ public static class TerrainGenerator
 
     public static uint SampleTerrain(int x, int y, int z)
     {
+        if (y <= 0) return VoxelData.NameToVoxelId("bedrock");
+        if (y >= 140) return VoxelData.NameToVoxelId("air");
+        
         return y switch
         {
-            <= 0 => VoxelData.NameToVoxelId("bedrock"),
-            // <= 23 => Sample(x, y, z, scale: 0.05f) > 0.35f ? VoxelData.NameToVoxelId("stone") : VoxelData.NameToVoxelId("air"),
-            <= 25 => VoxelData.NameToVoxelId("stone"),
-            <= 28 => VoxelData.NameToVoxelId("dirt"),
-            <= 29 => Sample(x, z) >= 0.5f ? VoxelData.NameToVoxelId("grass_block") : Sample(x, z, scale: 0.05f) >= 0.5f ? VoxelData.NameToVoxelId("glass") : VoxelData.NameToVoxelId("red_glass"),
-            <= 30 => Random.Hash((uint)new Vector3(x,   y    , z).GetHashCode()) >= 0.99f ? VoxelData.NameToVoxelId("oak_log") : VoxelData.NameToVoxelId("air"),
-            <= 31 => Random.Hash((uint)new Vector3(x, y - 1, z).GetHashCode()) >= 0.99f ? VoxelData.NameToVoxelId("oak_log") : VoxelData.NameToVoxelId("air"),
-            <= 32 => Random.Hash((uint)new Vector3(x, y - 2, z).GetHashCode()) >= 0.99f ? VoxelData.NameToVoxelId("oak_log") : VoxelData.NameToVoxelId("air"),
-            <= 33 => Random.Hash((uint)new Vector3(x, y - 3, z).GetHashCode()) >= 0.99f ? VoxelData.NameToVoxelId("oak_log") : VoxelData.NameToVoxelId("air"),
-            _ => VoxelData.NameToVoxelId("air")
+            <= 0   => VoxelData.NameToVoxelId("bedrock"),
+            <= 5 => VoxelData.NameToVoxelId("stone"),
+            <= 8 => VoxelData.NameToVoxelId("dirt"),
+            <= 9 => Sample(x, z) >= 0.5f ? VoxelData.NameToVoxelId("grass_block") : Sample(x, z, scale: 0.05f) >= 0.5f ? VoxelData.NameToVoxelId("glass") : VoxelData.NameToVoxelId("red_glass"),
+            _      => VoxelData.NameToVoxelId("air")
         };
+        
+        // Constants for sea level and sand depth
+        const int seaLevel = 80;
+        const int sandDepth = 82;
 
-        // if (y <= 0) return VoxelData.NameToVoxelId("bedrock");
-        // if (y >= MaxHeight + SeaLevel) return VoxelData.NameToVoxelId("air");
-        //
-        // float biomeVal = Sample(x, z, 0.005f);
-        // int biome = biomeVal >= 0.5f ? 1 : 0;
-        // biome = 0;
-        //
-        // int height = biome == 0 ? MaxHeight : 35;
-        //
-        // if (biome == 0) 
-        // {
-        //     float heightValue = FractalNoise(x, z) * height + SeaLevel;
-        //     
-        //     // Determine the terrain type based on the height value and y coordinate
-        //     if (y > heightValue)
-        //     {
-        //         return VoxelData.NameToVoxelId("air"); // Above the terrain, it's air
-        //     }
-        //     else if (y > heightValue - 1)
-        //     {
-        //         return VoxelData.NameToVoxelId("grass_block"); // Top layer, use grass
-        //     }
-        //     else if (y > heightValue - 5)
-        //     {
-        //         return VoxelData.NameToVoxelId("dirt"); // Below top layer, use dirt
-        //     }
-        //     else
-        //     {
-        //         return VoxelData.NameToVoxelId("stone"); // Deep underground, use stone
-        //     }
-        // }
-        // else
-        // {
-        //     float heightValue = FractalNoise(x, z, 0.004f) * height + SeaLevel;
-        //     
-        //     // Determine the terrain type based on the height value and y coordinate
-        //     if (y > heightValue)
-        //     {
-        //         return VoxelData.NameToVoxelId("air"); // Above the terrain, it's air
-        //     }
-        //     else
-        //     {
-        //         return VoxelData.NameToVoxelId("stone"); // Deep underground, use stone
-        //     }
-        // }
+        if (y <= 0) return VoxelData.NameToVoxelId("bedrock");
+        if (y >= MaxHeight + SeaLevel) return VoxelData.NameToVoxelId("air");
+
+        int height = MaxHeight;
+
+        float heightValue = FractalNoise(x, z) * height + SeaLevel;
+
+        // Determine the terrain type based on the height value and y coordinate
+        if (y > heightValue)
+        {
+            // Above the terrain, fill in water if below sea level, otherwise it's air
+            return y < seaLevel ? VoxelData.NameToVoxelId("water") : VoxelData.NameToVoxelId("air");
+        }
+        else if (y > heightValue - 1)
+        {
+            // Top layer, use grass, or sand if below the sand depth
+            return y < sandDepth ? VoxelData.NameToVoxelId("sand") : VoxelData.NameToVoxelId("grass_block");
+        }
+        else if (y > heightValue - 5)
+        {
+            // Below top layer, use stone if below the sand depth, otherwise use dirt
+            return y < sandDepth ? VoxelData.NameToVoxelId("stone") : VoxelData.NameToVoxelId("dirt");
+        }
+        else
+        {
+            return VoxelData.NameToVoxelId("stone"); // Deep underground, use stone
+        }
     }
 }
