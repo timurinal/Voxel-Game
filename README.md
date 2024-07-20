@@ -9,6 +9,7 @@ Features
 
 - Infinite procedural terrain in each direction
 - Custom-made lighting engine with realtime shadows for directional lights, and a point light system with specular highlights
+- Fast, multithreaded chunk builder
 
 How to use
 ---
@@ -30,13 +31,4 @@ Any required packages should automatically be installed by your IDE's package ma
 Planned for the future
 ---
 
-Progress is tracked on a [Trello board](https://trello.com/b/lt8gN72f)<br>
-- Physics engine that allows for player gravity
-- Debug information on screen
-- UI system
-- Non blocking chunk generation
-- Lighting improvements
-- Point and spot light shadows
-- Shadow cascading
-- Biomes
-- Chunk saving and loading
+Progress is tracked on a [Trello board](https://trello.com/b/lt8gN72f)
