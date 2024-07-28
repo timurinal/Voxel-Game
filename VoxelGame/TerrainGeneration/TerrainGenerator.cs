@@ -44,17 +44,17 @@ public static class TerrainGenerator
 
     public static uint SampleTerrain(int x, int y, int z)
     {
-        if (y <= 0) return VoxelData.NameToVoxelId("bedrock");
-        if (y >= 140) return VoxelData.NameToVoxelId("air");
-        
-        return y switch
-        {
-            <= 0   => VoxelData.NameToVoxelId("bedrock"),
-            <= 5 => VoxelData.NameToVoxelId("stone"),
-            <= 8 => VoxelData.NameToVoxelId("dirt"),
-            <= 9 => Sample(x, z) >= 0.5f ? VoxelData.NameToVoxelId("grass_block") : Sample(x, z, scale: 0.05f) >= 0.5f ? VoxelData.NameToVoxelId("glass") : VoxelData.NameToVoxelId("red_glass"),
-            _      => VoxelData.NameToVoxelId("air")
-        };
+        // if (y <= 0) return VoxelData.NameToVoxelId("bedrock");
+        // if (y >= 140) return VoxelData.NameToVoxelId("air");
+        //
+        // return y switch
+        // {
+        //     <= 0   => VoxelData.NameToVoxelId("bedrock"),
+        //     <= 5 => VoxelData.NameToVoxelId("stone"),
+        //     <= 8 => VoxelData.NameToVoxelId("dirt"),
+        //     <= 9 => Sample(x, z) >= 0.5f ? VoxelData.NameToVoxelId("grass_block") : Sample(x, z, scale: 0.05f) >= 0.5f ? VoxelData.NameToVoxelId("glass") : VoxelData.NameToVoxelId("red_glass"),
+        //     _      => VoxelData.NameToVoxelId("air")
+        // };
         
         // Constants for sea level and sand depth
         const int seaLevel = 80;

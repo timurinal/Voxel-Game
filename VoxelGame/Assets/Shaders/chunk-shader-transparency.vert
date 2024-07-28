@@ -2,8 +2,7 @@
 
 layout (location = 0) in vec3 vPosition;
 layout (location = 1) in vec3 vNormal;
-layout (location = 2) in vec2 vTexCoord;
-layout (location = 3) in float vFaceId;
+layout (location = 2) in vec2 vUv;
 
 uniform mat4 m_proj;
 uniform mat4 m_view;
@@ -19,5 +18,5 @@ void main() {
 
     normal = mat3(transpose(inverse(m_model))) * vNormal;
     fragPos = vec3(m_model * vec4(vPosition, 1.0));
-    texcoord = vTexCoord;
+    texcoord = vUv;
 }

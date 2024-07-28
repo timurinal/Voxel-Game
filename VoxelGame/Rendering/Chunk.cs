@@ -1,8 +1,10 @@
 ﻿using OpenTK.Mathematics;
 using VoxelGame.Maths;
 using VoxelGame.TerrainGeneration;
+using VoxelGame.Threading;
 using Vector2 = VoxelGame.Maths.Vector2;
 using Vector3 = VoxelGame.Maths.Vector3;
+using Vector4 = OpenTK.Mathematics.Vector4;
 
 namespace VoxelGame.Rendering;
 
@@ -49,6 +51,9 @@ public sealed class Chunk
     private Shader _transparentShader;
     private int _transparentVao, _transparentVbo, _transparentEbo;
 
+    private Vector3[] _transparentVertices;
+    private int[] _transparentTriangles;
+
     private int _vertexCount;
     private int _triangleCount, _transparentTriangleCount;
 
@@ -58,6 +63,7 @@ public sealed class Chunk
     {
         this.chunkPosition = chunkPosition;
         _shader = shader;
+
         _transparentShader = transparentShader;
 
         voxels = new uint[ChunkVolume];
@@ -95,7 +101,7 @@ public sealed class Chunk
         Bounds = AABB.CreateFromExtents(chunkCentre, new Vector3(ChunkSize / 2f, ChunkSize / 2f, ChunkSize / 2f));
     }
 
-    internal async void BuildChunk(Dictionary<Vector3Int, Chunk> chunks)
+    internal async void BuildChunk(Dictionary<Vector3Int, Chunk> chunks, Vector3 cameraPos)
     {
         solidVoxelCount = 0;
 
@@ -107,7 +113,7 @@ public sealed class Chunk
                 break;
             }
 
-        var result = await Task.Run(() => BuildChunkAsync(chunks));
+        var result = await Task.Run(() => BuildChunkAsync(chunks, cameraPos));
         if (result.hasData)
         {
             Engine.RegisterMainThreadAction(() =>
@@ -142,13 +148,14 @@ public sealed class Chunk
                     GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, Stride * sizeof(float), 0 * sizeof(float));
                     GL.VertexAttribPointer(1, 3, VertexAttribPointerType.Float, false, Stride * sizeof(float), 3 * sizeof(float));
                     GL.VertexAttribPointer(2, 2, VertexAttribPointerType.Float, false, Stride * sizeof(float), 6 * sizeof(float));
-                    GL.VertexAttribPointer(3, 1, VertexAttribPointerType.Float, false, Stride * sizeof(float), 8 * sizeof(float));
                     GL.EnableVertexAttribArray(0);
                     GL.EnableVertexAttribArray(1);
                     GL.EnableVertexAttribArray(2);
-                    GL.EnableVertexAttribArray(3);
 
                     GL.BindVertexArray(0);
+
+                    _transparentVertices = result.transparentVertices;
+                    _transparentTriangles = result.transparentTriangles;
                 }
                 
                 ContainsTransparentVoxels = result.containsTransparentVoxels;
@@ -160,7 +167,13 @@ public sealed class Chunk
         }
     }
     
-    private (bool hasData, float[] data, int[] triangles, bool containsTransparentVoxels, float[] transparentData, int[] transparentTriangles) BuildChunkAsync(Dictionary<Vector3Int, Chunk> chunks)
+    private (bool hasData, 
+        float[] data, 
+        int[] triangles, 
+        bool containsTransparentVoxels, 
+        Vector3[] transparentVertices, 
+        float[] transparentData, int[] 
+        transparentTriangles) BuildChunkAsync(Dictionary<Vector3Int, Chunk> chunks, Vector3 cameraPos)
     {
         if (!IsEmpty)
         {
@@ -957,7 +970,7 @@ public sealed class Chunk
             }
             
             var transparentData = new float[transparentVertices.Count * Stride];
-            
+                
             for (int i = 0; i < transparentVertices.Count; i++)
             {
                 transparentData[i * Stride + 0] = transparentVertices[i].X;
@@ -975,17 +988,20 @@ public sealed class Chunk
             if (_triangleCount <= 0)
                 IsEmpty = true;
 
-            return (true, data, triangles.ToArray(), containsTransparentVoxels, transparentData, transparentTriangles.ToArray());
+            var transparentTrianglesArr = transparentTriangles.ToArray();
+            var transparentVerticesArr = transparentVertices.ToArray();
+
+            return (true, data, triangles.ToArray(), containsTransparentVoxels, transparentVerticesArr, transparentData, transparentTrianglesArr);
         }
 
-        return (false, null, null, false, null, null);
+        return (false, null, null, false, null, null, null);
     }
     
-    internal void RebuildChunk(Dictionary<Vector3Int, Chunk> chunks, bool recursive = false)
+    internal void RebuildChunk(Dictionary<Vector3Int, Chunk> chunks, Vector3 cameraPos, bool recursive = false)
     {
         // Console.WriteLine($"Chunk at position {chunkPosition} has been rebuilt!");
         
-        BuildChunk(chunks);
+        BuildChunk(chunks, cameraPos);
 
         Vector3Int[] neighbourChunkOffsets =
         [
@@ -1003,7 +1019,7 @@ public sealed class Chunk
             {
                 if (chunks.TryGetValue(ChunkSpacePosition + offset, out var neighbour))
                 {
-                    neighbour.BuildChunk(chunks);
+                    neighbour.BuildChunk(chunks, cameraPos);
                 }
             }
         }
@@ -1088,18 +1104,21 @@ public sealed class Chunk
         
         if (ContainsTransparentVoxels)
         {
-            Engine.RegisterTransparentChunkDrawCall(() =>
+            Engine.RegisterTransparentChunkDrawCall(Vector3.SqrDistance(chunkCentre, player.Position), () =>
             {
+                TextureAtlas.AlbedoTexture.Use(TextureUnit.Texture0);
+                TextureAtlas.SpecularTexture.Use(TextureUnit.Texture1);
+                
+                SortTriangles(player.Position);
+                
                 _transparentShader.Use();
                 _transparentShader.SetUniform("m_proj", ref player.ProjectionMatrix, autoUse: false);
                 _transparentShader.SetUniform("m_view", ref player.ViewMatrix, autoUse: false);
                 _transparentShader.SetUniform("m_model", ref m_model, autoUse: false);
-            
+                
                 GL.BindVertexArray(_transparentVao);
                 TextureAtlas.AlbedoTexture.Use(TextureUnit.Texture0);
-                TextureAtlas.SpecularTexture.Use(TextureUnit.Texture1);
                 GL.DrawElements(PrimitiveType.Triangles, _transparentTriangleCount, DrawElementsType.UnsignedInt, 0);
-            
                 GL.BindVertexArray(0);
             });
         }
@@ -1169,5 +1188,68 @@ public sealed class Chunk
         }
 
         return collisions.ToArray();
+    }
+    
+    internal void SortTriangles(Vector3 cameraPos)
+    {
+        SortedList<(float distance, int index), Triangle> sortedTriangles = new(new DescComparer<(float, int)>());
+        ConcurrentArray<((float distance, int index), Triangle tri)> arr = new(_transparentTriangles.Length / 3);
+        
+        Parallel.For(0, _transparentTriangles.Length / 3, i =>
+        {
+            int triIndex = i * 3;
+            
+            // Extract actual vertex indices from the _triangles array
+            int index0 = _transparentTriangles[triIndex];
+            int index1 = _transparentTriangles[triIndex + 1];
+            int index2 = _transparentTriangles[triIndex + 2];
+
+            Triangle triangle = new Triangle(index0, index1, index2);
+
+            var points = triangle.GetPoints(_transparentVertices);
+            Vector3 p1 = points.p1;
+            Vector3 p2 = points.p2;
+            Vector3 p3 = points.p3;
+            
+            Vector3 centerPoint = (p1 + p2 + p3) / 3f;
+
+            float sqrDst = Vector3.SqrDistance(centerPoint, cameraPos);
+
+            arr[i] = ((sqrDst, triIndex / 3), triangle);
+            // nonSortedTriangles.TryAdd((sqrDst, triIndex / 3), triangle);
+        });
+        
+        foreach (var triangle in arr)
+        {
+            sortedTriangles.Add(triangle.Item1, triangle.tri);
+        }
+
+        int idx = 0;
+        foreach (var triangle in sortedTriangles.Values)
+        {
+            _transparentTriangles[idx] = triangle.a;
+            _transparentTriangles[idx + 1] = triangle.b;
+            _transparentTriangles[idx + 2] = triangle.c;
+            idx += 3;
+        }
+
+        GL.BindVertexArray(_transparentVao);
+        
+        GL.BindBuffer(BufferTarget.ElementArrayBuffer, _transparentEbo);
+        GL.BufferData(BufferTarget.ElementArrayBuffer, _transparentTriangles.Length * sizeof(int), _transparentTriangles, BufferUsageHint.StaticDraw);
+    }
+
+    struct Triangle
+    {
+        public int a, b, c;
+
+        public Triangle(int a, int b, int c)
+        {
+            this.a = a;
+            this.b = b;
+            this.c = c;
+        }
+        
+        public (Vector3 p1, Vector3 p2, Vector3 p3) GetPoints(Vector3[] vertices) => (vertices[a], vertices[b], vertices[c]);
     }
 }

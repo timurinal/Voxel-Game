@@ -1,5 +1,6 @@
 ﻿// 6,953 lines of code :D
 
+using System.Collections;
 using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using ImGuiNET;
@@ -35,7 +36,7 @@ public sealed class Engine : GameWindow
     public RenderMode RenderMode = RenderMode.Polygon;
 
 
-    public readonly Player Player;
+    public static Player Player { get; private set; }
     
     public static Thread MainThread { get; private set; }
     public static Thread CurrentThread => Thread.CurrentThread;
@@ -106,7 +107,7 @@ public sealed class Engine : GameWindow
     private ShaderStorageBuffer _rtVoxelStorageBuffer;
 
     private static readonly ConcurrentQueue<Action> _mainThreadActions = new();
-    private static readonly Queue<Action> _transparentChunkDrawCalls = new();
+    private static readonly SortedList<float, Action> _transparentChunkDrawCalls = new(new DescComparer<float>());
 
     private GizmoBox box;
     
@@ -374,12 +375,18 @@ public sealed class Engine : GameWindow
         {
             _updated = false;
             
-            var chunk = Chunks[new Vector3Int(0, 0, 0)];
+            var chunk = Chunks[new Vector3Int(0, 2, -1)];
             for (int i = 0; i < chunk.voxels.Length; i++)
             {
+                var vox = chunk.voxels[i];
+                // if (VoxelData.IsLiquid(vox))
+                //     chunk.voxels[i] = Random.Hash((uint)i) >= 0.5f ? vox : 0u;
+                // else
+                //     chunk.voxels[i] = chunk.voxels[i] == 4u ? 4u : 0u;
+                
                 chunk.voxels[i] = chunk.voxels[i] == 4u ? 4u : 0u;
             }
-            chunk.RebuildChunk(Chunks, recursive: true);
+            chunk.RebuildChunk(Chunks, Player.Position, recursive: true);
         }
 
         if (Input.GetKeyDown(Keys.Enter))
@@ -446,7 +453,7 @@ public sealed class Engine : GameWindow
 
                     // await chunk.GenerateChunkAsync(Chunks);
                     // chunk.RebuildChunk(Chunks, recursive: true);
-                    chunk.BuildChunk(Chunks);
+                    chunk.BuildChunk(Chunks, Player.Position);
         
                     // Force neighbouring chunks to rebuild
                     foreach (var offset in neighbourChunkOffsets)
@@ -454,7 +461,7 @@ public sealed class Engine : GameWindow
                         if (Chunks.TryGetValue(chunkPosition + offset, out var neighbour))
                         {
                             // await neighbour.GenerateChunkAsync(Chunks);
-                            neighbour.BuildChunk(Chunks);
+                            neighbour.BuildChunk(Chunks, Player.Position);
                         }
                     }
                 }
@@ -658,14 +665,16 @@ public sealed class Engine : GameWindow
                         }
                     }
                 }
-
+                
                 GL.Enable(EnableCap.Blend);
-                var transparentChunkCopy = new List<Action>(_transparentChunkDrawCalls);
-                _transparentChunkDrawCalls.Clear();
-                foreach (var drawCall in transparentChunkCopy)
+                
+                foreach (var drawCall in _transparentChunkDrawCalls)
                 {
-                    drawCall();
+                    drawCall.Value();
                 }
+                
+                _transparentChunkDrawCalls.Clear();
+                
                 GL.Disable(EnableCap.Blend);
             }
             catch (GLException e)
@@ -967,9 +976,19 @@ public sealed class Engine : GameWindow
         _mainThreadActions.Enqueue(action);
     }
 
-    internal static void RegisterTransparentChunkDrawCall(Action action)
+    internal static void RegisterTransparentChunkDrawCall(float dst, Action action)
     {
-        _transparentChunkDrawCalls.Enqueue(action);
+        const int maxIterations = 100;
+        int i = 0;
+
+        while (_transparentChunkDrawCalls.ContainsKey(dst) && i < maxIterations)
+        {
+            dst += 0.001f + (i / 10f);
+            
+            i++;
+        }
+        
+        _transparentChunkDrawCalls.Add(dst, action);
     }
 
     internal static void CheckGLError(string title)
