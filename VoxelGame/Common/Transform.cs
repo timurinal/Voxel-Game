@@ -1,11 +1,12 @@
-﻿using OpenTK.Mathematics;
-using VoxelGame.Maths;
+using OpenTK.Mathematics;
+using Maths_Vector3 = VoxelGame.Maths.Vector3;
 using Vector3 = VoxelGame.Maths.Vector3;
-using Vector4 = OpenTK.Mathematics.Vector4;
 
 namespace VoxelGame;
 
-public class Transform
+using Vector3 = Maths_Vector3;
+
+public struct Transform
 {
     public Vector3 Position;
     public Vector3 Rotation;
@@ -17,7 +18,7 @@ public class Transform
         Rotation = Vector3.Zero;
         Scale = Vector3.One;
     }
-
+    
     public Transform(Vector3 position, Vector3 rotation, Vector3 scale)
     {
         Position = position;
@@ -25,35 +26,18 @@ public class Transform
         Scale = scale;
     }
 
-    public void LookAt(Vector3 position)
+    internal Matrix4 GenerateModelMatrix()
     {
-        Vector3 forward = Vector3.Normalize(position - Position);
-        Rotation = new Vector3(Mathf.Atan2(forward.Y, forward.Z) * Mathf.Rad2Deg,
-            Mathf.Atan2(-forward.X, Mathf.Sqrt(forward.Y * forward.Y + forward.Z * forward.Z)) * Mathf.Rad2Deg, 0);
-    }
-
-    public Vector3 TransformPoint(Vector3 point)
-    {
-        return (new Vector4(point) * GetModelMatrix()).Xyz;
-    }
-    
-    public static Vector3 TransformPoint(Vector3 point, ref Matrix4 matrix)
-    {
-        return (new Vector4(point) * matrix).Xyz;
-    }
-
-    internal Matrix4 GetModelMatrix()
-    {
-        Matrix4 scale = Matrix4.CreateScale(Scale);
+        // Create scale matrix
+        Matrix4 m_scale = Matrix4.CreateScale(Scale);
         
-        // TODO: Replace this with a quaternion as this is a lot of matrix multiplication
-        Matrix4 rotX = Matrix4.CreateRotationX(Rotation.X * Mathf.Deg2Rad);
-        Matrix4 rotY = Matrix4.CreateRotationY(Rotation.Y * Mathf.Deg2Rad);
-        Matrix4 rotZ = Matrix4.CreateRotationZ(Rotation.Z * Mathf.Deg2Rad);
-        Matrix4 rot = rotX * rotY * rotZ;
+        // Create rotation matrix around each axis
+        Matrix4 m_rot = Matrix4.CreateRotationX(Rotation.X) * Matrix4.CreateRotationY(Rotation.Y) * Matrix4.CreateRotationZ(Rotation.Z);
         
-        Matrix4 trans = Matrix4.CreateTranslation(Position);
+        // Create translation matrix
+        Matrix4 m_pos = Matrix4.CreateTranslation(Position);
 
-        return scale * rot * trans;
+        // Multiply in this order to ensure correct transformation
+        return m_scale * m_rot * m_pos;
     }
 }

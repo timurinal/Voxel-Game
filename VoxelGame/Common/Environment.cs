@@ -1,8 +1,8 @@
-﻿using System.Reflection;
+using System.Reflection;
 
 namespace VoxelGame;
 
-public static class Environment
+internal static class Environment
 {
     public static Assembly Current { get; private set; }
 

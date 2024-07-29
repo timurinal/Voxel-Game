@@ -1,4 +1,4 @@
-﻿using StbImageSharp;
+using StbImageSharp;
 
 namespace VoxelGame.Rendering;
 
@@ -102,7 +102,7 @@ public struct Texture2D
             return new Texture2D(stream, flip, useLinearSampling, generateMipmaps);
         else
         {
-            Console.WriteLine($"Failed to load image from location ({location}). Using fallback texture");
+            Debug.LogWarning($"Failed to load image from location ({location}). Using fallback texture");
             return new Texture2D(NoTextureImage, flip, false, false);
         }
     }

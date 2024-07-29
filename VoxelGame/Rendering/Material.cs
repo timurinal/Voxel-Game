@@ -1,4 +1,4 @@
-﻿namespace VoxelGame.Rendering;
+namespace VoxelGame.Rendering;
 
 public class Material
 {

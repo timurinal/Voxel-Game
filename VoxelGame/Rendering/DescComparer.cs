@@ -1,4 +1,4 @@
-﻿namespace VoxelGame.Rendering;
+namespace VoxelGame.Rendering;
 
 internal class DescComparer<T> : IComparer<T>
 {

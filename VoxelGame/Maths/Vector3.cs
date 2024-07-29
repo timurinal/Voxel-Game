@@ -288,4 +288,9 @@ public struct Vector3 : IEquatable<Vector3>
     {
         return new Vector3(Mathf.Max(a.X, b.X), Mathf.Max(a.Y, b.Y), Mathf.Max(a.Z, b.Z));
     }
+
+    public static Vector3 Lerp(Vector3 a, Vector3 b, float t)
+    {
+        return a + (b - a) * t;
+    }
 }

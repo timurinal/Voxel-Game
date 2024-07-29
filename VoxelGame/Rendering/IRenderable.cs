@@ -1,6 +1,10 @@
-﻿namespace VoxelGame.Rendering;
+using OpenTK.Mathematics;
 
-public interface IRenderable
+namespace VoxelGame.Rendering;
+
+internal interface IRenderable
 {
-    internal (int vertexCount, int triangleCount) Render(Player player);
+    internal void Render(Camera camera);
+    internal void Render(Matrix4 m_projview);
+    internal void Render(Matrix4 m_proj, Matrix4 m_view);
 }

@@ -1,6 +1,0 @@
-﻿[
-  {
-    "name": "image-effect.vert",
-    "code": "#version 450 core\n\nlayout (location = 0) in vec3 vPosition;\nlayout (location = 1) in vec2 vUv;\n\nout vec2 texcoord;\n\nvoid main() {\n\tgl_Position = vec4(vPosition, 1.0);\n\n\ttexcoord = vUv;\n}"
-  }
-]

@@ -49,47 +49,39 @@
 
     <ItemGroup>
       <None Remove="Assets\Shaders\tonemapper.frag" />
-      <EmbeddedResource Include="Assets\Shaders\chunk-shader-transparency.frag" />
-      <EmbeddedResource Include="Assets\Shaders\chunk-shader-transparency.vert" />
-      <EmbeddedResource Include="Assets\Shaders\tonemapper.frag" />
       <None Remove="Assets\Textures\atlas-font.png" />
       <EmbeddedResource Include="Assets\Textures\atlas-font.png" />
       <None Remove="Assets\Shaders\depth.frag" />
-      <EmbeddedResource Include="Assets\Shaders\depth.frag" />
       <None Remove="Assets\Shaders\raytracer.vert" />
-      <EmbeddedResource Include="Assets\Shaders\raytracer.vert" />
       <None Remove="Assets\Shaders\bloom.frag" />
-      <EmbeddedResource Include="Assets\Shaders\bloom.frag" />
       <None Remove="Assets\Shaders\fxaa.frag" />
-      <EmbeddedResource Include="Assets\Shaders\fxaa.frag" />
       <None Remove="Assets\Shaders\denoiser.frag" />
-      <EmbeddedResource Include="Assets\Shaders\denoiser.frag" />
       <None Remove="Assets\voxels.json" />
-      <EmbeddedResource Include="Assets\voxels.json" />
       <None Remove="Assets\Shaders\BUILTIN.json" />
-      <EmbeddedResource Include="Assets\Shaders\BUILTIN.json" />
       <None Remove="Assets\Textures\atlas-main.png" />
       <EmbeddedResource Include="Assets\Textures\atlas-main.png" />
       <None Remove="Assets\Shaders\chunk-shader.vert" />
-      <EmbeddedResource Include="Assets\Shaders\chunk-shader.vert" />
       <None Remove="Assets\Shaders\chunk-shader.frag" />
-      <EmbeddedResource Include="Assets\Shaders\chunk-shader.frag" />
       <None Remove="Assets\Shaders\depth.vert" />
-      <EmbeddedResource Include="Assets\Shaders\depth.vert" />
       <None Remove="Assets\Textures\uv-checker.png" />
       <EmbeddedResource Include="Assets\Textures\uv-checker.png" />
       <None Remove="Assets\Shaders\raytracer.frag" />
-      <EmbeddedResource Include="Assets\Shaders\raytracer.frag" />
       <None Remove="Assets\Shaders\skybox.vert" />
-      <EmbeddedResource Include="Assets\Shaders\skybox.vert" />
       <None Remove="Assets\Shaders\skybox.frag" />
-      <EmbeddedResource Include="Assets\Shaders\skybox.frag" />
       <None Remove="Assets\Textures\atlas-specular.png" />
       <EmbeddedResource Include="Assets\Textures\atlas-specular.png" />
       <None Remove="Assets\Textures\crosshair.png" />
       <EmbeddedResource Include="Assets\Textures\crosshair.png" />
       <None Remove="Assets\character-set.json" />
-      <EmbeddedResource Include="Assets\character-set.json" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Content Include="Assets\shaders\chunk-shader.frag">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </Content>
+      <Content Include="Assets\shaders\chunk-shader.vert">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </Content>
     </ItemGroup>
 
 </Project>

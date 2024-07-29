@@ -1,5 +1,5 @@
-﻿using VoxelGame.Maths;
-using OpenTK.Mathematics;
+﻿using OpenTK.Mathematics;
+using VoxelGame.Maths;
 
 namespace VoxelGame.Rendering;
 
@@ -17,12 +17,12 @@ public struct Colour
     /// <param name="g">The green component of the colour, ranging from 0 (none) to 1 (full intensity).</param>
     /// <param name="b">The blue component of the colour, ranging from 0 (none) to 1 (full intensity).</param>
     /// <param name="a">The alpha (transparency) component of the colour, ranging from 0 (fully transparent) to 1 (fully opaque).</param>
-    public Colour(float r = 0, float g = 0, float b = 0, float a = 1)
+    public Colour(float r = 0, float g = 0, float b = 0, float a = 0.5f)
     {
-        this.R = r;
-        this.G = g;
-        this.B = b;
-        this.A = a;
+        R = r;
+        G = g;
+        B = b;
+        A = a;
     }
 
     public static Colour Red => new(1f, 0f, 0f);

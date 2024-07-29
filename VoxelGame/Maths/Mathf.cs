@@ -126,6 +126,10 @@ public static class Mathf
         return v + Mathf.Sign(target - v) * maxDelta;
     }
 
+    public static float Max(float a, float b)
+    {
+        return a >= b ? a : b;
+    }
     public static float Max(params float[] values)
     {
         return values.Max();
@@ -135,6 +139,10 @@ public static class Mathf
         return values.Max();
     }
     
+    public static float Min(float a, float b)
+    {
+        return a < b ? a : b;
+    }
     public static float Min(params float[] values)
     {
         return values.Min();
@@ -153,7 +161,7 @@ public static class Mathf
 
     public static int Floor(float v) => (int)Math.Floor(v);
 
-    public static float Frac(float v)
+    public static float Fract(float v)
     {
         return v - Mathf.Floor(v);
     }
