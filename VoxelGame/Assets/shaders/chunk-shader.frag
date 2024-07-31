@@ -5,6 +5,8 @@ out vec3 finalColour;
 in vec4 colour;
 in vec2 texcoord;
 
+uniform sampler2D TestTexture;
+
 void main() {
-    finalColour = vec3(texcoord, 0.0);
+    finalColour = texture(TestTexture, texcoord).rgb;
 }

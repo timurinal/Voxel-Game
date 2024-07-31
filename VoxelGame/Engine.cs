@@ -9,8 +9,11 @@ namespace VoxelGame;
 public sealed class Engine : GameWindow
 {
     public static Camera Camera { get; private set; }
-    
-    internal static Scene MainScene;
+
+    private Shader _shader;
+    private Material _material;
+    private Texture2D _texture;
+    private Mesh _cube;
     
     public Engine(GameWindowSettings gws, NativeWindowSettings nws) : base(gws, nws)
     {
@@ -20,9 +23,6 @@ public sealed class Engine : GameWindow
 
         // Lock the cursor in the middle of the screen
         CursorState = CursorState.Grabbed;
-
-        // Setup the main scene
-        MainScene = Scene.CreateScene("Main Scene");
     }
 
     protected override void OnLoad()
@@ -51,16 +51,20 @@ public sealed class Engine : GameWindow
         // Make the window visible after all GL setup has been completed
         IsVisible = true;
         
-        // Load a shader and assign it to a material
-        Shader shader = Shader.Load("assets/shaders/chunk-shader.vert", "assets/shaders/chunk-shader.frag");
-        Material material = new Material(shader)
+        // Load a shader/texture and assign it to a material
+        _shader = Shader.Load("assets/shaders/chunk-shader.vert", "assets/shaders/chunk-shader.frag");
+        
+        _shader.SetInt("TestTexture", 0);
+        
+        _texture = new Texture2D("assets/textures/uv-checker.png");
+        _material = new Material(_shader)
         {
             surfaceMode = Material.SurfaceMode.Opaque
         };
 
         // Create a cube with the new material
-        Mesh cube = MeshUtility.CreateCube(material);
-        cube.Transform.Position = new Vector3(5, 0, 0);
+        _cube = MeshUtility.CreateCube(_material);
+        _cube.Transform.Position = new Vector3(5, 0, 0);
     }
 
     protected override void OnUpdateFrame(FrameEventArgs args)
@@ -89,8 +93,10 @@ public sealed class Engine : GameWindow
         // Clear the colour and depth buffers
         GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
         
-        // Render the currently active scene
-        Scene.Current.Render(Camera);
+        // Render here
+        
+        _texture.Use(TextureUnit.Texture0);
+        _cube.Render(Camera);
         
         // Finally, swap buffers
         SwapBuffers();

@@ -2,15 +2,13 @@ using System.Collections.Concurrent;
 using OpenTK.Mathematics;
 using VoxelGame.Maths;
 using VoxelGame.Threading;
-using Maths_Vector2 = VoxelGame.Maths.Vector2;
-using Maths_Vector3 = VoxelGame.Maths.Vector3;
 using Vector2 = VoxelGame.Maths.Vector2;
 using Vector3 = VoxelGame.Maths.Vector3;
 using Vector4 = OpenTK.Mathematics.Vector4;
 
 namespace VoxelGame.Rendering;
 
-public partial class Mesh : IRenderable
+public sealed class Mesh : IRenderable
 {
     public Transform Transform;
     public Material Material;
@@ -23,12 +21,9 @@ public partial class Mesh : IRenderable
         // Generate the vertex array from now as it doesn't change
         // only the data associated to it changes
         _vao = GL.GenVertexArray();
-        
-        // Add this mesh to the currently open scene
-        Scene.Current.AddMesh(this);
     }
 
-    public Maths_Vector3[] Vertices
+    public Vector3[] Vertices
     {
         get => _vertices;
         set
@@ -38,7 +33,7 @@ public partial class Mesh : IRenderable
         }
     }
     
-    public Maths_Vector3[] Normals
+    public Vector3[] Normals
     {
         get => _normals;
         set
@@ -48,7 +43,7 @@ public partial class Mesh : IRenderable
         }
     }
     
-    public Maths_Vector3[] Tangents
+    public Vector3[] Tangents
     {
         get => _tangents;
         set
@@ -68,7 +63,7 @@ public partial class Mesh : IRenderable
         }
     }
     
-    public Maths_Vector2[] Uvs
+    public Vector2[] Uvs
     {
         get => _uvs;
         set
@@ -88,11 +83,11 @@ public partial class Mesh : IRenderable
         }
     }
     
-    private Maths_Vector3[] _vertices;
-    private Maths_Vector3[] _normals;
-    private Maths_Vector3[] _tangents;
+    private Vector3[] _vertices;
+    private Vector3[] _normals;
+    private Vector3[] _tangents;
     private Colour[] _colours;
-    private Maths_Vector2[] _uvs;
+    private Vector2[] _uvs;
     private int[] _triangles;
 
     private int _vertexCount, _triangleCount;
@@ -155,7 +150,7 @@ public partial class Mesh : IRenderable
                 data[i * stride + 9] = 0;
                 data[i * stride + 10] = 1;
                 data[i * stride + 11] = 0;
-                data[i * stride + 12] = 0.5f;
+                data[i * stride + 12] = 1f;
             }
 
             if (_uvs != null && _uvs.Length == _vertices.Length)
@@ -250,8 +245,8 @@ public partial class Mesh : IRenderable
     public void RecalculateNormals()
     {
         // Initialize normals and tangents
-        _normals = new Maths_Vector3[_vertices.Length];
-        _tangents = new Maths_Vector3[_vertices.Length];
+        _normals = new Vector3[_vertices.Length];
+        _tangents = new Vector3[_vertices.Length];
 
         // Step through each triangle and calculate face normals
         for (int i = 0; i < _triangles.Length; i += 3)
@@ -260,30 +255,30 @@ public partial class Mesh : IRenderable
             int index1 = _triangles[i + 1];
             int index2 = _triangles[i + 2];
 
-            Maths_Vector3 vertex0 = _vertices[index0];
-            Maths_Vector3 vertex1 = _vertices[index1];
-            Maths_Vector3 vertex2 = _vertices[index2];
+            Vector3 vertex0 = _vertices[index0];
+            Vector3 vertex1 = _vertices[index1];
+            Vector3 vertex2 = _vertices[index2];
 
-            Maths_Vector2 uv0 = _uvs[index0];
-            Maths_Vector2 uv1 = _uvs[index1];
-            Maths_Vector2 uv2 = _uvs[index2];
+            Vector2 uv0 = _uvs[index0];
+            Vector2 uv1 = _uvs[index1];
+            Vector2 uv2 = _uvs[index2];
 
-            Maths_Vector3 side1 = vertex1 - vertex0;
-            Maths_Vector3 side2 = vertex2 - vertex0;
+            Vector3 side1 = vertex1 - vertex0;
+            Vector3 side2 = vertex2 - vertex0;
 
-            Maths_Vector2 deltaUV1 = uv1 - uv0;
-            Maths_Vector2 deltaUV2 = uv2 - uv0;
+            Vector2 deltaUV1 = uv1 - uv0;
+            Vector2 deltaUV2 = uv2 - uv0;
 
             float f = 1.0f / (deltaUV1.X * deltaUV2.Y - deltaUV2.X * deltaUV1.Y);
 
-            Maths_Vector3 faceTangent = new Maths_Vector3
+            Vector3 faceTangent = new Vector3
             {
                 X = f * (deltaUV2.Y * side1.X - deltaUV1.Y * side2.X),
                 Y = f * (deltaUV2.Y * side1.Y - deltaUV1.Y * side2.Y),
                 Z = f * (deltaUV2.Y * side1.Z - deltaUV1.Y * side2.Z),
             };
 
-            Maths_Vector3 faceNormal = Maths_Vector3.Cross(side1, side2).Normalized;
+            Vector3 faceNormal = Vector3.Cross(side1, side2).Normalized;
 
             // Add the tangent and normal to each vertex's tangent and normal 
             _normals[index0] += faceNormal;
@@ -303,7 +298,7 @@ public partial class Mesh : IRenderable
         }
     }
 
-    internal void SortTriangles(Maths_Vector3 cameraPos)
+    internal void SortTriangles(Vector3 cameraPos)
     {
         SortedList<(float distance, int index), Triangle> sortedTriangles = new(new DescComparer<(float, int)>());
         ConcurrentArray<((float distance, int index), Triangle tri)> arr = new(_triangles.Length / 3);
@@ -326,9 +321,9 @@ public partial class Mesh : IRenderable
             Vector4 p2 = new Vector4(points.p2, 1.0f) * m_model;
             Vector4 p3 = new Vector4(points.p3, 1.0f) * m_model;
             
-            Maths_Vector3 centerPoint = (p1.Xyz + p2.Xyz + p3.Xyz) / 3f;
+            Vector3 centerPoint = (p1.Xyz + p2.Xyz + p3.Xyz) / 3f;
 
-            float sqrDst = Maths_Vector3.SqrDistance(centerPoint, cameraPos);
+            float sqrDst = Vector3.SqrDistance(centerPoint, cameraPos);
 
             arr[i] = ((sqrDst, triIndex / 3), triangle);
             // nonSortedTriangles.TryAdd((sqrDst, triIndex / 3), triangle);
@@ -362,6 +357,6 @@ public partial class Mesh : IRenderable
             this.c = c;
         }
         
-        public (Maths_Vector3 p1, Maths_Vector3 p2, Maths_Vector3 p3) GetPoints(Maths_Vector3[] vertices) => (vertices[a], vertices[b], vertices[c]);
+        public (Vector3 p1, Vector3 p2, Vector3 p3) GetPoints(Vector3[] vertices) => (vertices[a], vertices[b], vertices[c]);
     }
 }

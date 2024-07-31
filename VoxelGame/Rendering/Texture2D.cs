@@ -2,7 +2,7 @@ using StbImageSharp;
 
 namespace VoxelGame.Rendering;
 
-public struct Texture2D
+public class Texture2D
 {
     private int _handle;
 
@@ -106,7 +106,7 @@ public struct Texture2D
             return new Texture2D(NoTextureImage, flip, false, false);
         }
     }
-
+    
     internal void Use(TextureUnit unit = TextureUnit.Texture0)
     {
         GL.ActiveTexture(unit);
