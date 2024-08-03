@@ -10,7 +10,7 @@ class Program
     {
         GameWindowSettings gws = new()
         {
-            UpdateFrequency = 240
+            UpdateFrequency = -1
         };
 
         NativeWindowSettings nws = new()
