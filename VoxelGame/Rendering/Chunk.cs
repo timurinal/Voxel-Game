@@ -5,7 +5,7 @@ namespace VoxelGame.Rendering;
 
 public class Chunk
 {
-    public const int ChunkSize = 8;
+    public const int ChunkSize = 4;
     public const int HChunkSize = ChunkSize / 2;
     public const int ChunkArea = ChunkSize * ChunkSize;
     public const int ChunkVolume = ChunkArea * ChunkSize;
@@ -48,24 +48,5 @@ public class Chunk
                 }
             }
         }
-    }
-
-    internal Engine.RTCube[] GenCubes(Engine.RTMaterial mat)
-    {
-        List<Engine.RTCube> cubes = new();
-        
-        for (int x = 0; x < ChunkSize; x++)
-        {
-            for (int y = 0; y < ChunkSize; y++)
-            {
-                for (int z = 0; z < ChunkSize; z++)
-                {
-                    if (Voxels[x, y, z] != 0u)
-                        cubes.Add(new Engine.RTCube(new Vector3(x + Position.X, y + Position.Y, z + Position.Z), 0, mat));
-                }
-            }
-        }
-
-        return cubes.ToArray();
     }
 }

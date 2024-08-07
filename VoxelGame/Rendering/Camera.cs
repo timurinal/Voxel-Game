@@ -10,6 +10,7 @@ namespace VoxelGame.Rendering;
 
 public class Camera
 {
+    private const float SlowSpeed = 0.5f;
     private const float Speed = 2f;
     private const float SprintSpeed = 5f;
 
@@ -47,7 +48,7 @@ public class Camera
 
     public void Update()
     {
-        float speed = Input.GetKey(Keys.LeftShift) ? SprintSpeed : Speed;
+        float speed = Input.GetKey(Keys.LeftShift) ? SprintSpeed : Input.GetKey(Keys.LeftControl) ? SlowSpeed : Speed;
         
         // Update position based on input
         if (Input.GetKey(Keys.W)) _position += _front * speed * Time.DeltaTime;                         // Forward
