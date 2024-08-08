@@ -24,7 +24,7 @@ public class ConcurrentArray<T> : IEnumerable<T>
     }
 
     /// <summary>
-    /// Gets the value at the specified index in the thread-safe array.
+    /// Gets the value at the specified index in the array.
     /// </summary>
     /// <param name="index">The index of the element to get.</param>
     /// <returns>The value at the specified index.</returns>
@@ -49,22 +49,11 @@ public class ConcurrentArray<T> : IEnumerable<T>
         }
     }
 
-    /// <summary>
-    /// Returns an enumerator that iterates through the elements of the ConcurrentArray.
-    /// </summary>
-    /// <returns>An enumerator that can be used to iterate through the elements of the ConcurrentArray.</returns>
     public IEnumerator<T> GetEnumerator()
     {
         return ((IEnumerable<T>)_array).GetEnumerator();
     }
 
-    /// <summary>
-    /// Retrieves an enumerator that iterates through the elements in the ConcurrentArray.
-    /// </summary>
-    /// <returns>An enumerator that can be used to iterate through the elements in the ConcurrentArray.</returns>
-    /// <remarks>
-    /// The order of the elements in the enumerator is the same as the order in which they were inserted into the array.
-    /// </remarks>
     IEnumerator IEnumerable.GetEnumerator()
     {
         return ((IEnumerable)_array).GetEnumerator();

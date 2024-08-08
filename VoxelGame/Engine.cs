@@ -1,10 +1,12 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using OpenTK.Windowing.Common;
 using OpenTK.Windowing.Desktop;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using VoxelGame.Maths;
 using VoxelGame.Rendering;
+using VoxelGame.Threading;
 using ErrorCode = OpenTK.Graphics.OpenGL4.ErrorCode;
 
 namespace VoxelGame;
@@ -13,6 +15,10 @@ public sealed class Engine : GameWindow
 {
     public static Camera Camera { get; private set; }
 
+    private Texture2D _texture;
+    private Chunk _chunk;
+    
+    private static ConcurrentQueue<Action> _mainThreadActions = new();
     private int _fpsTotal;
     
     public Engine(GameWindowSettings gws, NativeWindowSettings nws) : base(gws, nws)
@@ -50,6 +56,12 @@ public sealed class Engine : GameWindow
         
         // Make the window visible after all GL setup has been completed
         IsVisible = true;
+
+        _texture = new Texture2D("assets/textures/uv-checker.png");
+        Shader shader = Shader.Load("assets/shaders/chunk-shader.vert", "assets/shaders/chunk-shader.frag");
+        Material material = new Material(shader);
+        _chunk = new Chunk(Vector3Int.Zero, material);
+        _chunk.BuildChunk();
     }
 
     protected override void OnUpdateFrame(FrameEventArgs args)
@@ -62,6 +74,14 @@ public sealed class Engine : GameWindow
         Time.NumFrames++;
         Input._kbState = KeyboardState;
 
+        // if there are any actions registerd to be run on the main thread, run them
+        var copy = new List<Action>(_mainThreadActions);
+        _mainThreadActions.Clear();
+        foreach (var action in copy)
+        {
+            action();
+        }
+        
         // Close the window when the escape key is pressed
         if (Input.GetKeyDown(Keys.Escape))
             Close();
@@ -85,7 +105,8 @@ public sealed class Engine : GameWindow
         GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
         
         // Render here
-        
+        _texture.Use();
+        _chunk.Render(Camera);
         
         // Finally, swap buffers
         SwapBuffers();
@@ -108,5 +129,10 @@ public sealed class Engine : GameWindow
         
         // Update the camera's rotation with the mouse delta
         Camera.Rotate(e.Delta);
+    }
+
+    public static void RunOnMainThread(Action action)
+    {
+        _mainThreadActions.Enqueue(action);
     }
 }
