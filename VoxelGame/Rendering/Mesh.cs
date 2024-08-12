@@ -222,6 +222,9 @@ public sealed class Mesh : IRenderable
         GL.BindVertexArray(_vao);
         GL.DrawElements(PrimitiveType.Triangles, _triangleCount, DrawElementsType.UnsignedInt, 0);
         GL.BindVertexArray(0);
+        
+        Engine.VertexCount += _vertexCount;
+        Engine.TriangleCount += _triangleCount / 3;
     }
     
     public void Render(Matrix4 m_proj, Matrix4 m_view)
@@ -240,6 +243,9 @@ public sealed class Mesh : IRenderable
         GL.BindVertexArray(_vao);
         GL.DrawElements(PrimitiveType.Triangles, _triangleCount, DrawElementsType.UnsignedInt, 0);
         GL.BindVertexArray(0);
+        
+        Engine.VertexCount += _vertexCount;
+        Engine.TriangleCount += _triangleCount / 3;
     }
     
     public void RecalculateNormals()

@@ -4,10 +4,16 @@
 
 out vec3 finalColour;
 
-in vec3 normal;
 in vec2 texcoord;
 
+in vec3 normal;
+in vec3 tangent;
+in vec3 bitangent;
+
+in vec3 fragPos;
+
 uniform sampler2D TestTexture;
+uniform sampler2D Normal;
 
 const float faceShading[6] = float[6](
     0.6, 0.8,  // front back
@@ -16,14 +22,27 @@ const float faceShading[6] = float[6](
 );
 
 void main() {
-    int faceId = 0;
-    if (length(normal - vec3(0, 0, -1)) < EPSILON) faceId = 0;
-    else if (length(normal - vec3(0, 0, 1)) < EPSILON) faceId = 1;
-    else if (length(normal - vec3(0, 1, 0)) < EPSILON) faceId = 2;
-    else if (length(normal - vec3(0, -1, 0)) < EPSILON) faceId = 3;
-    else if (length(normal - vec3(1, 0, 0)) < EPSILON) faceId = 4;
-    else if (length(normal - vec3(-1, 0, 0)) < EPSILON) faceId = 5;
     
-    finalColour = vec3(texture(TestTexture, texcoord).rgb) * faceShading[faceId];
-//    finalColour = vec3(texcoord, 0.0);
+    finalColour = normal * 0.5 + 0.5;
+    return;
+    
+    vec3 norm = normal;
+    vec3 sampledNormal = texture(Normal, texcoord).xyz;
+    sampledNormal = sampledNormal * 2.0 - 1.0; // normalize to [-1, 1]
+    norm = normalize(tangent * sampledNormal.x +
+    bitangent * sampledNormal.y +
+    normal * sampledNormal.z);
+
+    vec3 lightPos = vec3(1, 1, 1);
+    vec3 lightDir = normalize(lightPos - fragPos);
+
+    vec3 ambient = 0.2 * texture(TestTexture, texcoord).rgb;
+    
+    float diff = max(dot(norm, lightDir), 0.0);
+    vec3 diffuse = diff * texture(TestTexture, texcoord).rgb;
+    
+    vec3 result = ambient + diffuse;
+    result = clamp(result, 0.0, 1.0);
+    
+    finalColour = result;
 }

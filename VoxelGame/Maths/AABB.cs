@@ -5,17 +5,43 @@ public struct AABB : IEquatable<AABB>
     public Vector3 Min, Max;
 
     public Vector3 Center => (Min + Max) * 0.5f;
+    
+    private Vector3[] corners;
 
     public AABB(Vector3 min, Vector3 max)
     {
         Min = min;
         Max = max;
+        
+        corners =
+        [
+            new Vector3(Min.X, Min.Y, Min.Z),
+            new Vector3(Min.X, Min.Y, Max.Z),
+            new Vector3(Min.X, Max.Y, Min.Z),
+            new Vector3(Min.X, Max.Y, Max.Z),
+            new Vector3(Max.X, Min.Y, Min.Z),
+            new Vector3(Max.X, Min.Y, Max.Z),
+            new Vector3(Max.X, Max.Y, Min.Z),
+            new Vector3(Max.X, Max.Y, Max.Z)
+        ];
     }
 
     public AABB(Vector3 offset)
     {
         Min = new Vector3(-0.5f, -0.5f, -0.5f) + offset;
         Max = new Vector3( 0.5f,  0.5f,  0.5f) + offset;
+        
+        corners =
+        [
+            new Vector3(Min.X, Min.Y, Min.Z),
+            new Vector3(Min.X, Min.Y, Max.Z),
+            new Vector3(Min.X, Max.Y, Min.Z),
+            new Vector3(Min.X, Max.Y, Max.Z),
+            new Vector3(Max.X, Min.Y, Min.Z),
+            new Vector3(Max.X, Min.Y, Max.Z),
+            new Vector3(Max.X, Max.Y, Min.Z),
+            new Vector3(Max.X, Max.Y, Max.Z)
+        ];
     }
     
     public static AABB CreateFromExtents(Vector3 center, Vector3 extents)
@@ -27,12 +53,36 @@ public struct AABB : IEquatable<AABB>
     {
         Min += dir;
         Max += dir;
+        
+        corners =
+        [
+            new Vector3(Min.X, Min.Y, Min.Z),
+            new Vector3(Min.X, Min.Y, Max.Z),
+            new Vector3(Min.X, Max.Y, Min.Z),
+            new Vector3(Min.X, Max.Y, Max.Z),
+            new Vector3(Max.X, Min.Y, Min.Z),
+            new Vector3(Max.X, Min.Y, Max.Z),
+            new Vector3(Max.X, Max.Y, Min.Z),
+            new Vector3(Max.X, Max.Y, Max.Z)
+        ];
     }
 
     public void SetCenter(Vector3 pos)
     {
         Min = pos - (Max - Min) / 2;
         Max = pos + (Max - Min) / 2;
+        
+        corners =
+        [
+            new Vector3(Min.X, Min.Y, Min.Z),
+            new Vector3(Min.X, Min.Y, Max.Z),
+            new Vector3(Min.X, Max.Y, Min.Z),
+            new Vector3(Min.X, Max.Y, Max.Z),
+            new Vector3(Max.X, Min.Y, Min.Z),
+            new Vector3(Max.X, Min.Y, Max.Z),
+            new Vector3(Max.X, Max.Y, Min.Z),
+            new Vector3(Max.X, Max.Y, Max.Z)
+        ];
     }
 
     public void Encapsulate(Vector3 point)
@@ -45,6 +95,18 @@ public struct AABB : IEquatable<AABB>
     {
         Min = Vector3.Min(Min, box.Min);
         Max = Vector3.Max(Max, box.Max);
+        
+        corners =
+        [
+            new Vector3(Min.X, Min.Y, Min.Z),
+            new Vector3(Min.X, Min.Y, Max.Z),
+            new Vector3(Min.X, Max.Y, Min.Z),
+            new Vector3(Min.X, Max.Y, Max.Z),
+            new Vector3(Max.X, Min.Y, Min.Z),
+            new Vector3(Max.X, Min.Y, Max.Z),
+            new Vector3(Max.X, Max.Y, Min.Z),
+            new Vector3(Max.X, Max.Y, Max.Z)
+        ];
     }
 
     public bool Contains(Vector3 point)
@@ -72,5 +134,10 @@ public struct AABB : IEquatable<AABB>
     public override bool Equals(object? obj)
     {
         return obj is AABB other && Equals(other);
+    }
+    
+    public Vector3[] GetCorners()
+    {
+        return corners;
     }
 }

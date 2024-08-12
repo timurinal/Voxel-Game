@@ -1,4 +1,5 @@
-﻿using OpenTK.Mathematics;
+﻿using System.Runtime.InteropServices;
+using OpenTK.Mathematics;
 using VoxelGame.Maths;
 using VoxelGame.TerrainGeneration;
 using Vector2 = VoxelGame.Maths.Vector2;
@@ -8,12 +9,14 @@ namespace VoxelGame.Rendering;
 
 internal class Chunk
 {
-    public const int ChunkSize = 32;
+    public const int ChunkSize = 16;
     public const int HChunkSize = ChunkSize / 2;
     public const int ChunkArea = ChunkSize * ChunkSize;
     public const int ChunkVolume = ChunkArea * ChunkSize;
 
     public Vector3Int Position;
+    /// Position in chunk-space
+    public Vector3Int CSPosition;
     public Vector3 Centre =>
         new(Position.X + HChunkSize, 
             Position.Y + HChunkSize,
@@ -26,42 +29,50 @@ internal class Chunk
     
     public bool IsRenderReady { get; private set; }
     
-    public uint[,,] Voxels;
+    public uint[] Voxels;
 
-    private Mesh _opaqueMesh;
+    private Material chunkMaterial;
+    private int opaqueMesh_vao;
+    private int opaqueMesh_vbo;
+    private int opaqueMesh_ebo;
+    private int _vertexCount, _triangleCount;
+    
+    // private Mesh _opaqueMesh;
 
     public Chunk(Vector3Int position, Material material)
     {
         Position = position * ChunkSize;
+        CSPosition = position;
         
-        Bounds = AABB.CreateFromExtents(Centre, Vector3.One * (HChunkSize + 1));
+        Bounds = AABB.CreateFromExtents(Centre, Vector3.One * HChunkSize);
         
-        Voxels = new uint[ChunkSize, ChunkSize, ChunkSize];
+        Voxels = new uint[ChunkVolume];
         
         SolidVoxelCount = 0;
-        
-        for (int x = 0; x < ChunkSize; x++)
+
+        Parallel.For(0, ChunkVolume, i =>
         {
-            for (int y = 0; y < ChunkSize; y++)
-            {
-                for (int z = 0; z < ChunkSize; z++)
-                {
-                    int globalX = x + Position.X;
-                    int globalY = y + Position.Y;
-                    int globalZ = z + Position.Z;
+            int x = i % ChunkSize;
+            int y = (i / ChunkSize) % ChunkSize;
+            int z = i / ChunkArea;
             
-                    float val = TerrainGenerator.Sample(globalX, globalY, globalZ, scale: 0.1f);
+            int globalX = x + Position.X;
+            int globalY = y + Position.Y;
+            int globalZ = z + Position.Z;
                     
-                    uint vox = val >= 0.5f ? 1u : 0u;
-                    Voxels[x, y, z] = vox;
+            uint vox = TerrainGenerator.SampleTerrain(globalX, globalY, globalZ);
+            Voxels[i] = vox;
 
-                    SolidVoxelCount += vox != 0u ? 1 : 0;
-                }
-            }
-        }
+            SolidVoxelCount += vox != 0u ? 1 : 0;
+        });
 
-        _opaqueMesh = new Mesh(material);
-        _opaqueMesh.Transform.Position = Position;
+        // _opaqueMesh = new Mesh(material);
+        // _opaqueMesh.Transform.Position = Position;
+
+        chunkMaterial = material;
+        opaqueMesh_vao = GL.GenVertexArray();
+        opaqueMesh_vbo = GL.GenBuffer();
+        opaqueMesh_ebo = GL.GenBuffer();
     }
 
     internal async void BuildChunk()
@@ -74,12 +85,23 @@ internal class Chunk
         {
             if (data.opaqueData.hasData)
             {
-                _opaqueMesh.Vertices = data.opaqueData.vertices;
-                _opaqueMesh.Normals = data.opaqueData.normals;
-                _opaqueMesh.Tangents = data.opaqueData.tangents;
-                _opaqueMesh.Uvs = data.opaqueData.uvs;
-            
-                _opaqueMesh.Triangles = data.opaqueData.triangles;
+                GL.BindVertexArray(opaqueMesh_vao);
+                
+                GL.BindBuffer(BufferTarget.ArrayBuffer, opaqueMesh_vbo);
+                GL.BufferData(BufferTarget.ArrayBuffer, 
+                    data.opaqueData.data.Length * sizeof(UInt32), 
+                    data.opaqueData.data, 
+                    BufferUsageHint.DynamicDraw);
+                
+                GL.VertexAttribIPointer(0, 1, VertexAttribIntegerType.UnsignedInt, 0, 0);
+                GL.EnableVertexAttribArray(0);
+                
+                GL.BindBuffer(BufferTarget.ElementArrayBuffer, opaqueMesh_ebo);
+                GL.BufferData(BufferTarget.ElementArrayBuffer, data.opaqueData.triangles.Length * sizeof(int), data.opaqueData.triangles, BufferUsageHint.DynamicDraw);
+                
+                GL.BindVertexArray(0);
+                
+                IsRenderReady = true;
             }
         });
     }
@@ -92,298 +114,268 @@ internal class Chunk
         // that is always executed on the main thread.
         if (!IsEmpty)
         {
-            List<Vector3> vertices = new();
-            List<Vector3> normals = new();
-            List<Vector3> tangents = new();
-            List<Vector2> uvs = new();
+            List<(byte x, byte y, byte z)> vertices = new();
+            List<byte> normals = new();
+            List<byte> textures = new();
             List<int> triangles = new();
             
-            for (int x = 0, triangleIndex = 0; x < ChunkSize; x++)
+            for (int i = 0, triangleIndex = 0; i < ChunkVolume; i++)
             {
-                for (int y = 0; y < ChunkSize; y++)
+                int x = i % ChunkSize;
+                int y = (i / ChunkSize) % ChunkSize;
+                int z = i / ChunkArea;
+                
+                byte bX = (byte)x;
+                byte bY = (byte)y;
+                byte bZ = (byte)z;
+                
+                uint voxel = Voxels[i];
+                        
+                // 0 means air, so skip adding any faces for this voxel
+                if (voxel == 0)
+                    continue;
+                
+                #region Chunk Builder
+                
+                // Front face
+                if (IsTransparent(x, y, z - 1, Voxels, Engine.Chunks, CSPosition))
                 {
-                    for (int z = 0; z < ChunkSize; z++)
-                    {
-                        uint voxel = Voxels[x, y, z];
-                        
-                        // 0 means air, so skip adding any faces for this voxel
-                        if (voxel == 0)
-                            continue;
-                        
-                        #region Chunk Builder
-                        
-                        // TODO: cull faces between voxels
-                        
-                        // Front face
-                        if (IsTransparent(x, y, z - 1, Voxels))
-                        {
-                            vertices.AddRange(new Vector3[] {
-                                new Vector3(x - 0.5f, y - 0.5f, z - 0.5f),
-                                new Vector3(x - 0.5f, y + 0.5f, z - 0.5f),
-                                new Vector3(x + 0.5f, y - 0.5f, z - 0.5f),
-                                new Vector3(x + 0.5f, y + 0.5f, z - 0.5f),
-                            });
+                    vertices.AddRange([
+                        new(bX, bY, bZ),
+                        new(bX, Add(bY, 1), bZ),
+                        new(Add(bX, 1), bY, bZ),
+                        new(Add(bX, 1), Add(bY, 1), bZ),
+                    ]);
 
-                            normals.AddRange(new Vector3[] {
-                                new Vector3(0, 0, -1),
-                                new Vector3(0, 0, -1),
-                                new Vector3(0, 0, -1),
-                                new Vector3(0, 0, -1),
-                            });
-                            tangents.AddRange(new Vector3[] {
-                                new Vector3(-1, 0, 0),
-                                new Vector3(-1, 0, 0),
-                                new Vector3(-1, 0, 0),
-                                new Vector3(-1, 0, 0),
-                            });
-                            
-                            uvs.AddRange(new Vector2[] {
-                                new Vector2(1, 0),
-                                new Vector2(1, 1),
-                                new Vector2(0, 0),
-                                new Vector2(0, 1),
-                            });
-                            
-                            triangles.AddRange(new int[] {
-                                0 + triangleIndex, 2 + triangleIndex, 1 + triangleIndex,
-                                2 + triangleIndex, 3 + triangleIndex, 1 + triangleIndex
-                            });
+                    normals.AddRange([0, 0, 0, 0]);
 
-                            triangleIndex += 4;
-                        }
-                        // Back face
-                        if (IsTransparent(x, y, z + 1, Voxels))
-                        {
-                            vertices.AddRange(new Vector3[] {
-                                new Vector3(x - 0.5f, y - 0.5f, z + 0.5f),
-                                new Vector3(x - 0.5f, y + 0.5f, z + 0.5f),
-                                new Vector3(x + 0.5f, y - 0.5f, z + 0.5f),
-                                new Vector3(x + 0.5f, y + 0.5f, z + 0.5f),
-                            });
+                    textures.AddRange([ 0, 0, 0, 0 ]);
+                    
+                    triangles.AddRange(new int[] {
+                        0 + triangleIndex, 2 + triangleIndex, 1 + triangleIndex,
+                        2 + triangleIndex, 3 + triangleIndex, 1 + triangleIndex
+                    });
 
-                            normals.AddRange(new Vector3[] {
-                                new Vector3(0, 0, 1),
-                                new Vector3(0, 0, 1),
-                                new Vector3(0, 0, 1),
-                                new Vector3(0, 0, 1),
-                            });
-                            tangents.AddRange(new Vector3[] {
-                                new Vector3(1, 0, 0),
-                                new Vector3(1, 0, 0),
-                                new Vector3(1, 0, 0),
-                                new Vector3(1, 0, 0),
-                            });
-                            
-                            uvs.AddRange(new Vector2[] {
-                                new Vector2(0, 0),
-                                new Vector2(0, 1),
-                                new Vector2(1, 0),
-                                new Vector2(1, 1),
-                            });
-                            
-                            triangles.AddRange(new int[] {
-                                0 + triangleIndex, 1 + triangleIndex, 2 + triangleIndex,
-                                2 + triangleIndex, 1 + triangleIndex, 3 + triangleIndex
-                            });
-
-                            triangleIndex += 4;
-                        }
-                        
-                        // Top face
-                        if (IsTransparent(x, y + 1, z, Voxels))
-                        {
-                            vertices.AddRange(new Vector3[] {
-                                new Vector3(x - 0.5f, y + 0.5f, z - 0.5f),
-                                new Vector3(x + 0.5f, y + 0.5f, z - 0.5f),
-                                new Vector3(x - 0.5f, y + 0.5f, z + 0.5f),
-                                new Vector3(x + 0.5f, y + 0.5f, z + 0.5f),
-                            });
-
-                            normals.AddRange(new Vector3[] {
-                                new Vector3(0, 1, 0),
-                                new Vector3(0, 1, 0),
-                                new Vector3(0, 1, 0),
-                                new Vector3(0, 1, 0),
-                            });
-                            tangents.AddRange(new Vector3[] {
-                                new Vector3(0, 0, 1),
-                                new Vector3(0, 0, 1),
-                                new Vector3(0, 0, 1),
-                                new Vector3(0, 0, 1),
-                            });
-                            
-                            uvs.AddRange(new Vector2[] {
-                                new Vector2(0, 0),
-                                new Vector2(0, 1),
-                                new Vector2(1, 0),
-                                new Vector2(1, 1),
-                            });
-                            
-                            triangles.AddRange(new int[] {
-                                0 + triangleIndex, 1 + triangleIndex, 2 + triangleIndex,
-                                2 + triangleIndex, 1 + triangleIndex, 3 + triangleIndex
-                            });
-
-                            triangleIndex += 4;
-                        }
-                        // Bottom face
-                        if (IsTransparent(x, y - 1, z, Voxels))
-                        {
-                            vertices.AddRange(new Vector3[] {
-                                new Vector3(x - 0.5f, y - 0.5f, z - 0.5f),
-                                new Vector3(x + 0.5f, y - 0.5f, z - 0.5f),
-                                new Vector3(x - 0.5f, y - 0.5f, z + 0.5f),
-                                new Vector3(x + 0.5f, y - 0.5f, z + 0.5f),
-                            });
-
-                            normals.AddRange(new Vector3[] {
-                                new Vector3(0, -1, 0),
-                                new Vector3(0, -1, 0),
-                                new Vector3(0, -1, 0),
-                                new Vector3(0, -1, 0),
-                            });
-                            tangents.AddRange(new Vector3[] {
-                                new Vector3(0, 0, -1),
-                                new Vector3(0, 0, -1),
-                                new Vector3(0, 0, -1),
-                                new Vector3(0, 0, -1),
-                            });
-                            
-                            uvs.AddRange(new Vector2[] {
-                                new Vector2(1, 0),
-                                new Vector2(1, 1),
-                                new Vector2(0, 0),
-                                new Vector2(0, 1),
-                            });
-                            
-                            triangles.AddRange(new int[] {
-                                0 + triangleIndex, 2 + triangleIndex, 1 + triangleIndex,
-                                2 + triangleIndex, 3 + triangleIndex, 1 + triangleIndex
-                            });
-
-                            triangleIndex += 4;
-                        }
-                        
-                        // Right face
-                        if (IsTransparent(x + 1, y, z, Voxels))
-                        {
-                            vertices.AddRange(new Vector3[] {
-                                new Vector3(x + 0.5f, y - 0.5f, z - 0.5f),
-                                new Vector3(x + 0.5f, y + 0.5f, z - 0.5f),
-                                new Vector3(x + 0.5f, y - 0.5f, z + 0.5f),
-                                new Vector3(x + 0.5f, y + 0.5f, z + 0.5f),
-                            });
-
-                            normals.AddRange(new Vector3[] {
-                                new Vector3(1, 0, 0),
-                                new Vector3(1, 0, 0),
-                                new Vector3(1, 0, 0),
-                                new Vector3(1, 0, 0),
-                            });
-                            tangents.AddRange(new Vector3[] {
-                                new Vector3(0, 0, -1),
-                                new Vector3(0, 0, -1),
-                                new Vector3(0, 0, -1),
-                                new Vector3(0, 0, -1),
-                            });
-                            
-                            uvs.AddRange(new Vector2[] {
-                                new Vector2(1, 0),
-                                new Vector2(1, 1),
-                                new Vector2(0, 0),
-                                new Vector2(0, 1),
-                            });
-                            
-                            triangles.AddRange(new int[] {
-                                0 + triangleIndex, 2 + triangleIndex, 1 + triangleIndex,
-                                2 + triangleIndex, 3 + triangleIndex, 1 + triangleIndex
-                            });
-
-                            triangleIndex += 4;
-                        }
-                        // Left face
-                        if (IsTransparent(x - 1, y, z, Voxels))
-                        {
-                            vertices.AddRange(new Vector3[] {
-                                new Vector3(x - 0.5f, y - 0.5f, z - 0.5f),
-                                new Vector3(x - 0.5f, y + 0.5f, z - 0.5f),
-                                new Vector3(x - 0.5f, y - 0.5f, z + 0.5f),
-                                new Vector3(x - 0.5f, y + 0.5f, z + 0.5f),
-                            });
-
-                            normals.AddRange(new Vector3[] {
-                                new Vector3(-1, 0, 0),
-                                new Vector3(-1, 0, 0),
-                                new Vector3(-1, 0, 0),
-                                new Vector3(-1, 0, 0),
-                            });
-                            tangents.AddRange(new Vector3[] {
-                                new Vector3(0, 0, 1),
-                                new Vector3(0, 0, 1),
-                                new Vector3(0, 0, 1),
-                                new Vector3(0, 0, 1),
-                            });
-                            
-                            uvs.AddRange(new Vector2[] {
-                                new Vector2(0, 0),
-                                new Vector2(0, 1),
-                                new Vector2(1, 0),
-                                new Vector2(1, 1),
-                            });
-                            
-                            triangles.AddRange(new int[] {
-                                0 + triangleIndex, 1 + triangleIndex, 2 + triangleIndex,
-                                2 + triangleIndex, 1 + triangleIndex, 3 + triangleIndex
-                            });
-
-                            triangleIndex += 4;
-                        }
-                        
-                        #endregion
-                    }
+                    triangleIndex += 4;
                 }
+                // Back face
+                if (IsTransparent(x, y, z + 1, Voxels, Engine.Chunks, CSPosition))
+                {
+                    vertices.AddRange([
+                        new(bX        , bY        , Add(bZ, 1)),
+                        new(bX        , Add(bY, 1), Add(bZ, 1)),
+                        new(Add(bX, 1), bY        , Add(bZ, 1)),
+                        new(Add(bX, 1), Add(bY, 1), Add(bZ, 1)),
+                    ]);
+
+                    normals.AddRange([ 1, 1, 1, 1 ]);
+                    
+                    textures.AddRange([ 0, 0, 0, 0 ]);
+                    
+                    triangles.AddRange(new int[] {
+                        0 + triangleIndex, 1 + triangleIndex, 2 + triangleIndex,
+                        2 + triangleIndex, 1 + triangleIndex, 3 + triangleIndex
+                    });
+
+                    triangleIndex += 4;
+                }
+                
+                // Top face
+                if (IsTransparent(x, y + 1, z, Voxels, Engine.Chunks, CSPosition))
+                {
+                    vertices.AddRange([
+                        new(bX        , Add(bY, 1), bZ        ),
+                        new(Add(bX, 1), Add(bY, 1), bZ        ),
+                        new(bX        , Add(bY, 1), Add(bZ, 1)),
+                        new(Add(bX, 1), Add(bY, 1), Add(bZ, 1)),
+                    ]);
+
+                    normals.AddRange([ 2, 2, 2, 2 ]);
+                    
+                    textures.AddRange([ 0, 0, 0, 0 ]);
+                    
+                    triangles.AddRange(new int[] {
+                        0 + triangleIndex, 1 + triangleIndex, 2 + triangleIndex,
+                        2 + triangleIndex, 1 + triangleIndex, 3 + triangleIndex
+                    });
+
+                    triangleIndex += 4;
+                }
+                // Bottom face
+                if (IsTransparent(x, y - 1, z, Voxels, Engine.Chunks, CSPosition))
+                {
+                    vertices.AddRange([
+                        new(bX        , bY, bZ        ),
+                        new(Add(bX, 1), bY, bZ        ),
+                        new(bX        , bY, Add(bZ, 1)),
+                        new(Add(bX, 1), bY, Add(bZ, 1)),
+                    ]);
+
+                    normals.AddRange([ 3, 3, 3, 3 ]);
+                    
+                    textures.AddRange([ 0, 0, 0, 0 ]);
+                    
+                    triangles.AddRange(new int[] {
+                        0 + triangleIndex, 2 + triangleIndex, 1 + triangleIndex,
+                        2 + triangleIndex, 3 + triangleIndex, 1 + triangleIndex
+                    });
+
+                    triangleIndex += 4;
+                }
+                
+                // Right face
+                if (IsTransparent(x + 1, y, z, Voxels, Engine.Chunks, CSPosition))
+                {
+                    vertices.AddRange([
+                        new(Add(bX, 1), bY        , bZ        ),
+                        new(Add(bX, 1), Add(bY, 1), bZ        ),
+                        new(Add(bX, 1), bY        , Add(bZ, 1)),
+                        new(Add(bX, 1), Add(bY, 1), Add(bZ, 1)),
+                    ]);
+
+                    normals.AddRange([ 4, 4, 4, 4 ]);
+                    
+                    textures.AddRange([ 0, 0, 0, 0 ]);
+                    
+                    triangles.AddRange(new int[] {
+                        0 + triangleIndex, 2 + triangleIndex, 1 + triangleIndex,
+                        2 + triangleIndex, 3 + triangleIndex, 1 + triangleIndex
+                    });
+
+                    triangleIndex += 4;
+                }
+                // Left face
+                if (IsTransparent(x - 1, y, z, Voxels, Engine.Chunks, CSPosition))
+                {
+                    vertices.AddRange([
+                        new(bX, bY        , bZ        ),
+                        new(bX, Add(bY, 1), bZ        ),
+                        new(bX, bY        , Add(bZ, 1)),
+                        new(bX, Add(bY, 1), Add(bZ, 1)),
+                    ]);
+
+                    normals.AddRange([ 5, 5, 5, 5 ]);
+                    
+                    textures.AddRange([ 0, 0, 0, 0 ]);
+                    
+                    triangles.AddRange(new int[] {
+                        0 + triangleIndex, 1 + triangleIndex, 2 + triangleIndex,
+                        2 + triangleIndex, 1 + triangleIndex, 3 + triangleIndex
+                    });
+
+                    triangleIndex += 4;
+                }
+                
+                #endregion
             }
 
-            IsRenderReady = true;
+            UInt32[] data = new uint[vertices.Count];
+            for (int i = 0; i < data.Length; i++)
+            {
+                data[i] = PackData(
+                    vertices[i].x, vertices[i].y, vertices[i].z, normals[i], textures[i]
+                );
+            }
+
+            _triangleCount = triangles.Count;
+            _vertexCount = vertices.Count;
+            
             MeshData opaqueData = new MeshData(
                 true,
-                vertices.ToArray(),
-                normals.ToArray(),
-                tangents.ToArray(),
-                uvs.ToArray(),
+                data,
                 triangles.ToArray()
             );
             return new ChunkData(opaqueData);
         }
 
-        IsRenderReady = true;
+        IsRenderReady = false;
         return ChunkData.Empty;
     }
 
-    private static bool IsTransparent(int x, int y, int z, uint[,,] voxels)
+    public static bool IsTransparent(int x, int y, int z, uint[] voxels, Dictionary<Vector3Int, Chunk> chunks, Vector3Int currentChunkPosition)
     {
         // Check if the coordinates are outside of the current chunk boundaries
         if (x < 0 || y < 0 || z < 0 || x >= ChunkSize || y >= ChunkSize || z >= ChunkSize)
         {
-            return true;
-            // return y <= 0;
+            // Calculate which chunk the voxel would be in
+            Vector3Int neighborChunkPosition = currentChunkPosition + new Vector3Int(
+                x < 0 ? -1 : (x >= ChunkSize ? 1 : 0),
+                y < 0 ? -1 : (y >= ChunkSize ? 1 : 0),
+                z < 0 ? -1 : (z >= ChunkSize ? 1 : 0)
+            );
+
+            // Try to get the neighbouring chunk
+            if (chunks.TryGetValue(neighborChunkPosition, out Chunk neighborChunk))
+            {
+                // Convert global coordinates to local coordinates within the neighbouring chunk
+                int localX = (x + ChunkSize) % ChunkSize;
+                int localY = (y + ChunkSize) % ChunkSize;
+                int localZ = (z + ChunkSize) % ChunkSize;
+                int index = FlattenIndex3D(localX, localY, localZ, ChunkSize, ChunkSize);
+                return neighborChunk.Voxels[index] == 0u;
+            }
+            else
+            {
+                return y <= 0;
+            }
         }
         else
         {
             // Inside current chunk
-            return voxels[x, y, z] == 0;
+            int index = FlattenIndex3D(x, y, z, ChunkSize, ChunkSize);
+            return voxels[index] == 0;
         }
     }
 
     internal void Render(Camera camera)
     {
         if (IsRenderReady)
-            _opaqueMesh.Render(camera);
+        {
+            chunkMaterial.Use();
+            chunkMaterial.Shader.SetVector3("chunkPosition", Position, autoUse: false);
+            
+            chunkMaterial.Shader.SetMatrix("m_proj", ref camera.ProjectionMatrix);
+            chunkMaterial.Shader.SetMatrix("m_view", ref camera.ViewMatrix);
+            
+            // Bind the vertex array
+            GL.BindVertexArray(opaqueMesh_vao);
+            GL.DrawElements(PrimitiveType.Triangles, _triangleCount, DrawElementsType.UnsignedInt, 0);
+            GL.BindVertexArray(0);
+
+            Engine.TriangleCount += _triangleCount / 3;
+            Engine.VertexCount += _vertexCount;
+        }
+    }
+    
+    public static int FlattenIndex3D(int x, int y, int z, int width, int height)
+    {
+        return x + (y * width) + (z * width * height);
+    }
+
+    private static UInt32 PackData(byte x, byte y, byte z, byte face, byte texture)
+    {
+        if (x > 63 || y > 63 || z > 63) throw new ArgumentException("Positions can only be in the range 0-63");
+        if (face > 7) throw new ArgumentException("Face ID can only be in the range 0-7");
+        
+        UInt32 packedData = 0;
+
+        packedData |= ((UInt32)texture << 24); // TTTTTTTT - 8 bits are for texture
+        packedData |= ((UInt32)face << 21); // FFF - 3 bits for face
+        packedData |= ((UInt32)z << 15); // ZZZZZZ - 6 bits are for z
+        packedData |= ((UInt32)y << 9); // YYYYYY - 6 bits are for y
+        packedData |= x; // XXXXXX - 6 bits are for x
+
+        return packedData;
+    }
+
+    private static byte Add(byte a, byte b)
+    {
+        return (byte)(a + b);
     }
 
     struct ChunkData
     {
-        public static ChunkData Empty => new(new MeshData(false, null, null, null, null, null));
+        public static ChunkData Empty => new(new MeshData(false, null, null));
 
         public MeshData opaqueData;
 
@@ -396,19 +388,13 @@ internal class Chunk
     struct MeshData
     {
         public bool hasData;
-        public Vector3[] vertices;
-        public Vector3[] normals;
-        public Vector3[] tangents;
-        public Vector2[] uvs;
+        public UInt32[] data;
         public int[] triangles;
 
-        public MeshData(bool hasData, Vector3[] vertices, Vector3[] normals, Vector3[] tangents, Vector2[] uvs, int[] triangles)
+        public MeshData(bool hasData, UInt32[] data, int[] triangles)
         {
             this.hasData = hasData;
-            this.vertices = vertices;
-            this.normals = normals;
-            this.tangents = tangents;
-            this.uvs = uvs;
+            this.data = data;
             this.triangles = triangles;
         }
     }
