@@ -1,7 +1,7 @@
 ﻿using OpenTK.Mathematics;
 using VoxelGame.Maths;
 
-namespace VoxelGame.Rendering;
+namespace VoxelGame.Graphics;
 
 public struct Colour
 {

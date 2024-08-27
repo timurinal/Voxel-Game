@@ -1,5 +1,5 @@
 using VoxelGame.Maths;
-using VoxelGame.Rendering;
+using VoxelGame.Graphics;
 
 namespace VoxelGame;
 

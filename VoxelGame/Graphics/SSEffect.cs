@@ -1,7 +1,8 @@
 ﻿using OpenTK.Mathematics;
 using VoxelGame.Maths;
+using VoxelGame.Graphics.Shaders;
 
-namespace VoxelGame.Rendering;
+namespace VoxelGame.Graphics;
 
 public enum TexUnit
 {

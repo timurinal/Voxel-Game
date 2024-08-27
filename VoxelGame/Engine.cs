@@ -6,7 +6,8 @@ using OpenTK.Windowing.Desktop;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using VoxelGame.Common;
 using VoxelGame.Maths;
-using VoxelGame.Rendering;
+using VoxelGame.Graphics;
+using VoxelGame.Graphics.Shaders;
 using VoxelGame.Threading;
 using ErrorCode = OpenTK.Graphics.OpenGL4.ErrorCode;
 
@@ -29,10 +30,17 @@ public sealed class Engine : GameWindow
     private Texture2D _normal;
     
     private static ConcurrentQueue<Action> _mainThreadActions = new();
-    private int _fpsTotal;
+    private const int MaxMainThreadActionCallsPerFrame = 4;
+    
 
-    private static SortedList<float, Vector3Int> ChunksToBuild = new();
-    private const int MaxChunksToBuildPerFrame = 1;
+    private static SortedList<(float dst, int hash), Vector3Int> ChunksToBuild = new();
+    private const int MaxChunksToBuildPerFrame = 8;
+    
+
+    private int _fpsTotal;
+    private const int FpsUpdatedPerSecond = 3;
+    private float _nextFpsUpdateTime;
+    private float _fps = 0;
     
     public Engine(GameWindowSettings gws, NativeWindowSettings nws) : base(gws, nws)
     {
@@ -70,13 +78,18 @@ public sealed class Engine : GameWindow
         // Make the window visible after all GL setup has been completed
         IsVisible = true;
 
-        _texture = new Texture2D("assets/textures/uv-checker.png");
-        _normal = new Texture2D("assets/textures/uv-checker-normal.png");
+        _texture = new Texture2D("assets/textures/uv-checker.png", useLinearSampling: false, anisoLevel: 16, generateMipmaps: true);
+        _normal = new Texture2D("assets/textures/uv-checker-normal.png", useLinearSampling: false, anisoLevel: 16, generateMipmaps: true);
         Shader shader = Shader.Load("assets/shaders/chunk-shader.vert", "assets/shaders/chunk-shader.frag");
         DefaultChunkMaterial = new Material(shader);
         
         shader.SetInt("TestTexture", 0);
         shader.SetInt("Normal", 1);
+        
+        shader.SetFloat("Near", Camera.NearPlane);
+        shader.SetFloat("Far", Camera.FarPlane);
+        
+        shader.SetVector2("screenSize", new(Size.X, Size.Y));
     }
 
     protected override void OnUpdateFrame(FrameEventArgs args)
@@ -90,12 +103,19 @@ public sealed class Engine : GameWindow
         Input._kbState = KeyboardState;
 
         // if there are any actions registerd to be run on the main thread, run them
-        var copy = new List<Action>(_mainThreadActions);
-        _mainThreadActions.Clear();
-        foreach (var action in copy)
+        for (int i = 0; i < MaxMainThreadActionCallsPerFrame && _mainThreadActions.Count > 0; i++)
         {
-            action();
+            if (_mainThreadActions.TryDequeue(out var action))
+            {
+                action();
+            }
         }
+        // var copy = new List<Action>(_mainThreadActions);
+        // _mainThreadActions.Clear();
+        // foreach (var action in copy)
+        // {
+        //     action();
+        // }
         
         Vector3Int playerPosition = Vector3.Round(Camera.Position / Chunk.ChunkSize);
         
@@ -161,19 +181,9 @@ public sealed class Engine : GameWindow
                         {
                             float sqrDst = Vector3.SqrDistance(newChunk.Centre, Camera.Position);
 
-                            // If there is already a chunk with the same distance,
-                            // keep adding a small value to it until that key isn't in the list
-                            // To prevent an infinite loop, only run this code a maximum of 250 times.
-                            // But to ensure that the new key actually is different, the amount added increases
-                            // with each iteration
-                            int i = 0;
-                            const int maxIterations = 250;
-                            do
-                            {
-                                sqrDst += 0.01f * (i / 10f);
-                                i++;
-                            } while (ChunksToBuild.ContainsKey(sqrDst) && i < maxIterations);
-                            ChunksToBuild.Add(sqrDst, chunkPosition); // Queue the chunk for building
+                            int hash = chunkPosition.GetHashCode();
+                            
+                            ChunksToBuild.Add((sqrDst, hash), chunkPosition); // Queue the chunk for building
                         }
                     }
                 }
@@ -201,7 +211,13 @@ public sealed class Engine : GameWindow
             }
         }
 
-        Title = $"Vertices: {VertexCount:N0} Triangles: {TriangleCount:N0} | FPS Average (Actual): {Time.AvgFps} ({Time.Fps})";
+        if (Time.ElapsedTime >= _nextFpsUpdateTime)
+        {
+            _fps = Time.Fps;
+            _nextFpsUpdateTime = Time.ElapsedTime + (1f / FpsUpdatedPerSecond);
+        }
+        
+        Title = $"Vertices: {VertexCount:N0} Triangles: {TriangleCount:N0} | FPS: {_fps} | {Vector3.Round(Camera.Position, 3)}";
 
         Time.ElapsedTime += Time.DeltaTime;
         Time.UpdateFps();
@@ -249,6 +265,8 @@ public sealed class Engine : GameWindow
         
         // Update the camera's projection with the new screen size
         Camera.UpdateProjection(e.Size);
+        
+        DefaultChunkMaterial.Shader.SetVector2("screenSize", new(e.Size.X, e.Size.Y));
     }
 
     protected override void OnMouseMove(MouseMoveEventArgs e)

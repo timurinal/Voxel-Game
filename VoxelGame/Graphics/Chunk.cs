@@ -1,11 +1,12 @@
 ﻿using System.Runtime.InteropServices;
 using OpenTK.Mathematics;
+using VoxelGame;
 using VoxelGame.Maths;
 using VoxelGame.TerrainGeneration;
 using Vector2 = VoxelGame.Maths.Vector2;
 using Vector3 = VoxelGame.Maths.Vector3;
 
-namespace VoxelGame.Rendering;
+namespace VoxelGame.Graphics;
 
 internal class Chunk
 {
@@ -117,6 +118,7 @@ internal class Chunk
             List<(byte x, byte y, byte z)> vertices = new();
             List<byte> normals = new();
             List<byte> textures = new();
+            List<(bool u, bool v)> uvs = new();
             List<int> triangles = new();
             
             for (int i = 0, triangleIndex = 0; i < ChunkVolume; i++)
@@ -141,15 +143,17 @@ internal class Chunk
                 if (IsTransparent(x, y, z - 1, Voxels, Engine.Chunks, CSPosition))
                 {
                     vertices.AddRange([
-                        new(bX, bY, bZ),
-                        new(bX, Add(bY, 1), bZ),
-                        new(Add(bX, 1), bY, bZ),
+                        new(bX        , bY        , bZ),
+                        new(bX        , Add(bY, 1), bZ),
+                        new(Add(bX, 1), bY        , bZ),
                         new(Add(bX, 1), Add(bY, 1), bZ),
                     ]);
 
                     normals.AddRange([0, 0, 0, 0]);
 
                     textures.AddRange([ 0, 0, 0, 0 ]);
+                    
+                    uvs.AddRange([ (true, false), (true, true), (false, false), (false, true) ]);
                     
                     triangles.AddRange(new int[] {
                         0 + triangleIndex, 2 + triangleIndex, 1 + triangleIndex,
@@ -171,6 +175,8 @@ internal class Chunk
                     normals.AddRange([ 1, 1, 1, 1 ]);
                     
                     textures.AddRange([ 0, 0, 0, 0 ]);
+                    
+                    uvs.AddRange([ (false, false), (false, true), (true, false), (true, true) ]);
                     
                     triangles.AddRange(new int[] {
                         0 + triangleIndex, 1 + triangleIndex, 2 + triangleIndex,
@@ -194,6 +200,8 @@ internal class Chunk
                     
                     textures.AddRange([ 0, 0, 0, 0 ]);
                     
+                    uvs.AddRange([ (false, false), (false, true), (true, false), (true, true) ]);
+                    
                     triangles.AddRange(new int[] {
                         0 + triangleIndex, 1 + triangleIndex, 2 + triangleIndex,
                         2 + triangleIndex, 1 + triangleIndex, 3 + triangleIndex
@@ -214,6 +222,8 @@ internal class Chunk
                     normals.AddRange([ 3, 3, 3, 3 ]);
                     
                     textures.AddRange([ 0, 0, 0, 0 ]);
+                    
+                    uvs.AddRange([ (true, false), (true, true), (false, false), (false, true) ]);
                     
                     triangles.AddRange(new int[] {
                         0 + triangleIndex, 2 + triangleIndex, 1 + triangleIndex,
@@ -237,6 +247,8 @@ internal class Chunk
                     
                     textures.AddRange([ 0, 0, 0, 0 ]);
                     
+                    uvs.AddRange([ (true, false), (true, true), (false, false), (false, true) ]);
+                    
                     triangles.AddRange(new int[] {
                         0 + triangleIndex, 2 + triangleIndex, 1 + triangleIndex,
                         2 + triangleIndex, 3 + triangleIndex, 1 + triangleIndex
@@ -258,6 +270,8 @@ internal class Chunk
                     
                     textures.AddRange([ 0, 0, 0, 0 ]);
                     
+                    uvs.AddRange([ (false, false), (false, true), (true, false), (true, true) ]);
+                    
                     triangles.AddRange(new int[] {
                         0 + triangleIndex, 1 + triangleIndex, 2 + triangleIndex,
                         2 + triangleIndex, 1 + triangleIndex, 3 + triangleIndex
@@ -273,7 +287,7 @@ internal class Chunk
             for (int i = 0; i < data.Length; i++)
             {
                 data[i] = PackData(
-                    vertices[i].x, vertices[i].y, vertices[i].z, normals[i], textures[i]
+                    vertices[i].x, vertices[i].y, vertices[i].z, normals[i], textures[i], uvs[i].u, uvs[i].v
                 );
             }
 
@@ -352,17 +366,21 @@ internal class Chunk
         return x + (y * width) + (z * width * height);
     }
 
-    private static UInt32 PackData(byte x, byte y, byte z, byte face, byte texture)
+    private static UInt32 PackData(byte x, byte y, byte z, byte face, byte texture, bool texU, bool texV)
     {
         if (x > 63 || y > 63 || z > 63) throw new ArgumentException("Positions can only be in the range 0-63");
         if (face > 7) throw new ArgumentException("Face ID can only be in the range 0-7");
-        
+
         UInt32 packedData = 0;
 
-        packedData |= ((UInt32)texture << 24); // TTTTTTTT - 8 bits are for texture
-        packedData |= ((UInt32)face << 21); // FFF - 3 bits for face
-        packedData |= ((UInt32)z << 15); // ZZZZZZ - 6 bits are for z
-        packedData |= ((UInt32)y << 9); // YYYYYY - 6 bits are for y
+        // Data is layed out as follows:
+        // 0 U V TTTTTTTT FFF ZZZZZZ YYYYYY XXXXXX
+        packedData |= ((UInt32)(texU ? 1 : 0) << 31); // U - 1 bit is for uv U
+        packedData |= ((UInt32)(texV ? 1 : 0) << 30); // V - 1 bit is for uv V
+        packedData |= ((UInt32)texture << 22); // TTTTTTTT - 8 bits are for texture
+        packedData |= ((UInt32)face << 19); // FFF - 3 bits for face
+        packedData |= ((UInt32)z << 13); // ZZZZZZ - 6 bits are for z
+        packedData |= ((UInt32)y << 7); // YYYYYY - 6 bits are for y
         packedData |= x; // XXXXXX - 6 bits are for x
 
         return packedData;

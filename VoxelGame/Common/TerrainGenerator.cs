@@ -44,8 +44,12 @@ public static class TerrainGenerator
 
     public static uint SampleTerrain(int sampleX, int sampleY, int sampleZ)
     {
-        // if (sampleY < 16) return 1u;
-        // return 0u;
+        if (sampleX == 0 && sampleY == 0 && sampleZ == 0) return 1u;
+        return 0u;
+        
+        if (sampleY == 24) return 1u;
+        if (sampleY > 24) return 0u;
+        //return 0u;
 
         float val = Sample(sampleX, sampleY, sampleZ, scale: 0.1f);
         uint vox = val >= 0.5f ? 1u : 0u;

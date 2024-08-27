@@ -1,4 +1,4 @@
-﻿namespace VoxelGame.Rendering;
+﻿namespace VoxelGame.Graphics.Shaders;
 
 public struct ShaderStorageBuffer : IDisposable
 {

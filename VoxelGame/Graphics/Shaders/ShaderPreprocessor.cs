@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace VoxelGame.Rendering;
+namespace VoxelGame.Graphics.Shaders;
 
 internal static class ShaderPreprocessor
 {

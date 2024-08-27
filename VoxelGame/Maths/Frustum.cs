@@ -1,6 +1,6 @@
 ﻿using System.Numerics;
 using OpenTK.Mathematics;
-using VoxelGame.Rendering;
+using VoxelGame.Graphics;
 
 namespace VoxelGame.Maths;
 

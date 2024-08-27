@@ -1,12 +1,14 @@
 using StbImageSharp;
+using VoxelGame;
+using Environment = VoxelGame.Environment;
 
-namespace VoxelGame.Rendering;
+namespace VoxelGame.Graphics;
 
 public class Texture2D
 {
     private int _handle;
 
-    public Texture2D(string path, bool flip = true, bool useLinearSampling = true, bool generateMipmaps = true)
+    public Texture2D(string path, bool flip = true, bool useLinearSampling = true, bool generateMipmaps = true, int anisoLevel = -1)
     {
         _handle = GL.GenTexture();
         
@@ -18,16 +20,31 @@ public class Texture2D
 
         if (useLinearSampling)
         {
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+            if (generateMipmaps)
+                GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.LinearMipmapLinear);
+            else 
+                GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
         }
         else
         {
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Nearest);
+            if (generateMipmaps)
+                GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.NearestMipmapLinear);
+            else 
+                GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Nearest);
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Nearest);
         }
-        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
-        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
+        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Repeat);
+        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Repeat);
+
+        // -1 means anisotropic filtering is disabled
+        if (anisoLevel != -1)
+        {
+            float maxAnisotropy = GL.GetFloat(GetPName.MaxTextureMaxAnisotropy);
+            float aniso = maxAnisotropy > anisoLevel ? anisoLevel : maxAnisotropy;
+            
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMaxAnisotropy, aniso);
+        }
         
         GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba, image.Width, image.Height, 
             0, PixelFormat.Rgba, PixelType.UnsignedByte, image.Data);

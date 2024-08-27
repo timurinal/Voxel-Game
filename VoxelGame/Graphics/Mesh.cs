@@ -1,12 +1,13 @@
 using System.Collections.Concurrent;
 using OpenTK.Mathematics;
+using VoxelGame;
 using VoxelGame.Maths;
 using VoxelGame.Threading;
 using Vector2 = VoxelGame.Maths.Vector2;
 using Vector3 = VoxelGame.Maths.Vector3;
 using Vector4 = OpenTK.Mathematics.Vector4;
 
-namespace VoxelGame.Rendering;
+namespace VoxelGame.Graphics;
 
 public sealed class Mesh : IRenderable
 {

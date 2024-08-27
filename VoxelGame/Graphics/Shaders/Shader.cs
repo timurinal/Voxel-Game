@@ -1,11 +1,9 @@
 using OpenTK.Mathematics;
-using VoxelGame.Rendering;
-using Maths_Vector2 = VoxelGame.Maths.Vector2;
-using Maths_Vector3 = VoxelGame.Maths.Vector3;
-using Vector3 = VoxelGame.Maths.Vector3;
+using VoxelGame.Graphics;
 using Vector2 = VoxelGame.Maths.Vector2;
+using Vector3 = VoxelGame.Maths.Vector3;
 
-namespace VoxelGame.Rendering;
+namespace VoxelGame.Graphics.Shaders;
 
 public struct Shader : IEquatable<Shader>
 {
@@ -223,13 +221,13 @@ public struct Shader : IEquatable<Shader>
             Use();
         GL.Uniform1(GetUniformLocation(uniformName), v);
     }
-    public void SetVector2(string uniformName, Maths_Vector2 v, bool autoUse = true)
+    public void SetVector2(string uniformName, Vector2 v, bool autoUse = true)
     {
         if (autoUse)
             Use();
         GL.Uniform2(GetUniformLocation(uniformName), v);
     }
-    public void SetVector3(string uniformName, Maths_Vector3 v, bool autoUse = true)
+    public void SetVector3(string uniformName, Vector3 v, bool autoUse = true)
     {
         if (autoUse)
             Use();

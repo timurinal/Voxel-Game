@@ -1,6 +1,6 @@
 using OpenTK.Mathematics;
 
-namespace VoxelGame.Rendering;
+namespace VoxelGame.Graphics;
 
 internal interface IRenderable
 {

@@ -1,4 +1,4 @@
-namespace VoxelGame.Rendering;
+namespace VoxelGame.Graphics;
 
 public class PointLight
 {

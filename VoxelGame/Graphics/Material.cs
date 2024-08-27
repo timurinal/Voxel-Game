@@ -1,4 +1,6 @@
-namespace VoxelGame.Rendering;
+using VoxelGame.Graphics.Shaders;
+
+namespace VoxelGame.Graphics;
 
 public class Material
 {

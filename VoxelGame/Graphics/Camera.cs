@@ -1,10 +1,11 @@
 using OpenTK.Mathematics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
+using VoxelGame;
 using VoxelGame.Maths;
 using Vector3 = VoxelGame.Maths.Vector3;
 using Vector2 = VoxelGame.Maths.Vector2;
 
-namespace VoxelGame.Rendering;
+namespace VoxelGame.Graphics;
 
 public class Camera
 {
@@ -42,7 +43,7 @@ public class Camera
         NearPlane = nearPlane;
         FarPlane = farPlane;
 
-        _position = new Vector3(0, 16, 0);
+        _position = new Vector3(0, 32, 0);
         _front = new Vector3(0, 0, -1);
         _up = new Vector3(0, 1, 0);
 
