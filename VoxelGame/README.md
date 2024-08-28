@@ -10,8 +10,9 @@
 - **Local variables**: camelCase (e.g. `myLocalVariable`)
 
 ## Non-conventional Naming
-- **Matrices**: Always start with `m_` (e.g. `m_model`).
+- **Matrices**: Always start with `m` (e.g. `mModel`).
     - Public matrices: Follow PascalCase and use the full name of the matrix (e.g. `ProjectionMatrix`).
+    - GLSL matrices: Start with `m_` instead (e.g. `m_proj`)
 
 ## GLSL Naming Conventions
 
