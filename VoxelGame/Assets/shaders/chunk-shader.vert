@@ -17,15 +17,8 @@ struct VertexData {
 };
 
 out vec3 normal;
-out vec3 tangent;
-out vec3 bitangent;
-
-flat out vec3 vertexPos;
-out vec3 fragPos;
 
 out vec2 uv;
-
-flat out int faceId;
 
 uniform mat4 m_proj;
 uniform mat4 m_view;
@@ -51,24 +44,16 @@ void main() {
 
     normal = unpackedData.normal;
     
-    if (abs(normal.z) > abs(normal.y)) {
-        tangent = normalize(cross(vec3(0.0, 1.0, 0.0), normal));
-    } else {
-        tangent = normalize(cross(vec3(0.0, 0.0, 1.0), normal));
-    }
-        bitangent = normalize(cross(normal, tangent));
+//    if (abs(normal.z) > abs(normal.y)) {
+//        tangent = normalize(cross(vec3(0.0, 1.0, 0.0), normal));
+//    } else {
+//        tangent = normalize(cross(vec3(0.0, 0.0, 1.0), normal));
+//    }
+//        bitangent = normalize(cross(normal, tangent));
     
     normal = unpackedData.normal;
-    tangent = tangent;
-    bitangent = bitangent;
-
-    vertexPos = pos.xyz;
-    fragPos = pos.xyz;
 
     uv = computeTextureCoordinates(unpackedData.tex - 1, unpackedData.faceId, unpackedData.uvi.x, unpackedData.uvi.y);
-    // uv = unpackedData.uvs;
-    
-    faceId = unpackedData.faceId;
 }
 
 VertexData unpackData(uint data) {

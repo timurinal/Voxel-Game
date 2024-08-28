@@ -123,6 +123,8 @@ public class Texture2D
             return new Texture2D(NoTextureImage, flip, false, false);
         }
     }
+
+    public int GetHandle() => _handle;
     
     internal void Use(TextureUnit unit = TextureUnit.Texture0)
     {

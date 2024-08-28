@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using OpenTK.Windowing.Common;
@@ -26,12 +27,15 @@ public sealed class Engine : GameWindow
 
     private Material DefaultChunkMaterial;
     
-    private Texture2D _texture;
+    private Texture2D _albedo;
     private Texture2D _normal;
+    private Texture2D _specular;
     
     private static ConcurrentQueue<Action> _mainThreadActions = new();
     private const int MaxMainThreadActionCallsPerFrame = 4;
     
+    private DeferredRenderBuffer DeferredRenderBuffer;
+    private Shader DeferredLightingShader;
 
     private static SortedList<(float dst, int hash), Vector3Int> ChunksToBuild = new();
     private const int MaxChunksToBuildPerFrame = 8;
@@ -64,8 +68,6 @@ public sealed class Engine : GameWindow
         GL.FrontFace(FrontFaceDirection.Cw); // Front face is wound clockwise
         GL.CullFace(CullFaceMode.Back);           // and the back face is culled
         
-        GL.Enable(EnableCap.Multisample); // Allow MSAA
-        
         GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha); // Use a pretty simple blending function for transparency
         
         // Set the clear colour to a light-blue
@@ -74,17 +76,22 @@ public sealed class Engine : GameWindow
         
         // Initialise the camera
         Camera = new Camera();
+
+        DeferredLightingShader = Shader.Load("assets/shaders/deferred.vert", "assets/shaders/deferred.frag");
+        DeferredRenderBuffer = new DeferredRenderBuffer(DeferredLightingShader, Size);
         
         // Make the window visible after all GL setup has been completed
         IsVisible = true;
 
-        _texture = new Texture2D("assets/textures/atlas-main.png", useLinearSampling: false, anisoLevel: 16, generateMipmaps: true);
-        _normal = new Texture2D("assets/textures/atlas-normal.png", useLinearSampling: false, anisoLevel: 16, generateMipmaps: true);
-        Shader shader = Shader.Load("assets/shaders/chunk-shader.vert", "assets/shaders/chunk-shader.frag");
+        _albedo = new Texture2D("assets/textures/atlas-main.png", useLinearSampling: false, anisoLevel: 16, generateMipmaps: false);
+        _normal = new Texture2D("assets/textures/atlas-normal.png", useLinearSampling: false, anisoLevel: 16, generateMipmaps: false);
+        _specular = new Texture2D("assets/textures/atlas-specular.png", useLinearSampling: false, anisoLevel: 16, generateMipmaps: false);
+        Shader shader = Shader.Load("assets/shaders/chunk-shader.vert", "assets/shaders/chunk-shader-gpass.frag");
         DefaultChunkMaterial = new Material(shader);
         
-        shader.SetInt("TestTexture", 0);
+        shader.SetInt("Albedo", 0);
         shader.SetInt("Normal", 1);
+        shader.SetInt("Specular", 2);
         
         shader.SetFloat("Near", Camera.NearPlane);
         shader.SetFloat("Far", Camera.FarPlane);
@@ -217,7 +224,7 @@ public sealed class Engine : GameWindow
             _nextFpsUpdateTime = Time.ElapsedTime + (1f / FpsUpdatedPerSecond);
         }
         
-        Title = $"Vertices: {VertexCount:N0} Triangles: {TriangleCount:N0} | FPS: {_fps} | {Vector3.Round(Camera.Position, 3)}";
+        Title = $"v0.0.0 - OpenGL4 (Deferred Renderer) | Vertices: {VertexCount:N0} Triangles: {TriangleCount:N0} | FPS: {_fps}";
 
         Time.ElapsedTime += Time.DeltaTime;
         Time.UpdateFps();
@@ -232,16 +239,17 @@ public sealed class Engine : GameWindow
         
         // Render loop
         
-        // Clear the colour and depth buffers
-        GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+        DeferredRenderBuffer.Bind();
+        DeferredRenderBuffer.Clear();
         
         GL.PolygonMode(MaterialFace.FrontAndBack, IsWireframe ? PolygonMode.Line : PolygonMode.Fill);
         
         // Render here
-        _texture.Use();
+        _albedo.Use();
         _normal.Use(TextureUnit.Texture1);
+        _specular.Use(TextureUnit.Texture2);
         DefaultChunkMaterial.Shader.Use();
-        DefaultChunkMaterial.Shader.SetVector3("viewPos", Camera.Position, autoUse:false);
+        //DefaultChunkMaterial.Shader.SetVector3("viewPos", Camera.Position, autoUse:false);
 
         foreach (var chunk in Chunks)
         {
@@ -253,6 +261,16 @@ public sealed class Engine : GameWindow
                 }
             }
         }
+        
+        DeferredRenderBuffer.Unbind();
+        
+        // Ensure fill mode is used when rendering the deferred quad
+        // This is so I can still use wireframe mode without just seeing a quad across the whole screen
+        GL.PolygonMode(MaterialFace.FrontAndBack, PolygonMode.Fill);
+        
+        // Clear the colour and depth buffers
+        GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+        DeferredRenderBuffer.Render();
         
         // Finally, swap buffers
         SwapBuffers();
@@ -269,6 +287,8 @@ public sealed class Engine : GameWindow
         Camera.UpdateProjection(e.Size);
         
         DefaultChunkMaterial.Shader.SetVector2("screenSize", new(e.Size.X, e.Size.Y));
+        
+        DeferredRenderBuffer.Resize(e.Size);
     }
 
     protected override void OnMouseMove(MouseMoveEventArgs e)
@@ -282,5 +302,14 @@ public sealed class Engine : GameWindow
     public static void RunOnMainThread(Action action)
     {
         _mainThreadActions.Enqueue(action);
+    }
+
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        base.OnClosing(e);
+        
+        GL.DeleteTexture(_albedo.GetHandle());
+        GL.DeleteTexture(_normal.GetHandle());
+        DeferredRenderBuffer.Dispose();
     }
 }

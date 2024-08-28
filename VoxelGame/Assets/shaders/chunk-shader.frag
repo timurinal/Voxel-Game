@@ -2,21 +2,15 @@
 
 #define EPSILON 1e-5
 
-#include <assets/shaders/includes/triplanar.glsl>
-#include <assets/shaders/includes/camera.glsl>
-
 out vec3 finalColour;
 
 in vec3 normal;
 in vec3 tangent;
 in vec3 bitangent;
 
-flat in vec3 vertexPos;
 in vec3 fragPos;
 
 in vec2 uv;
-
-flat in int faceId;
 
 uniform sampler2D TestTexture;
 uniform sampler2D Normal;
@@ -27,12 +21,6 @@ uniform float Far;
 uniform vec2 screenSize;
 
 uniform vec3 viewPos;
-
-const float faceShading[6] = float[6](
-    0.6, 0.8,  // front back
-    1.0, 0.4,  // top bottom
-    0.5, 0.7   // right left
-);
 
 void main() {
     
@@ -56,7 +44,7 @@ void main() {
     vec3 lightPos = vec3(1, 1, 1);
     vec3 lightDir = normalize(vec3(1, 1, 1));
 
-    vec3 texCol = texture(TestTexture, uv).rgb;
+    vec3 texCol = textureLod(TestTexture, uv, 0).rgb;
     vec3 ambient = 0.2 * texCol;
 
     float diff = max(dot(norm, lightDir), 0.0);
