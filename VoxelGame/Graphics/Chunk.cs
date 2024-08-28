@@ -132,6 +132,7 @@ internal class Chunk
                 byte bZ = (byte)z;
                 
                 uint voxel = Voxels[i];
+                byte texture = (byte)voxel;
                         
                 // 0 means air, so skip adding any faces for this voxel
                 if (voxel == 0)
@@ -151,7 +152,7 @@ internal class Chunk
 
                     normals.AddRange([0, 0, 0, 0]);
 
-                    textures.AddRange([ 0, 0, 0, 0 ]);
+                    textures.AddRange([ texture, texture, texture, texture ]);
                     
                     uvs.AddRange([ (true, false), (true, true), (false, false), (false, true) ]);
                     
@@ -174,7 +175,7 @@ internal class Chunk
 
                     normals.AddRange([ 1, 1, 1, 1 ]);
                     
-                    textures.AddRange([ 0, 0, 0, 0 ]);
+                    textures.AddRange([ texture, texture, texture, texture ]);
                     
                     uvs.AddRange([ (false, false), (false, true), (true, false), (true, true) ]);
                     
@@ -198,7 +199,7 @@ internal class Chunk
 
                     normals.AddRange([ 2, 2, 2, 2 ]);
                     
-                    textures.AddRange([ 0, 0, 0, 0 ]);
+                    textures.AddRange([ texture, texture, texture, texture ]);
                     
                     uvs.AddRange([ (false, false), (false, true), (true, false), (true, true) ]);
                     
@@ -221,7 +222,7 @@ internal class Chunk
 
                     normals.AddRange([ 3, 3, 3, 3 ]);
                     
-                    textures.AddRange([ 0, 0, 0, 0 ]);
+                    textures.AddRange([ texture, texture, texture, texture ]);
                     
                     uvs.AddRange([ (true, false), (true, true), (false, false), (false, true) ]);
                     
@@ -245,7 +246,7 @@ internal class Chunk
 
                     normals.AddRange([ 4, 4, 4, 4 ]);
                     
-                    textures.AddRange([ 0, 0, 0, 0 ]);
+                    textures.AddRange([ texture, texture, texture, texture ]);
                     
                     uvs.AddRange([ (true, false), (true, true), (false, false), (false, true) ]);
                     
@@ -268,7 +269,7 @@ internal class Chunk
 
                     normals.AddRange([ 5, 5, 5, 5 ]);
                     
-                    textures.AddRange([ 0, 0, 0, 0 ]);
+                    textures.AddRange([ texture, texture, texture, texture ]);
                     
                     uvs.AddRange([ (false, false), (false, true), (true, false), (true, true) ]);
                     
@@ -341,11 +342,13 @@ internal class Chunk
         }
     }
 
-    internal void Render(Camera camera)
+    internal void Render(Camera camera, bool useShader = true)
     {
         if (IsRenderReady)
         {
-            chunkMaterial.Use();
+            if (useShader)
+                chunkMaterial.Use();
+            
             chunkMaterial.Shader.SetVector3("chunkPosition", Position, autoUse: false);
             
             chunkMaterial.Shader.SetMatrix("m_proj", ref camera.ProjectionMatrix);

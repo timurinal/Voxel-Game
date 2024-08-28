@@ -17,7 +17,7 @@ public class Texture2D
         if (flip) StbImage.stbi_set_flip_vertically_on_load(1);
         
         ImageResult image = ImageResult.FromStream(File.OpenRead(path), ColorComponents.RedGreenBlueAlpha);
-
+        
         if (useLinearSampling)
         {
             if (generateMipmaps)
@@ -36,7 +36,7 @@ public class Texture2D
         }
         GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Repeat);
         GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Repeat);
-
+        
         // -1 means anisotropic filtering is disabled
         if (anisoLevel != -1)
         {

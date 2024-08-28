@@ -1,5 +1,10 @@
 ﻿#version 450 core
 
+#define ATLAS_WIDTH 256
+#define ATLAS_HEIGHT ATLAS_WIDTH
+#define VOXEL_TEXTURE_SIZE 16
+#define PADDING 0.0001;
+
 layout (location = 0) in uint vData;
 
 struct VertexData {
@@ -7,6 +12,7 @@ struct VertexData {
     vec3 normal;
     int tex;
     vec2 uvs;
+    ivec2 uvi;
     int faceId;
 };
 
@@ -33,7 +39,8 @@ vec3(1, 0,  0), vec3(-1,  0, 0)
 );
 
 VertexData unpackData(uint data);
-vec2 computeCubeTextureCoordinates(vec3 position, vec3 normal);
+
+vec2 computeTextureCoordinates(int voxelId, int face, int u, int v);
 
 void main() {
     VertexData unpackedData = unpackData(vData);
@@ -58,7 +65,8 @@ void main() {
     vertexPos = pos.xyz;
     fragPos = pos.xyz;
 
-    uv = unpackedData.uvs;
+    uv = computeTextureCoordinates(unpackedData.tex - 1, unpackedData.faceId, unpackedData.uvi.x, unpackedData.uvi.y);
+    // uv = unpackedData.uvs;
     
     faceId = unpackedData.faceId;
 }
@@ -70,6 +78,7 @@ VertexData unpackData(uint data) {
     int texU = int((data >> 31) & 0x01);    // u
     int texV = int((data >> 30) & 0x01);    // v
     vData.uvs = vec2(texU, texV);
+    vData.uvi = ivec2(texU, texV);
 
     int normalId = int((data >> 19) & 0x07);
     vData.normal = normals[normalId];
@@ -85,47 +94,20 @@ VertexData unpackData(uint data) {
     return vData;
 }
 
-vec2 computeCubeTextureCoordinates(vec3 position, vec3 normal) {
-    vec2 uv;
-    vec3 absNormal = abs(normal);
+vec2 computeTextureCoordinates(int voxelId, int face, int u, int v) {
+    if (face < 0 || face > 6) return vec2(0, 0); // The face can only be 6 possible values, so if it is outside this range the data is likely incorrect
 
-    // Determine the face of the cube based on the dominant normal direction
-    if (absNormal.x > absNormal.y && absNormal.x > absNormal.z) {
-        // X face
-        if (normal.x > 0.0) {
-            uv = vec2(-position.y, -position.z); // +X face
-        } else {
-            uv = vec2(position.z, position.y);  // -X face
-        }
-    } else if (absNormal.y > absNormal.x && absNormal.y > absNormal.z) {
-        // Y face
-        if (normal.y > 0.0) {
-            uv = vec2(position.z, position.x); // +Y face
-        } else {
-            uv = vec2(position.x, position.z);  // -Y face
-        }
-    } else {
-        // Z face
-        if (normal.z > 0.0) {
-            uv = vec2(position.x, position.y); // +Z face
-        } else {
-            uv = vec2(-position.y, -position.x); // -Z face
-        }
-    }
+    int texId = voxelId; // TODO: calculate the texture id based on the face to allow faces to have unique textures
+    // this will have to be done by sending a buffer of texture information over, but I'll do that later
 
-//    vec2 signUv = sign(uv);
-//    bool isNegative;
-//    if (signUv.x < 0) {
-//        float u = uv.x;
-//        float v = uv.y;
-//        uv = vec2(1.0 - u, 1.0 - v);
-//    }
-//
-//    if (signUv.y < 0) {
-//        float u = uv.x;
-//        float v = uv.y;
-//        uv = vec2(u, 1.0 - v);
-//    }
+    int texturesPerRow = ATLAS_WIDTH / VOXEL_TEXTURE_SIZE;
+    float unit = 1.0 / texturesPerRow;
+    float adjustedUnit = unit - 2 * PADDING;
 
-    return abs(uv);
+    float x = (texId % texturesPerRow) * unit + PADDING;
+
+    // Flipping the y-coordinate to start from the top left
+    float y = 1.0 - ((texId / texturesPerRow) + 1) * unit + PADDING;
+
+    return vec2(x + u * adjustedUnit, y + v * adjustedUnit);
 }

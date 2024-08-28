@@ -26,6 +26,8 @@ uniform float Far;
 
 uniform vec2 screenSize;
 
+uniform vec3 viewPos;
+
 const float faceShading[6] = float[6](
     0.6, 0.8,  // front back
     1.0, 0.4,  // top bottom
@@ -33,6 +35,11 @@ const float faceShading[6] = float[6](
 );
 
 void main() {
+    
+//    finalColour = vec3(uv, 0.0);
+//    return;
+    
+    vec3 viewDir = normalize(fragPos - viewPos);
     
     vec2 screenspaceUV = gl_FragCoord.xy / screenSize;
     
@@ -43,7 +50,7 @@ void main() {
     bitangent * sampledNormal.y +
     normal * sampledNormal.z);
 
-    float normalMapInfluence = 0.75;
+    float normalMapInfluence = 0.0;
     norm = normalize(mix(normal, norm, normalMapInfluence));
     
     vec3 lightPos = vec3(1, 1, 1);

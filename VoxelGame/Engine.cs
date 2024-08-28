@@ -78,8 +78,8 @@ public sealed class Engine : GameWindow
         // Make the window visible after all GL setup has been completed
         IsVisible = true;
 
-        _texture = new Texture2D("assets/textures/uv-checker.png", useLinearSampling: false, anisoLevel: 16, generateMipmaps: true);
-        _normal = new Texture2D("assets/textures/uv-checker-normal.png", useLinearSampling: false, anisoLevel: 16, generateMipmaps: true);
+        _texture = new Texture2D("assets/textures/atlas-main.png", useLinearSampling: false, anisoLevel: 16, generateMipmaps: true);
+        _normal = new Texture2D("assets/textures/atlas-normal.png", useLinearSampling: false, anisoLevel: 16, generateMipmaps: true);
         Shader shader = Shader.Load("assets/shaders/chunk-shader.vert", "assets/shaders/chunk-shader.frag");
         DefaultChunkMaterial = new Material(shader);
         
@@ -240,6 +240,8 @@ public sealed class Engine : GameWindow
         // Render here
         _texture.Use();
         _normal.Use(TextureUnit.Texture1);
+        DefaultChunkMaterial.Shader.Use();
+        DefaultChunkMaterial.Shader.SetVector3("viewPos", Camera.Position, autoUse:false);
 
         foreach (var chunk in Chunks)
         {
@@ -247,7 +249,7 @@ public sealed class Engine : GameWindow
             {
                 if (Camera.Frustum.IsBoundingBoxInFrustum(chunk.Value.Bounds))
                 {
-                    chunk.Value.Render(Camera);
+                    chunk.Value.Render(Camera, false);
                 }
             }
         }
