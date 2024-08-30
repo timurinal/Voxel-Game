@@ -48,8 +48,9 @@ public static class TerrainGenerator
         // return 0u;
         
         if (sampleY == 24) return 1u;
+        if (sampleY == 25) return Random.Hash((uint)new Vector3Int(sampleX, sampleY, sampleZ).GetHashCode()) > 0.75f ? 9u : 0u;
         if (sampleY == 0) return 5u;
-        if (sampleY > 24) return 0u;
+        if (sampleY > 25) return 0u;
         //return 0u;
 
         float val = Sample(sampleX, sampleY, sampleZ, scale: 0.1f);

@@ -1,6 +1,7 @@
 ﻿using System.Runtime.InteropServices;
 using OpenTK.Mathematics;
 using VoxelGame;
+using VoxelGame.Graphics.Shaders;
 using VoxelGame.Maths;
 using VoxelGame.TerrainGeneration;
 using Vector2 = VoxelGame.Maths.Vector2;
@@ -342,17 +343,14 @@ internal class Chunk
         }
     }
 
-    internal void Render(Camera camera, bool useShader = true)
+    internal void Render(bool bindShader = true)
     {
         if (IsRenderReady)
         {
-            if (useShader)
+            if (bindShader)
                 chunkMaterial.Use();
             
             chunkMaterial.Shader.SetVector3("chunkPosition", Position, autoUse: false);
-            
-            chunkMaterial.Shader.SetMatrix("m_proj", ref camera.ProjectionMatrix);
-            chunkMaterial.Shader.SetMatrix("m_view", ref camera.ViewMatrix);
             
             // Bind the vertex array
             GL.BindVertexArray(opaqueMesh_vao);
@@ -361,6 +359,22 @@ internal class Chunk
 
             Engine.TriangleCount += _triangleCount / 3;
             Engine.VertexCount += _vertexCount;
+        }
+    }
+
+    /// <summary>
+    /// Renders the chunk using a sun VP matrix
+    /// </summary>
+    internal void DirLightRender(Shader shader, DirectionalLight light)
+    {
+        if (IsRenderReady)
+        {
+            shader.SetVector3("chunkPosition", Position, autoUse: false);
+            
+            // Bind the vertex array
+            GL.BindVertexArray(opaqueMesh_vao);
+            GL.DrawElements(PrimitiveType.Triangles, _triangleCount, DrawElementsType.UnsignedInt, 0);
+            GL.BindVertexArray(0);
         }
     }
     

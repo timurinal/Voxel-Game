@@ -172,6 +172,11 @@ public struct Vector2
     {
         return a.X * b.X + a.Y * b.Y;
     }
+    
+    public override string ToString()
+    {
+        return $"({X}, {Y})";
+    }
 
     #endregion
 }

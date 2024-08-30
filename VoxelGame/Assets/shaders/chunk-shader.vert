@@ -17,7 +17,7 @@ struct VertexData {
 };
 
 out vec3 normal;
-
+out vec3 fragPos;
 out vec2 uv;
 
 uniform mat4 m_proj;
@@ -52,7 +52,7 @@ void main() {
 //        bitangent = normalize(cross(normal, tangent));
     
     normal = unpackedData.normal;
-
+    fragPos = pos.xyz;
     uv = computeTextureCoordinates(unpackedData.tex - 1, unpackedData.faceId, unpackedData.uvi.x, unpackedData.uvi.y);
 }
 

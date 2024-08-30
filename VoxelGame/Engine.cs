@@ -22,10 +22,13 @@ public sealed class Engine : GameWindow
     public static int TriangleCount { get; internal set; }
     
     public static bool IsWireframe { get; private set; }
+    
+    public DirectionalLight Sun { get; private set; }
 
     internal static Dictionary<Vector3Int, Chunk> Chunks = new();
 
     private Material DefaultChunkMaterial;
+    private Shader ChunkDepthShader;
     
     private Texture2D _albedo;
     private Texture2D _normal;
@@ -80,14 +83,21 @@ public sealed class Engine : GameWindow
         DeferredLightingShader = Shader.Load("assets/shaders/deferred.vert", "assets/shaders/deferred.frag");
         DeferredRenderBuffer = new DeferredRenderBuffer(DeferredLightingShader, Size);
         
+        DeferredLightingShader.SetInt("shadowMap", 5);
+
+        Sun = new DirectionalLight();
+        Sun.LightPosition = new Vector3(1f, 1f, 1f);
+        
         // Make the window visible after all GL setup has been completed
         IsVisible = true;
 
-        _albedo = new Texture2D("assets/textures/atlas-main.png", useLinearSampling: false, anisoLevel: 16, generateMipmaps: false);
-        _normal = new Texture2D("assets/textures/atlas-normal.png", useLinearSampling: false, anisoLevel: 16, generateMipmaps: false);
-        _specular = new Texture2D("assets/textures/atlas-specular.png", useLinearSampling: false, anisoLevel: 16, generateMipmaps: false);
+        _albedo = new Texture2D("assets/textures/atlas-main.png", useLinearSampling: false, anisoLevel: 16, generateMipmaps: true);
+        _normal = new Texture2D("assets/textures/atlas-normal.png", useLinearSampling: false, anisoLevel: 16, generateMipmaps: true);
+        _specular = new Texture2D("assets/textures/atlas-specular.png", useLinearSampling: false, anisoLevel: 16, generateMipmaps: true);
         Shader shader = Shader.Load("assets/shaders/chunk-shader.vert", "assets/shaders/chunk-shader-gpass.frag");
         DefaultChunkMaterial = new Material(shader);
+
+        ChunkDepthShader = Shader.Load("assets/shaders/depth.vert", "assets/shaders/depth.frag");
         
         shader.SetInt("Albedo", 0);
         shader.SetInt("Normal", 1);
@@ -163,6 +173,8 @@ public sealed class Engine : GameWindow
         // Update the camera
         Camera.Update();
         
+        Sun.UpdateMatrix(Camera.Position);
+        
         for (int x = -PlayerSettings.RenderDistance; x < PlayerSettings.RenderDistance; x++)
         {
             for (int y = -PlayerSettings.RenderDistance; y < PlayerSettings.RenderDistance; y++)
@@ -237,30 +249,18 @@ public sealed class Engine : GameWindow
         VertexCount = 0;
         TriangleCount = 0;
         
-        // Render loop
+        // Render here
+        // GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+        
+        if (Sun.Shadows)
+            Render(0);
         
         DeferredRenderBuffer.Bind();
         DeferredRenderBuffer.Clear();
         
         GL.PolygonMode(MaterialFace.FrontAndBack, IsWireframe ? PolygonMode.Line : PolygonMode.Fill);
         
-        // Render here
-        _albedo.Use();
-        _normal.Use(TextureUnit.Texture1);
-        _specular.Use(TextureUnit.Texture2);
-        DefaultChunkMaterial.Shader.Use();
-        //DefaultChunkMaterial.Shader.SetVector3("viewPos", Camera.Position, autoUse:false);
-
-        foreach (var chunk in Chunks)
-        {
-            if (!chunk.Value.IsEmpty)
-            {
-                if (Camera.Frustum.IsBoundingBoxInFrustum(chunk.Value.Bounds))
-                {
-                    chunk.Value.Render(Camera, false);
-                }
-            }
-        }
+        Render(1);
         
         DeferredRenderBuffer.Unbind();
         
@@ -270,10 +270,83 @@ public sealed class Engine : GameWindow
         
         // Clear the colour and depth buffers
         GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
-        DeferredRenderBuffer.Render();
+        
+        DeferredLightingShader.Use();
+        DeferredLightingShader.SetInt("ShadowsEnabled", Sun.Shadows ? 1 : 0, autoUse: false);
+        DeferredLightingShader.SetInt("SoftShadows", Sun.SoftShadows ? 1 : 0, autoUse: false);
+
+        var sunLightProjMatrix = Sun.LightProjMatrix;
+        var sunLightViewMatrix = Sun.LightViewMatrix;
+        DeferredLightingShader.SetMatrix("m_lightProj", ref sunLightProjMatrix, autoUse: false);
+        DeferredLightingShader.SetMatrix("m_lightView", ref sunLightViewMatrix, autoUse: false);
+        
+        DeferredLightingShader.SetVector3("LightDir", Sun.LightDirection, autoUse: false);
+        
+        GL.ActiveTexture(TextureUnit.Texture5);
+        GL.BindTexture(TextureTarget.Texture2D, Sun.DepthTexture);
+        
+        DeferredRenderBuffer.Render(bindShader: false);
         
         // Finally, swap buffers
         SwapBuffers();
+    }
+
+    /// <summary>
+    /// Renders the scene with a specific mode
+    /// </summary>
+    /// <param name="renderMode">0 = Shadow pass, 1 = Geometry pass</param>
+    /// <exception cref="ArgumentException">Thrown when <see cref="renderMode"/> is not 0 or 1</exception>
+    private void Render(int renderMode)
+    {
+        if (renderMode == 0)
+        {
+            Sun.Use();
+            
+            ChunkDepthShader.Use();
+            var sunLightProjMatrix = Sun.LightProjMatrix;
+            var sunLightViewMatrix = Sun.LightViewMatrix;
+            ChunkDepthShader.SetMatrix("m_lightProj", ref sunLightProjMatrix, autoUse: false);
+            ChunkDepthShader.SetMatrix("m_lightView", ref sunLightViewMatrix, autoUse: false);
+            
+            foreach (var chunk in Chunks)
+            {
+                if (!chunk.Value.IsEmpty)
+                {
+                    // if (Sun.Frustum.IsBoundingBoxInFrustum(chunk.Value.Bounds))
+                    {
+                        chunk.Value.DirLightRender(ChunkDepthShader, Sun);
+                    }
+                }
+            }
+            
+            Sun.Unuse(Size);
+        }
+        else if (renderMode == 1)
+        {
+            _albedo.Use();
+            _normal.Use(TextureUnit.Texture1);
+            _specular.Use(TextureUnit.Texture2);
+            DefaultChunkMaterial.Shader.Use();
+            //DefaultChunkMaterial.Shader.SetVector3("viewPos", Camera.Position, autoUse:false);
+
+            DefaultChunkMaterial.Shader.SetMatrix("m_proj", ref Camera.ProjectionMatrix);
+            DefaultChunkMaterial.Shader.SetMatrix("m_view", ref Camera.ViewMatrix);
+            
+            foreach (var chunk in Chunks)
+            {
+                if (!chunk.Value.IsEmpty)
+                {
+                    if (Camera.Frustum.IsBoundingBoxInFrustum(chunk.Value.Bounds))
+                    {
+                        chunk.Value.Render(false);
+                    }
+                }
+            }
+        }
+        else
+        {
+            throw new AggregateException($"Render mode invalid ({renderMode}).");
+        }
     }
 
     protected override void OnResize(ResizeEventArgs e)
@@ -310,6 +383,7 @@ public sealed class Engine : GameWindow
         
         GL.DeleteTexture(_albedo.GetHandle());
         GL.DeleteTexture(_normal.GetHandle());
+        GL.DeleteTexture(_specular.GetHandle());
         DeferredRenderBuffer.Dispose();
     }
 }
