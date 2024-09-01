@@ -9,7 +9,7 @@ using Vector3 = VoxelGame.Maths.Vector3;
 
 namespace VoxelGame.Graphics;
 
-internal class Chunk
+internal class Chunk : IDisposable
 {
     public const int ChunkSize = 16;
     public const int HChunkSize = ChunkSize / 2;
@@ -133,11 +133,17 @@ internal class Chunk
                 byte bZ = (byte)z;
                 
                 uint voxel = Voxels[i];
-                byte texture = (byte)voxel;
-                        
+
                 // 0 means air, so skip adding any faces for this voxel
                 if (voxel == 0)
                     continue;
+                
+                byte frontTex = (byte)VoxelData.GetTextureFace(voxel - 1, VoxelFace.Front);
+                byte backTex  = (byte)VoxelData.GetTextureFace(voxel - 1, VoxelFace.Back);
+                byte upTex    = (byte)VoxelData.GetTextureFace(voxel - 1, VoxelFace.Top);
+                byte downTex  = (byte)VoxelData.GetTextureFace(voxel - 1, VoxelFace.Bottom);
+                byte rightTex = (byte)VoxelData.GetTextureFace(voxel - 1, VoxelFace.Right);
+                byte leftTex  = (byte)VoxelData.GetTextureFace(voxel - 1, VoxelFace.Left);
                 
                 #region Chunk Builder
                 
@@ -151,9 +157,10 @@ internal class Chunk
                         new(Add(bX, 1), Add(bY, 1), bZ),
                     ]);
 
+                    // TODO: Profile performance difference between List.Add and List.AddRange
                     normals.AddRange([0, 0, 0, 0]);
 
-                    textures.AddRange([ texture, texture, texture, texture ]);
+                    textures.AddRange([ frontTex, frontTex, frontTex, frontTex ]);
                     
                     uvs.AddRange([ (true, false), (true, true), (false, false), (false, true) ]);
                     
@@ -176,7 +183,7 @@ internal class Chunk
 
                     normals.AddRange([ 1, 1, 1, 1 ]);
                     
-                    textures.AddRange([ texture, texture, texture, texture ]);
+                    textures.AddRange([ backTex, backTex, backTex, backTex ]);
                     
                     uvs.AddRange([ (false, false), (false, true), (true, false), (true, true) ]);
                     
@@ -200,7 +207,7 @@ internal class Chunk
 
                     normals.AddRange([ 2, 2, 2, 2 ]);
                     
-                    textures.AddRange([ texture, texture, texture, texture ]);
+                    textures.AddRange([ upTex, upTex, upTex, upTex ]);
                     
                     uvs.AddRange([ (false, false), (false, true), (true, false), (true, true) ]);
                     
@@ -223,7 +230,7 @@ internal class Chunk
 
                     normals.AddRange([ 3, 3, 3, 3 ]);
                     
-                    textures.AddRange([ texture, texture, texture, texture ]);
+                    textures.AddRange([ downTex, downTex, downTex, downTex ]);
                     
                     uvs.AddRange([ (true, false), (true, true), (false, false), (false, true) ]);
                     
@@ -247,7 +254,7 @@ internal class Chunk
 
                     normals.AddRange([ 4, 4, 4, 4 ]);
                     
-                    textures.AddRange([ texture, texture, texture, texture ]);
+                    textures.AddRange([ rightTex, rightTex, rightTex, rightTex ]);
                     
                     uvs.AddRange([ (true, false), (true, true), (false, false), (false, true) ]);
                     
@@ -270,7 +277,7 @@ internal class Chunk
 
                     normals.AddRange([ 5, 5, 5, 5 ]);
                     
-                    textures.AddRange([ texture, texture, texture, texture ]);
+                    textures.AddRange([ leftTex, leftTex, leftTex, leftTex ]);
                     
                     uvs.AddRange([ (false, false), (false, true), (true, false), (true, true) ]);
                     
@@ -432,5 +439,12 @@ internal class Chunk
             this.data = data;
             this.triangles = triangles;
         }
+    }
+
+    public void Dispose()
+    {
+        GL.DeleteVertexArray(opaqueMesh_vao);
+        GL.DeleteBuffer(opaqueMesh_vbo);
+        GL.DeleteBuffer(opaqueMesh_ebo);
     }
 }

@@ -40,20 +40,13 @@ void main() {
 
     vec3 vertexPosition = unpackedData.position + chunkPosition;
     vec4 pos = vec4(vertexPosition, 1.0);
-    gl_Position = m_proj * m_view * pos;
+    vec4 vsPos = m_view * pos;
+    gl_Position = m_proj * vsPos;
 
     normal = unpackedData.normal;
-    
-//    if (abs(normal.z) > abs(normal.y)) {
-//        tangent = normalize(cross(vec3(0.0, 1.0, 0.0), normal));
-//    } else {
-//        tangent = normalize(cross(vec3(0.0, 0.0, 1.0), normal));
-//    }
-//        bitangent = normalize(cross(normal, tangent));
-    
-    normal = unpackedData.normal;
+
     fragPos = pos.xyz;
-    uv = computeTextureCoordinates(unpackedData.tex - 1, unpackedData.faceId, unpackedData.uvi.x, unpackedData.uvi.y);
+    uv = computeTextureCoordinates(unpackedData.tex, unpackedData.faceId, unpackedData.uvi.x, unpackedData.uvi.y);
 }
 
 VertexData unpackData(uint data) {
@@ -82,7 +75,7 @@ VertexData unpackData(uint data) {
 vec2 computeTextureCoordinates(int voxelId, int face, int u, int v) {
     if (face < 0 || face > 6) return vec2(0, 0); // The face can only be 6 possible values, so if it is outside this range the data is likely incorrect
 
-    int texId = voxelId; // TODO: calculate the texture id based on the face to allow faces to have unique textures
+    int texId = voxelId;
     // this will have to be done by sending a buffer of texture information over, but I'll do that later
 
     int texturesPerRow = ATLAS_WIDTH / VOXEL_TEXTURE_SIZE;

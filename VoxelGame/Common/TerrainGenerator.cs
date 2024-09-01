@@ -44,17 +44,17 @@ public static class TerrainGenerator
 
     public static uint SampleTerrain(int sampleX, int sampleY, int sampleZ)
     {
-        // if (sampleX == 0 && sampleY == 0 && sampleZ == 0) return 1u;
+        // if (sampleY == 0) return VoxelData.NameToVoxelId("grass_block");
         // return 0u;
         
-        if (sampleY == 24) return 1u;
-        if (sampleY == 25) return Random.Hash((uint)new Vector3Int(sampleX, sampleY, sampleZ).GetHashCode()) > 0.75f ? 9u : 0u;
-        if (sampleY == 0) return 5u;
+        if (sampleY == 24) return VoxelData.NameToVoxelId("grass_block");
+        if (sampleY == 25) return Random.Hash((uint)new Vector3Int(sampleX, sampleY, sampleZ).GetHashCode()) > 0.75f ? VoxelData.NameToVoxelId("cobblestone") : 0u;
+        if (sampleY == 0) return VoxelData.NameToVoxelId("bedrock");
         if (sampleY > 25) return 0u;
         //return 0u;
 
         float val = Sample(sampleX, sampleY, sampleZ, scale: 0.1f);
-        uint vox = val >= 0.5f ? 4u : 0u;
+        uint vox = val >= 0.5f ? VoxelData.NameToVoxelId("stone") : 0u;
         
         return vox;
     }

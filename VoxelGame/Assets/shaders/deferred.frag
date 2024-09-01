@@ -1,5 +1,7 @@
 ﻿#version 450 core
 
+// #include "assets/shaders/chunk-lit.glsl"
+
 #define MIN_SHADOW_INTENSITY 0.5
 
 out vec3 finalColour;
@@ -12,8 +14,16 @@ uniform sampler2D gAlbedo;
 uniform sampler2D gSpecular;
 uniform sampler2D gDepth;
 
+uniform sampler2D gAo;
+
 uniform int ShadowsEnabled;
 uniform int SoftShadows;
+
+uniform vec3 viewPos;
+
+uniform mat4 m_proj;
+uniform mat4 m_view;
+uniform mat4 m_invView;
 
 uniform mat4 m_lightProj;
 uniform mat4 m_lightView;
@@ -35,26 +45,21 @@ void main() {
 
     vec3 position = texture(gPosition, uv).xyz;
     vec3 normal = normalize(texture(gNormal, uv).xyz);
-    vec4 specular = texture(gSpecular, uv);
-
-    vec3 ambient = 0.2 * albedo;
+    vec4 specularTex = texture(gSpecular, uv);
+    
+    vec3 viewDir = normalize(viewPos - position);
+    vec3 reflectDir = reflect(-LightDir, normal);
+    
+    float ambientStrength = 0.2;
+    vec3 ambient = ambientStrength * albedo;
     
     float diff = max(dot(normal, LightDir), 0.0);
     vec3 diffuse = diff * albedo;
     
-    if (ShadowsEnabled == 1) {
-        vec4 fragPosLightSpace = m_lightProj * m_lightView * vec4(position, 1.0);
-        
-        float shadow = calcShadow(fragPosLightSpace, normal);
+    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32);
+    vec3 specular = specularTex.r * spec * vec3(1.0);
 
-        vec3 result = ambient + shadow * (diffuse);
-        result = clamp(result, 0.0, 1.0);
-        
-        finalColour = result * shadow;
-        return;
-    }
-
-    vec3 result = ambient + diffuse;
+    vec3 result = ambient + diffuse + specular;
     result = clamp(result, 0.0, 1.0);
     
     finalColour = result;

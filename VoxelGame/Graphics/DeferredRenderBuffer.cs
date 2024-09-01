@@ -57,7 +57,7 @@ internal class DeferredRenderBuffer : IDisposable
         GL.BindVertexArray(0);
     }
 
-    public void GenerateFramebuffer(Vector2Int size)
+    private void GenerateFramebuffer(Vector2Int size)
     {
         // Generate and bind framebuffer
         gBuffer = GL.GenFramebuffer();
@@ -174,6 +174,15 @@ internal class DeferredRenderBuffer : IDisposable
         if (bindShader)
             _shader.Use();
         
+        BindTextures();
+        
+        GL.BindVertexArray(_vao);
+        GL.DrawElements(PrimitiveType.Triangles, 6, DrawElementsType.UnsignedInt, 0);
+        GL.BindVertexArray(0);
+    }
+
+    public void BindTextures()
+    {
         GL.ActiveTexture(TextureUnit.Texture0);
         GL.BindTexture(TextureTarget.Texture2D, gPosition);
         
@@ -188,10 +197,6 @@ internal class DeferredRenderBuffer : IDisposable
         
         GL.ActiveTexture(TextureUnit.Texture4);
         GL.BindTexture(TextureTarget.Texture2D, gDepth);
-        
-        GL.BindVertexArray(_vao);
-        GL.DrawElements(PrimitiveType.Triangles, 6, DrawElementsType.UnsignedInt, 0);
-        GL.BindVertexArray(0);
     }
 
     public void Dispose()

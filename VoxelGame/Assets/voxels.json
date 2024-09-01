@@ -1,0 +1,74 @@
+﻿[
+  {
+    "id": 1,
+    "displayName": "Grass Block",
+    "name": "grass_block",
+    "textureFaces": [ 1, 1, 0, 2, 1, 1 ]
+  },
+  {
+    "id": 2,
+    "displayName": "Dirt Block",
+    "name": "dirt",
+    "textureFaces": [ 2, 2, 2, 2, 2, 2 ]
+  },
+  {
+    "id": 3,
+    "displayName": "Stone",
+    "name": "stone",
+    "textureFaces": [ 3, 3, 3, 3, 3, 3 ]
+  },
+  {
+    "id": 4,
+    "displayName": "Bedrock",
+    "name": "bedrock",
+    "textureFaces": [ 4, 4, 4, 4, 4, 4 ]
+  },
+  {
+    "id": 5,
+    "displayName": "Oak Log",
+    "name": "oak_log",
+    "textureFaces": [ 5, 5, 6, 6, 5, 5 ]
+  },
+  {
+    "id": 6,
+    "displayName": "Cobblestone",
+    "name": "cobblestone",
+    "textureFaces": [ 8, 8, 8, 8, 8, 8 ]
+  },
+  {
+    "id": 7,
+    "displayName": "Light",
+    "name": "light",
+    "textureFaces": [ 9, 9, 9, 9, 9, 9 ],
+    "lightColour": [ 1.0, 0.898, 0.7 ],
+    "lightRange": 50
+  },
+  {
+    "id": 8,
+    "displayName": "Glass",
+    "name": "glass",
+    "textureFaces": [ 7, 7, 7, 7, 7, 7 ],
+    "transparent": true
+  },
+  {
+    "id": 9,
+    "displayName": "Red Glass",
+    "name": "red_glass",
+    "textureFaces": [ 10, 10, 10, 10, 10, 10 ],
+    "transparent": true
+  },
+  {
+    "id": 10,
+    "displayName": "Sand",
+    "name": "sand",
+    "textureFaces": [ 11, 11, 11, 11, 11, 11 ]
+  },
+  {
+    "id": 11,
+    "displayName": "Water",
+    "name": "water",
+    "textureFaces": [ 16, 16, 16, 16, 16, 16 ],
+    "transparent": true,
+    "liquid": true
+  }
+]

@@ -40,6 +40,9 @@ public sealed class Engine : GameWindow
     private DeferredRenderBuffer DeferredRenderBuffer;
     private Shader DeferredLightingShader;
 
+    private DeferredPreprocessor SSAO;
+    private Shader SSAOShader;
+
     private static SortedList<(float dst, int hash), Vector3Int> ChunksToBuild = new();
     private const int MaxChunksToBuildPerFrame = 8;
     
@@ -84,12 +87,19 @@ public sealed class Engine : GameWindow
         DeferredRenderBuffer = new DeferredRenderBuffer(DeferredLightingShader, Size);
         
         DeferredLightingShader.SetInt("shadowMap", 5);
+        DeferredLightingShader.SetInt("gAo", 6);
+
+        SSAOShader = Shader.Load("assets/shaders/deferred.vert", "assets/shaders/ssao.frag");
+        SSAOShader.Use();
+        SSAOShader.SetInt("gPosition", 0, autoUse: false);
+        SSAOShader.SetInt("gNormal"  , 1, autoUse: false);
+        SSAOShader.SetInt("gAlbedo"  , 2, autoUse: false);
+        SSAOShader.SetInt("gSpecular", 3, autoUse: false);
+        SSAOShader.SetInt("gDepth"   , 4, autoUse: false);
+        SSAO = new DeferredPreprocessor(SSAOShader, Size);
 
         Sun = new DirectionalLight();
         Sun.LightPosition = new Vector3(1f, 1f, 1f);
-        
-        // Make the window visible after all GL setup has been completed
-        IsVisible = true;
 
         _albedo = new Texture2D("assets/textures/atlas-main.png", useLinearSampling: false, anisoLevel: 16, generateMipmaps: true);
         _normal = new Texture2D("assets/textures/atlas-normal.png", useLinearSampling: false, anisoLevel: 16, generateMipmaps: true);
@@ -107,6 +117,9 @@ public sealed class Engine : GameWindow
         shader.SetFloat("Far", Camera.FarPlane);
         
         shader.SetVector2("screenSize", new(Size.X, Size.Y));
+        
+        // Make the window visible after all setup has been completed
+        IsVisible = true;
     }
 
     protected override void OnUpdateFrame(FrameEventArgs args)
@@ -159,6 +172,8 @@ public sealed class Engine : GameWindow
         
         foreach (var chunkPos in chunksToRemove)
         {
+            var chunkToRemove = Chunks[chunkPos];
+            chunkToRemove.Dispose(); // Dispose any vertex arrays related to this chunk to free up gpu memory
             Chunks.Remove(chunkPos);
         }
         
@@ -268,12 +283,25 @@ public sealed class Engine : GameWindow
         // This is so I can still use wireframe mode without just seeing a quad across the whole screen
         GL.PolygonMode(MaterialFace.FrontAndBack, PolygonMode.Fill);
         
+        DeferredRenderBuffer.BindTextures();
+        
+        SSAOShader.Use();
+        SSAOShader.SetMatrix("m_proj", ref Camera.ProjectionMatrix, autoUse: false);
+        SSAO.Render(bindShader: false);
+        
         // Clear the colour and depth buffers
         GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+        
+        GL.ActiveTexture(TextureUnit.Texture6);
+        GL.BindTexture(TextureTarget.Texture2D, SSAO.Texture);
         
         DeferredLightingShader.Use();
         DeferredLightingShader.SetInt("ShadowsEnabled", Sun.Shadows ? 1 : 0, autoUse: false);
         DeferredLightingShader.SetInt("SoftShadows", Sun.SoftShadows ? 1 : 0, autoUse: false);
+        
+        DeferredLightingShader.SetMatrix("m_proj", ref Camera.ProjectionMatrix, autoUse: false);
+        DeferredLightingShader.SetMatrix("m_view", ref Camera.ViewMatrix, autoUse: false);
+        DeferredLightingShader.SetMatrix("m_invView", ref Camera.InvViewMatrix, autoUse: false);
 
         var sunLightProjMatrix = Sun.LightProjMatrix;
         var sunLightViewMatrix = Sun.LightViewMatrix;
@@ -281,6 +309,8 @@ public sealed class Engine : GameWindow
         DeferredLightingShader.SetMatrix("m_lightView", ref sunLightViewMatrix, autoUse: false);
         
         DeferredLightingShader.SetVector3("LightDir", Sun.LightDirection, autoUse: false);
+        
+        DeferredLightingShader.SetVector3("viewPos", Camera.Position, autoUse: false);
         
         GL.ActiveTexture(TextureUnit.Texture5);
         GL.BindTexture(TextureTarget.Texture2D, Sun.DepthTexture);
@@ -362,6 +392,8 @@ public sealed class Engine : GameWindow
         DefaultChunkMaterial.Shader.SetVector2("screenSize", new(e.Size.X, e.Size.Y));
         
         DeferredRenderBuffer.Resize(e.Size);
+        
+        SSAO.Resize(e.Size);
     }
 
     protected override void OnMouseMove(MouseMoveEventArgs e)
@@ -384,6 +416,7 @@ public sealed class Engine : GameWindow
         GL.DeleteTexture(_albedo.GetHandle());
         GL.DeleteTexture(_normal.GetHandle());
         GL.DeleteTexture(_specular.GetHandle());
+        SSAO.Dispose();
         DeferredRenderBuffer.Dispose();
     }
 }

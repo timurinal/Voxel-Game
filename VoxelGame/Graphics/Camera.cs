@@ -29,6 +29,7 @@ public class Camera
     
     public Matrix4 ProjectionMatrix;
     public Matrix4 ViewMatrix;
+    public Matrix4 InvViewMatrix;
     public Matrix4 VPMatrix;
     
     private Vector3 _position;
@@ -80,6 +81,8 @@ public class Camera
         ViewMatrix = Matrix4.LookAt(_position, _position + _front, _up);
 
         VPMatrix = ViewMatrix * ProjectionMatrix;
+
+        InvViewMatrix = Matrix4.Invert(ViewMatrix);
         
         Frustum = new Frustum(VPMatrix);
     }
