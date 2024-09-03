@@ -4,10 +4,10 @@ using VoxelGame.Maths;
 
 internal class DeferredRenderBuffer : IDisposable
 {
-    public const float FramebufferScale = 2f;
+    public const float FramebufferScale = 1.5f;
     
     private int gBuffer;
-    private int gPosition, gNormal, gAlbedo, gSpecular, gDepth;
+    private int gPosition, gNormal, gAlbedo, gMaterial, gSpecular, gDepth;
     private Vector2Int size;
 
     private int _vao, _vbo, _ebo;
@@ -20,11 +20,12 @@ internal class DeferredRenderBuffer : IDisposable
 
         _shader = shader;
         _shader.Use();
-        _shader.SetInt("gPosition", 0, autoUse: false);
-        _shader.SetInt("gNormal"  , 1, autoUse: false);
-        _shader.SetInt("gAlbedo"  , 2, autoUse: false);
-        _shader.SetInt("gSpecular", 3, autoUse: false);
-        _shader.SetInt("gDepth"   , 4, autoUse: false);
+        _shader.SetInt("gPosition"  , 0, autoUse: false);
+        _shader.SetInt("gNormal"    , 1, autoUse: false);
+        _shader.SetInt("gAlbedo"    , 2, autoUse: false);
+        _shader.SetInt("gMaterial"  , 3, autoUse: false);
+        _shader.SetInt("gSpecular"  , 4, autoUse: false);
+        _shader.SetInt("gDepth"     , 5, autoUse: false);
 
         float[] data =
         [
@@ -67,7 +68,7 @@ internal class DeferredRenderBuffer : IDisposable
         gBuffer = GL.GenFramebuffer();
         GL.BindFramebuffer(FramebufferTarget.Framebuffer, gBuffer);
 
-        const bool LinearSampling = true;
+        const bool LinearSampling = false;
         TextureMinFilter minFilter = LinearSampling ? TextureMinFilter.Linear : TextureMinFilter.Nearest;
         TextureMagFilter magFilter = LinearSampling ? TextureMagFilter.Linear : TextureMagFilter.Nearest;
         
@@ -107,6 +108,18 @@ internal class DeferredRenderBuffer : IDisposable
         GL.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment2,
             TextureTarget.Texture2D, gAlbedo, 0);
         
+        // Material texture setup
+        gMaterial = GL.GenTexture();
+        GL.BindTexture(TextureTarget.Texture2D, gMaterial);
+        GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.R8i, size.X, size.Y, 0, PixelFormat.RedInteger,
+            PixelType.UnsignedByte, IntPtr.Zero);
+        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Nearest);
+        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Nearest);
+        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
+        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
+        GL.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment3,
+            TextureTarget.Texture2D, gMaterial, 0);
+        
         // Specular texture setup
         gSpecular = GL.GenTexture();
         GL.BindTexture(TextureTarget.Texture2D, gSpecular);
@@ -116,7 +129,7 @@ internal class DeferredRenderBuffer : IDisposable
         GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)magFilter);
         GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
         GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
-        GL.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment3,
+        GL.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment4,
             TextureTarget.Texture2D, gSpecular, 0);
 
         // Depth texture setup
@@ -138,6 +151,7 @@ internal class DeferredRenderBuffer : IDisposable
             DrawBuffersEnum.ColorAttachment1,
             DrawBuffersEnum.ColorAttachment2,
             DrawBuffersEnum.ColorAttachment3,
+            DrawBuffersEnum.ColorAttachment4,
         };
         GL.DrawBuffers(attachments.Length, attachments);
 
@@ -182,7 +196,8 @@ internal class DeferredRenderBuffer : IDisposable
         if (bindShader)
             _shader.Use();
         
-        GL.Viewport(0, 0, this.size.X, this.size.Y);
+        Vector2Int size = new Vector2Int(Mathf.RoundToInt(this.size.X * FramebufferScale), Mathf.RoundToInt(this.size.Y * FramebufferScale));
+        GL.Viewport(0, 0, size.X, size.Y);
         
         BindTextures();
         
@@ -190,8 +205,7 @@ internal class DeferredRenderBuffer : IDisposable
         GL.DrawElements(PrimitiveType.Triangles, 6, DrawElementsType.UnsignedInt, 0);
         GL.BindVertexArray(0);
         
-        Vector2Int size = new Vector2Int(Mathf.RoundToInt(this.size.X * FramebufferScale), Mathf.RoundToInt(this.size.Y * FramebufferScale));
-        GL.Viewport(0, 0, size.X, size.Y);
+        GL.Viewport(0, 0, this.size.X, this.size.Y);
     }
 
     public void BindTextures()
@@ -206,9 +220,12 @@ internal class DeferredRenderBuffer : IDisposable
         GL.BindTexture(TextureTarget.Texture2D, gAlbedo);
         
         GL.ActiveTexture(TextureUnit.Texture3);
-        GL.BindTexture(TextureTarget.Texture2D, gSpecular);
+        GL.BindTexture(TextureTarget.Texture2D, gMaterial);
         
         GL.ActiveTexture(TextureUnit.Texture4);
+        GL.BindTexture(TextureTarget.Texture2D, gSpecular);
+        
+        GL.ActiveTexture(TextureUnit.Texture5);
         GL.BindTexture(TextureTarget.Texture2D, gDepth);
     }
 

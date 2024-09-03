@@ -70,6 +70,8 @@ public sealed class Engine : GameWindow
         
         GL.Enable(EnableCap.DepthTest); // Allow depth testing
         
+        GL.Enable(EnableCap.DepthClamp); // idk
+        
         GL.Enable(EnableCap.CullFace);  // Allow face culling
         GL.FrontFace(FrontFaceDirection.Cw); // Front face is wound clockwise
         GL.CullFace(CullFaceMode.Back);           // and the back face is culled
@@ -86,8 +88,8 @@ public sealed class Engine : GameWindow
         DeferredLightingShader = Shader.Load("assets/shaders/deferred.vert", "assets/shaders/deferred.frag");
         DeferredRenderBuffer = new DeferredRenderBuffer(DeferredLightingShader, Size);
         
-        DeferredLightingShader.SetInt("shadowMap", 5);
-        DeferredLightingShader.SetInt("gAo", 6);
+        DeferredLightingShader.SetInt("shadowMap", 6);
+        DeferredLightingShader.SetInt("gAo", 7);
 
         SSAOShader = Shader.Load("assets/shaders/deferred.vert", "assets/shaders/ssao.frag");
         SSAOShader.Use();
@@ -99,7 +101,7 @@ public sealed class Engine : GameWindow
         SSAO = new DeferredPreprocessor(SSAOShader, Size);
 
         Sun = new DirectionalLight();
-        Sun.LightPosition = new Vector3(1f, 1f, 1f);
+        Sun.LightPosition = new Vector3(1f, 2f, 1f);
 
         _albedo = new Texture2D("assets/textures/atlas-main.png", useLinearSampling: false, anisoLevel: 16, generateMipmaps: true);
         _normal = new Texture2D("assets/textures/atlas-normal.png", useLinearSampling: false, anisoLevel: 16, generateMipmaps: true);
@@ -307,7 +309,7 @@ public sealed class Engine : GameWindow
         
         DeferredLightingShader.SetVector3("viewPos", Camera.Position, autoUse: false);
         
-        GL.ActiveTexture(TextureUnit.Texture5);
+        GL.ActiveTexture(TextureUnit.Texture6);
         GL.BindTexture(TextureTarget.Texture2D, Sun.DepthTexture);
         
         DeferredRenderBuffer.Render(bindShader: false);

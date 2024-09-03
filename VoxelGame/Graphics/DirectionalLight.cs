@@ -4,14 +4,13 @@ using Vector3 = VoxelGame.Maths.Vector3;
 
 namespace VoxelGame.Graphics;
 
-// TODO: idk why the shadows are so noisy so i might try re-implementing shadows
 public class DirectionalLight
 {
     public Vector3 LightPosition { get; set; }
     public Vector3 LightDirection => LightPosition.Normalized;
 
     // TODO: csm
-    public bool Shadows { get; set; } = false;
+    public bool Shadows { get; set; } = true;
     public ShadowMapQuality ShadowQuality { get; private set; } = ShadowMapQuality.Ultra;
     public bool SoftShadows { get; set; } = true;
 
@@ -47,8 +46,8 @@ public class DirectionalLight
         GL.BindTexture(TextureTarget.Texture2D, _shadowDepthTexture);
         GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.DepthComponent32f, quality, quality, 0,
             PixelFormat.DepthComponent, PixelType.Float, IntPtr.Zero);
-        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Nearest);
-        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Nearest);
+        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
         GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToBorder);
         GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToBorder);
         float[] borderCol = [ 1.0f, 1.0f, 1.0f, 1.0f ];
@@ -66,13 +65,12 @@ public class DirectionalLight
 
     internal void UpdateMatrix(Vector3 cameraPosition)
     {
-        LightProjMatrix = Matrix4.CreateOrthographicOffCenter(-OrthoSize, OrthoSize, -OrthoSize, OrthoSize, 0.1f, 1000f);
+        LightProjMatrix = Matrix4.CreateOrthographicOffCenter(-OrthoSize, OrthoSize, -OrthoSize, OrthoSize, 1f, 500f);
 
         Vector3 lightDir = LightPosition.Normalized;
 
         // The distance from the camera that the sun is considered to be
-        Vector3 camPos = Vector3.Round(cameraPosition);
-        const float SunViewLength = 500f;
+        const float SunViewLength = 100f;
         Vector3 eyePosition = lightDir * SunViewLength + cameraPosition;
         LightViewMatrix = Matrix4.LookAt(eyePosition, cameraPosition, Vector3.Up);
     }
