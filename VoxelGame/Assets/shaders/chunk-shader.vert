@@ -76,7 +76,6 @@ vec2 computeTextureCoordinates(int voxelId, int face, int u, int v) {
     if (face < 0 || face > 6) return vec2(0, 0); // The face can only be 6 possible values, so if it is outside this range the data is likely incorrect
 
     int texId = voxelId;
-    // this will have to be done by sending a buffer of texture information over, but I'll do that later
 
     int texturesPerRow = ATLAS_WIDTH / VOXEL_TEXTURE_SIZE;
     float unit = 1.0 / texturesPerRow;

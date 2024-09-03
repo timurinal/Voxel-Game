@@ -43,7 +43,7 @@ public sealed class Engine : GameWindow
     private DeferredPreprocessor SSAO;
     private Shader SSAOShader;
 
-    private static SortedList<(float dst, int hash), Vector3Int> ChunksToBuild = new();
+    private static List<Vector3Int> ChunksToBuild = new();
     private const int MaxChunksToBuildPerFrame = 8;
     
 
@@ -213,11 +213,7 @@ public sealed class Engine : GameWindow
                         
                         if (!newChunk.IsEmpty)
                         {
-                            float sqrDst = Vector3.SqrDistance(newChunk.Centre, Camera.Position);
-
-                            int hash = chunkPosition.GetHashCode();
-                            
-                            ChunksToBuild.Add((sqrDst, hash), chunkPosition); // Queue the chunk for building
+                            ChunksToBuild.Add(chunkPosition); // Queue the chunk for building
                         }
                     }
                 }
@@ -226,10 +222,9 @@ public sealed class Engine : GameWindow
         
         for (int i = 0; i < MaxChunksToBuildPerFrame && ChunksToBuild.Count > 0; i++)
         {
-            var firstKey = ChunksToBuild.Keys[0];
-            var firstValue = ChunksToBuild[firstKey];
+            var first = ChunksToBuild[0];
             ChunksToBuild.RemoveAt(0);
-            var chunkPosition = firstValue;
+            var chunkPosition = first;
             if (Chunks.TryGetValue(chunkPosition, out var chunk))
             {
                 chunk.BuildChunk();

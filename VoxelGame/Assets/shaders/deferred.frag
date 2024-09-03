@@ -19,6 +19,8 @@ uniform sampler2D gAo;
 uniform int ShadowsEnabled;
 uniform int SoftShadows;
 
+uniform int PlayerDynamicLight;
+
 uniform vec3 viewPos;
 
 uniform mat4 m_proj;
@@ -35,6 +37,10 @@ uniform vec3 LightDir;
 float calcShadow(vec4 fragPosLightSpace, vec3 normal);
 
 void main() {
+    
+//    finalColour = vec3(uv, 0.0);
+//    return;
+    
     vec3 albedo = texture(gAlbedo, uv).rgb;
     float depth = texture(gDepth, uv).r;
     
