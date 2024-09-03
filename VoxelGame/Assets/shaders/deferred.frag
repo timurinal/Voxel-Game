@@ -2,7 +2,7 @@
 
 // #include "assets/shaders/chunk-lit.glsl"
 
-#define MIN_SHADOW_INTENSITY 0.5
+#define MIN_SHADOW_INTENSITY 0.0
 
 out vec3 finalColour;
 
@@ -11,6 +11,7 @@ in vec2 uv;
 uniform sampler2D gPosition;
 uniform sampler2D gNormal;
 uniform sampler2D gAlbedo;
+uniform sampler2D gMaterial;
 uniform sampler2D gSpecular;
 uniform sampler2D gDepth;
 
@@ -56,6 +57,9 @@ void main() {
     vec3 viewDir = normalize(viewPos - position);
     vec3 reflectDir = reflect(-LightDir, normal);
     
+    vec4 fragPosLightSpace = m_lightProj * m_lightView * vec4(position, 1.0);
+    float shadow = calcShadow(fragPosLightSpace, normal);
+    
     float ambientStrength = 0.2;
     vec3 ambient = ambientStrength * albedo;
     
@@ -65,13 +69,13 @@ void main() {
     float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32);
     vec3 specular = specularTex.r * spec * vec3(1.0);
 
-    vec3 result = ambient + diffuse + specular;
+    vec3 result = ambient + shadow * (diffuse + specular);
     result = clamp(result, 0.0, 1.0);
     
     finalColour = result;
 }
 
-float pcfSoftShadow(vec2 uv, float currentDepth, float radius, float samples) {
+float pcfSoftShadow(vec2 uv, float currentDepth, float radius, float samples, float bias) {
     float shadow = 0.0;
     float diskRadius = radius / float(samples);
 
@@ -82,7 +86,7 @@ float pcfSoftShadow(vec2 uv, float currentDepth, float radius, float samples) {
         for (int j = -halfSamples; j < halfSamples; j++) {
             vec2 offset = diskRadius * vec2(float(i), float(j));
             float sampleDepth = texture(shadowMap, uv + offset * texelSize).r;
-            shadow += (currentDepth < sampleDepth ? 1.0 : 0.0);
+            shadow += (currentDepth < sampleDepth - bias ? 1.0 - MIN_SHADOW_INTENSITY : 0.0);
         }
     }
     shadow /= samples * samples;
@@ -98,12 +102,12 @@ float calcShadow(vec4 fragPosLightSpace, vec3 normal) {
 
     // Sample the shadow map
     float currentDepth = projCoords.z;
-    
-    float bias = max(0.0001 * (1.0 - dot(normal, LightDir)), 0.00001);
 
-    float radius = 5.0;
-    float samples = 25.0;
-    float shadow = pcfSoftShadow(projCoords.xy, currentDepth - bias, radius, samples);
+    float bias = max(0.0005 * tan(acos(dot(normal, LightDir))), 0.00005);
 
-    return clamp(shadow, MIN_SHADOW_INTENSITY, 1.0);
+    float radius = 2.5;
+    float samples = 15.0;
+    float shadow = pcfSoftShadow(projCoords.xy, currentDepth - bias, radius, samples, bias);
+
+    return shadow;
 }

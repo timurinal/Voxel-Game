@@ -44,7 +44,7 @@ public class DirectionalLight
         
         _shadowDepthTexture = GL.GenTexture();
         GL.BindTexture(TextureTarget.Texture2D, _shadowDepthTexture);
-        GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.DepthComponent32f, quality, quality, 0,
+        GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.DepthComponent, quality, quality, 0,
             PixelFormat.DepthComponent, PixelType.Float, IntPtr.Zero);
         GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
         GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);

@@ -1,9 +1,12 @@
 ﻿#version 450 core
 
+#extension GL_NV_gpu_shader5 : enable 
+
 layout (location = 0) out vec3 gPosition;
 layout (location = 1) out vec3 gNormal;
 layout (location = 2) out vec3 gAlbedo;
-layout (location = 3) out vec4 gSpecular;
+layout (location = 3) out uint8_t gMaterial;
+layout (location = 4) out vec4 gSpecular;
 
 in vec3 normal;
 in vec3 fragPos;
@@ -22,5 +25,6 @@ void main() {
     gPosition = fragPos;
     gNormal = normal;
     gAlbedo = albedo;
+    gMaterial = uint8_t(0);
     gSpecular = vec4(specular.rgb, Smoothness);
 }

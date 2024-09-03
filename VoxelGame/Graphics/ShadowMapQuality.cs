@@ -2,9 +2,9 @@
 
 public enum ShadowMapQuality
 {
-    Low = 256,
-    Medium = 512,
-    High = 1024,
-    VeryHigh = 2048,
-    Ultra = 4096
+    Low = 512,
+    Medium = 256,
+    High = 2048,
+    VeryHigh = 4096,
+    Ultra = 8192
 }

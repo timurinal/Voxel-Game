@@ -7,6 +7,7 @@ in vec2 uv;
 uniform sampler2D gPosition;
 uniform sampler2D gNormal;
 uniform sampler2D gAlbedo;
+uniform sampler2D gMaterial;
 uniform sampler2D gSpecular;
 uniform sampler2D gDepth;
 
