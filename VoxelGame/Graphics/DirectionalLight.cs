@@ -14,7 +14,7 @@ public class DirectionalLight
     public ShadowMapQuality ShadowQuality { get; private set; } = ShadowMapQuality.Ultra;
     public bool SoftShadows { get; set; } = true;
 
-    public int OrthoSize { get; set; } = 50;
+    public int OrthoSize { get; set; } = 100;
     
     public Matrix4 LightProjMatrix { get; private set; }
     public Matrix4 LightViewMatrix { get; private set; }

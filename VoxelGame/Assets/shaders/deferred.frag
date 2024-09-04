@@ -1,8 +1,18 @@
 ﻿#version 450 core
 
-// #include "assets/shaders/chunk-lit.glsl"
-
 #define MIN_SHADOW_INTENSITY 0.0
+
+struct PointLight {
+    vec3 position;
+
+    float constant;
+    float linear;
+    float quadratic;
+
+    vec3 ambient;
+    vec3 diffuse;
+    vec3 specular;
+};
 
 out vec3 finalColour;
 
@@ -35,6 +45,11 @@ uniform sampler2D shadowMap;
 
 uniform vec3 LightDir;
 
+//uniform PointLight PlayerDynamicLight;
+
+vec3 calcDirLight(vec3 albedo, vec3 normal, vec3 viewDir, vec3 reflectDir, vec4 specularTex, float shadow);
+vec3 calcPointLight(vec3 lightPos, vec3 position, vec3 albedo, vec3 normal, vec3 viewDir, vec3 reflectDir, vec4 specularTex);
+
 float calcShadow(vec4 fragPosLightSpace, vec3 normal);
 
 void main() {
@@ -60,19 +75,55 @@ void main() {
     vec4 fragPosLightSpace = m_lightProj * m_lightView * vec4(position, 1.0);
     float shadow = calcShadow(fragPosLightSpace, normal);
     
+    vec3 result = calcDirLight(albedo, normal, viewDir, reflectDir, specularTex, shadow);
+    result += calcPointLight(viewPos, position, albedo, normal, viewDir, reflectDir, specularTex);
+    
+    finalColour = result;
+}
+
+vec3 calcDirLight(vec3 albedo, vec3 normal, vec3 viewDir, vec3 reflectDir, vec4 specularTex, float shadow) {
     float ambientStrength = 0.2;
     vec3 ambient = ambientStrength * albedo;
-    
+
     float diff = max(dot(normal, LightDir), 0.0);
     vec3 diffuse = diff * albedo;
-    
+
     float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32);
     vec3 specular = specularTex.r * spec * vec3(1.0);
 
     vec3 result = ambient + shadow * (diffuse + specular);
     result = clamp(result, 0.0, 1.0);
     
-    finalColour = result;
+    return result;
+}
+
+float sqrLength(vec3 v) {
+    return v.x * v.x + v.y * v.y + v.z * v.z;
+}
+
+vec3 calcPointLight(vec3 lightPos, vec3 position, vec3 albedo, vec3 normal, vec3 viewDir, vec3 reflectDir, vec4 specularTex) {
+    
+    float lightRadius = 15;
+    float sqrRadius = lightRadius * lightRadius;
+    
+    if (sqrLength(lightPos - position) > sqrRadius) return vec3(0.0);
+    
+    vec3 lightDir = normalize(lightPos - position);
+    
+    // point lights won't have any ambient light (at least not yet)
+    float ambientStrength = 0.0;
+    vec3 ambient = ambientStrength * albedo;
+
+    float diff = max(dot(normal, lightDir), 0.0);
+    vec3 diffuse = diff * albedo;
+
+    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32);
+    vec3 specular = specularTex.r * spec * vec3(1.0);
+
+    vec3 result = ambient + diffuse + specular;
+    result = clamp(result, 0.0, 1.0);
+
+    return result;
 }
 
 float pcfSoftShadow(vec2 uv, float currentDepth, float radius, float samples, float bias) {
@@ -104,8 +155,8 @@ float calcShadow(vec4 fragPosLightSpace, vec3 normal) {
     float currentDepth = projCoords.z;
 
     float bias = max(0.0005 * tan(acos(dot(normal, LightDir))), 0.00005);
-
-    float radius = 2.5;
+    
+    float radius = 3.5;
     float samples = 15.0;
     float shadow = pcfSoftShadow(projCoords.xy, currentDepth - bias, radius, samples, bias);
 

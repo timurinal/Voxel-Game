@@ -44,18 +44,35 @@ public static class TerrainGenerator
 
     public static uint SampleTerrain(int sampleX, int sampleY, int sampleZ)
     {
-        // if (sampleY == 0) return VoxelData.NameToVoxelId("grass_block");
-        // return 0u;
+        float noise = FractalNoise(sampleX, sampleZ);
         
-        if (sampleY == 24) return VoxelData.NameToVoxelId("grass_block");
-        if (sampleY == 25) return Random.Hash((uint)new Vector3Int(sampleX, sampleY, sampleZ).GetHashCode()) > 0.75f ? VoxelData.NameToVoxelId("cobblestone") : 0u;
-        if (sampleY == 0) return VoxelData.NameToVoxelId("bedrock");
-        if (sampleY > 25) return 0u;
-        //return 0u;
+        float height = SeaLevel + noise * MaxHeight;
 
-        float val = Sample(sampleX, sampleY, sampleZ, scale: 0.1f);
-        uint vox = val >= 0.5f ? VoxelData.NameToVoxelId("stone") : 0u;
-        
-        return vox;
+        // Determine the voxel type based on height
+        uint voxelId;
+
+        if (sampleY <= 0)
+        {
+            voxelId = VoxelData.NameToVoxelId("bedrock");
+        }
+        else if (sampleY <= height - 5)
+        {
+            float caveNoise = Sample(sampleX, sampleY, sampleZ, scale: 0.1f);
+            voxelId = caveNoise >= 0.5f ? VoxelData.NameToVoxelId("stone") : 0u;
+        }
+        else if (sampleY < height)
+        {
+            voxelId = VoxelData.NameToVoxelId("dirt");
+        }
+        else if (sampleY == Mathf.RoundToInt(height))
+        {
+            voxelId = VoxelData.NameToVoxelId("grass_block");
+        }
+        else
+        {
+            voxelId = VoxelData.NameToVoxelId("air");
+        }
+
+        return voxelId;
     }
 }

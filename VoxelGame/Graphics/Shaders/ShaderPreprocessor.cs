@@ -18,7 +18,7 @@ internal static class ShaderPreprocessor
             return source;
         }
 
-        var regex = new Regex("#include\\s*\"(.+?)>\"");
+        var regex = new Regex("#include\\s*\"(.+?)\"");
 
         return regex.Replace(source, match =>
         {

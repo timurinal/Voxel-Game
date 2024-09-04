@@ -75,6 +75,9 @@
       <None Update="assets\shaders\chunk-lit.glsl">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
+      <None Update="assets\shaders\includes\kernels\blur-kernel.glsl">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
     </ItemGroup>
 
     <ItemGroup>

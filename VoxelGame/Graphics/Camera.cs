@@ -44,7 +44,7 @@ public class Camera
         NearPlane = nearPlane;
         FarPlane = farPlane;
 
-        _position = new Vector3(0, 32, 0);
+        _position = new Vector3(0, 100, 0);
         _front = new Vector3(0, 0, -1);
         _up = new Vector3(0, 1, 0);
 

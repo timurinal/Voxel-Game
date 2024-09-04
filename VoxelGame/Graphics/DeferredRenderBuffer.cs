@@ -4,7 +4,7 @@ using VoxelGame.Maths;
 
 internal class DeferredRenderBuffer : IDisposable
 {
-    public const float FramebufferScale = 1.5f;
+    public const float FramebufferScale = 1.25f;
     
     private int gBuffer;
     private int gPosition, gNormal, gAlbedo, gMaterial, gSpecular, gDepth;
@@ -75,7 +75,7 @@ internal class DeferredRenderBuffer : IDisposable
         // Position texture setup
         gPosition = GL.GenTexture();
         GL.BindTexture(TextureTarget.Texture2D, gPosition);
-        GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgb16f, size.X, size.Y, 0, PixelFormat.Rgb,
+        GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgb32f, size.X, size.Y, 0, PixelFormat.Rgb,
             PixelType.Float, IntPtr.Zero);
         GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)minFilter);
         GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)magFilter);
